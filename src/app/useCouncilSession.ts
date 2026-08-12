@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CouncilOrchestrator } from "../core/orchestrator.js";
 import type {
+  CouncilAgent,
   CouncilEvent,
   CouncilParticipant,
   CouncilPhase,
@@ -23,6 +24,8 @@ export type CouncilUiStage =
   | "complete"
   | "error";
 
+export type CouncilRunMode = "demo" | "hybrid" | "live";
+
 const pause = (milliseconds: number) =>
   new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
 
@@ -30,10 +33,32 @@ function phaseToStage(phase: CouncilPhase): CouncilUiStage {
   return phase;
 }
 
-export function useCouncilSession() {
+function composeCouncil(realAgents: readonly CouncilAgent[]): {
+  agents: readonly CouncilAgent[];
+  mode: CouncilRunMode;
+} {
+  if (realAgents.length === 0) {
+    return { agents: createMockCouncil(), mode: "demo" };
+  }
+  if (realAgents.length === 1) {
+    // A Council requires at least two agents. One live advisor is immediately
+    // useful in a clearly-labelled hybrid rehearsal with deterministic mocks.
+    return {
+      agents: [realAgents[0]!, ...createMockCouncil().slice(0, 3)],
+      mode: "hybrid",
+    };
+  }
+  return { agents: realAgents.slice(0, 4), mode: "live" };
+}
+
+export function useCouncilSession(realAgents: readonly CouncilAgent[] = []) {
+  const councilComposition = useMemo(
+    () => composeCouncil(realAgents),
+    [realAgents],
+  );
   const participants = useMemo<readonly CouncilParticipant[]>(
-    () => createMockCouncil().map((agent) => agent.participant),
-    [],
+    () => councilComposition.agents.map((agent) => agent.participant),
+    [councilComposition.agents],
   );
   const historyStorePromise = useMemo(() => createCouncilHistoryStore(), []);
   const [events, setEvents] = useState<CouncilEvent[]>([]);
@@ -55,9 +80,7 @@ export function useCouncilSession() {
       setHistory(await store.list(12));
       setHistoryError(null);
     } catch (caught) {
-      setHistoryError(
-        caught instanceof Error ? caught.message : String(caught),
-      );
+      setHistoryError(caught instanceof Error ? caught.message : String(caught));
     }
   }, [historyStorePromise]);
 
@@ -69,6 +92,12 @@ export function useCouncilSession() {
     const trimmed = question.trim();
     if (!trimmed || isRunning) return;
 
+    const { agents, mode } = councilComposition;
+    if (agents.length < 2) {
+      setError("至少需要两位智囊才能开廷。");
+      return;
+    }
+
     setEvents([]);
     setReport(null);
     setError(null);
@@ -78,8 +107,10 @@ export function useCouncilSession() {
     setIsRunning(true);
     setStage("sealed");
 
+    const phasePause = mode === "demo" ? 420 : 80;
+
     try {
-      const orchestrator = new CouncilOrchestrator(createMockCouncil());
+      const orchestrator = new CouncilOrchestrator(agents);
       const result = await orchestrator.run(trimmed, {
         maxRounds: 3,
         minDebateRounds: 1,
@@ -88,19 +119,21 @@ export function useCouncilSession() {
           setStage(phaseToStage(phase));
           setRound(phaseRound);
           setActiveActorId(null);
-          await pause(420);
+          await pause(phasePause);
         },
         onEvent: async (event) => {
           setEvents((current) => [...current, event]);
           setActiveActorId(event.actorId);
           const delay =
-            event.kind === "revision"
-              ? 900
-              : event.kind === "final_position"
-                ? 520
-                : event.round === 1
-                  ? 430
-                  : 600;
+            mode !== "demo"
+              ? 90
+              : event.kind === "revision"
+                ? 900
+                : event.kind === "final_position"
+                  ? 520
+                  : event.round === 1
+                    ? 430
+                    : 600;
           await pause(delay);
         },
       });
@@ -115,9 +148,7 @@ export function useCouncilSession() {
         await store.save(createArchive(result.report, result.blackboard.events));
         await refreshHistory();
       } catch (caught) {
-        setHistoryError(
-          caught instanceof Error ? caught.message : String(caught),
-        );
+        setHistoryError(caught instanceof Error ? caught.message : String(caught));
       }
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : String(caught);
@@ -126,7 +157,7 @@ export function useCouncilSession() {
     } finally {
       setIsRunning(false);
     }
-  }, [historyStorePromise, isRunning, refreshHistory]);
+  }, [councilComposition, historyStorePromise, isRunning, refreshHistory]);
 
   const openHistory = useCallback(async (
     sessionId: string,
@@ -147,9 +178,7 @@ export function useCouncilSession() {
       setError(null);
       return archive;
     } catch (caught) {
-      setHistoryError(
-        caught instanceof Error ? caught.message : String(caught),
-      );
+      setHistoryError(caught instanceof Error ? caught.message : String(caught));
       return null;
     }
   }, [historyStorePromise, isRunning]);
@@ -175,6 +204,8 @@ export function useCouncilSession() {
     activeQuestion,
     error,
     isRunning,
+    mode: councilComposition.mode,
+    realAdvisorCount: realAgents.length,
     history,
     historyBackend,
     historyError,

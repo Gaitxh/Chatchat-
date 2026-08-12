@@ -28,8 +28,10 @@ export function profileFromDetection(
     url: detection.normalizedUrl,
     origin: detection.origin,
     profileKey: createId("profile"),
-    authState:
-      detection.kind === "known" ? "login_required" : "adapter_required",
+    // v0.9's taught Browser Council Bridge works for any http/https page.
+    // Known providers only add catalog metadata; custom URLs can use the same
+    // isolated WebView + Teach Recipe + Council Gate path.
+    authState: "login_required",
     seatState: "bench",
     createdAt: now,
     updatedAt: now,
