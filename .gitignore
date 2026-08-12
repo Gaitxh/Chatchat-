@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# Local ChatChat state must never be committed.
+.chatchat/
+profiles/
+sessions/
