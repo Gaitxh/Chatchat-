@@ -75,7 +75,7 @@ assert(
   "The scripted evidence event should support an Evidence Keeper title.",
 );
 assert(
-  awards.every((award) => award.provenanceEventIds.every((id) => result.blackboard.get(id))),
+  awards.every((award) => award.provenanceEventIds.every((id) => result.blackboard.find(id))),
   "Every fun award must link back to real Blackboard events.",
 );
 
