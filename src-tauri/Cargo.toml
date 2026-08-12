@@ -1,17 +1,14 @@
 [package]
 name = "chatchat"
-version = "0.6.0"
+version = "0.7.0"
 description = "ChatChat local-first AI Council desktop shell"
 authors = ["ChatChat contributors"]
 edition = "2021"
-
 [lib]
 name = "chatchat_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
-
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
@@ -19,7 +16,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 tokio = { version = "1", features = ["sync", "time"] }
-
 [profile.release]
 codegen-units = 1
 lto = true
