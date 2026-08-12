@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="ChatChat AI Council app icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#102c3a"/>
+      <stop offset="1" stop-color="#06131c"/>
+    </linearGradient>
+    <radialGradient id="table" cx="50%" cy="38%" r="68%">
+      <stop offset="0" stop-color="#2b5360"/>
+      <stop offset="1" stop-color="#17313c"/>
+    </radialGradient>
+  </defs>
+
+  <rect x="24" y="24" width="976" height="976" rx="232" fill="url(#bg)"/>
+  <rect x="44" y="44" width="936" height="936" rx="212" fill="none" stroke="#d7b66c" stroke-width="18" opacity=".72"/>
+
+  <!-- four advisor lights -->
+  <g fill="#79c7a1" stroke="#d7b66c" stroke-width="14">
+    <circle cx="258" cy="314" r="60"/>
+    <circle cx="766" cy="314" r="60"/>
+    <circle cx="258" cy="710" r="60"/>
+    <circle cx="766" cy="710" r="60"/>
+  </g>
+
+  <!-- round table -->
+  <ellipse cx="512" cy="552" rx="296" ry="224" fill="url(#table)" stroke="#d7b66c" stroke-width="24"/>
+  <ellipse cx="512" cy="552" rx="224" ry="160" fill="none" stroke="#d7b66c" stroke-width="12" opacity=".48"/>
+  <circle cx="512" cy="552" r="78" fill="#0b202b" stroke="#f1d18a" stroke-width="16"/>
+
+  <!-- crown / King seal -->
+  <path d="M421 530l31-94 62 57 60-72 53 73 69-58 25 94-29 25H449z" fill="#f1d18a" stroke="#7f612b" stroke-width="12" stroke-linejoin="round"/>
+  <rect x="447" y="527" width="244" height="48" rx="18" fill="#d7b66c" stroke="#7f612b" stroke-width="10"/>
+  <circle cx="452" cy="438" r="13" fill="#fff0b8"/>
+  <circle cx="514" cy="493" r="13" fill="#fff0b8"/>
+  <circle cx="574" cy="421" r="13" fill="#fff0b8"/>
+  <circle cx="696" cy="438" r="13" fill="#fff0b8"/>
+
+  <!-- discussion arrows -->
+  <g fill="none" stroke="#8db9d7" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" opacity=".9">
+    <path d="M320 330c77-71 176-92 273-56"/>
+    <path d="M579 257l25 24-36 15"/>
+    <path d="M708 690c-74 70-176 92-273 57"/>
+    <path d="M449 765l-27-24 36-16"/>
+  </g>
+
+  <!-- small chat marks -->
+  <g fill="#d9eef9" opacity=".92">
+    <circle cx="398" cy="678" r="14"/>
+    <circle cx="440" cy="678" r="14"/>
+    <circle cx="482" cy="678" r="14"/>
+  </g>
+</svg>

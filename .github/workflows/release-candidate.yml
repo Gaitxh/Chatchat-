@@ -55,8 +55,8 @@ jobs:
           npm run check
           npm test
 
-      - name: Generate platform icons from the ChatChat source avatar
-        run: npm run tauri -- icon assets/chatchat-avatar-pixel.png
+      - name: Generate platform icons from the reviewable SVG source
+        run: npm run tauri -- icon assets/chatchat-app-icon.svg
 
       - name: Build unsigned release candidate
         uses: tauri-apps/tauri-action@v0

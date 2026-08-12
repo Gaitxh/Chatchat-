@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chatchat.local/schemas/gate-b-proof-v1.schema.json",
+  "title": "ChatChat Gate B Proof Pack v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAt",
+    "evidenceCapturedAt",
+    "chatChatVersion",
+    "environment",
+    "verdict",
+    "providers",
+    "council",
+    "privacy"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "evidenceCapturedAt": { "type": "string", "format": "date-time" },
+    "chatChatVersion": { "type": "string", "minLength": 1, "maxLength": 32 },
+    "environment": { "type": "string", "maxLength": 160 },
+    "verdict": {
+      "enum": ["gate-b-candidate", "incomplete", "demo-only"]
+    },
+    "providers": {
+      "type": "array",
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "providerId",
+          "adapterId",
+          "host",
+          "recipeReady",
+          "testPassed",
+          "councilGatePassed",
+          "providerHostHealthy",
+          "seated"
+        ],
+        "properties": {
+          "providerId": { "type": "string", "minLength": 1, "maxLength": 96 },
+          "adapterId": { "type": "string", "minLength": 1, "maxLength": 96 },
+          "host": { "type": "string", "minLength": 1, "maxLength": 253 },
+          "recipeReady": { "type": "boolean" },
+          "testPassed": { "type": "boolean" },
+          "councilGatePassed": { "type": "boolean" },
+          "providerHostHealthy": { "type": "boolean" },
+          "seated": { "type": "boolean" }
+        }
+      }
+    },
+    "council": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "sessionFingerprint",
+            "realParticipantCount",
+            "rounds",
+            "eventCount",
+            "realEventCount",
+            "eventKinds",
+            "finalPositionCount",
+            "zeroConfidenceFinalCount",
+            "consensusRatio",
+            "minorityOpinionPresent",
+            "durationMs"
+          ],
+          "properties": {
+            "mode": { "enum": ["demo", "hybrid", "live"] },
+            "sessionFingerprint": { "type": "string", "minLength": 1, "maxLength": 12 },
+            "realParticipantCount": { "type": "integer", "minimum": 0, "maximum": 4 },
+            "rounds": { "type": "integer", "minimum": 0 },
+            "eventCount": { "type": "integer", "minimum": 0 },
+            "realEventCount": { "type": "integer", "minimum": 0 },
+            "eventKinds": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "argument",
+                "challenge",
+                "evidence",
+                "support",
+                "defense",
+                "revision",
+                "concede",
+                "question",
+                "uncertain",
+                "final_position"
+              ],
+              "properties": {
+                "argument": { "type": "integer", "minimum": 0 },
+                "challenge": { "type": "integer", "minimum": 0 },
+                "evidence": { "type": "integer", "minimum": 0 },
+                "support": { "type": "integer", "minimum": 0 },
+                "defense": { "type": "integer", "minimum": 0 },
+                "revision": { "type": "integer", "minimum": 0 },
+                "concede": { "type": "integer", "minimum": 0 },
+                "question": { "type": "integer", "minimum": 0 },
+                "uncertain": { "type": "integer", "minimum": 0 },
+                "final_position": { "type": "integer", "minimum": 0 }
+              }
+            },
+            "finalPositionCount": { "type": "integer", "minimum": 0 },
+            "zeroConfidenceFinalCount": { "type": "integer", "minimum": 0 },
+            "consensusRatio": { "type": "number", "minimum": 0, "maximum": 1 },
+            "minorityOpinionPresent": { "type": "boolean" },
+            "durationMs": {
+              "oneOf": [
+                { "type": "null" },
+                { "type": "number", "minimum": 0 }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "questionIncluded",
+        "eventTextIncluded",
+        "responseTextIncluded",
+        "selectorsIncluded",
+        "profileKeysIncluded",
+        "credentialsIncluded"
+      ],
+      "properties": {
+        "questionIncluded": { "const": false },
+        "eventTextIncluded": { "const": false },
+        "responseTextIncluded": { "const": false },
+        "selectorsIncluded": { "const": false },
+        "profileKeysIncluded": { "const": false },
+        "credentialsIncluded": { "const": false }
+      }
+    }
+  }
+}
