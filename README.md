@@ -1,8 +1,13 @@
+<div align="center">
+  <img src="assets/chatchat-avatar-pixel.png" width="180" alt="ChatChat pixel-art council avatar" />
+
 # ChatChat 👑🏛️
 
-> **You ask. They debate.**
->
-> 一个本地优先、开源的 **AI 圆桌会议 / AI Council**。
+**You ask. They debate.**
+
+一个本地优先、开源的 **AI 圆桌会议 / AI Council**。
+
+</div>
 
 ChatChat 的目标不是把几个模型的答案并排显示出来，而是让多个 AI 智囊真正完成一次可观察的议事过程：
 
@@ -35,7 +40,7 @@ ChatChat 想把不同模型变成一个智囊团，同时保留最重要的一�
 - ✅ 确定性的 Mock Council 演示
 - ✅ 零运行时依赖的 TypeScript 核心
 
-下一阶段才会接真实网页 Provider、桌面 UI 和本地持久化。
+下一阶段会接桌面 UI、本地持久化，再连接真实网页 Provider。
 
 ## 事件不是普通聊天消息
 
@@ -117,9 +122,10 @@ docs/
 
 ## 接下来
 
-### v0.2 — Desktop shell
-- Tauri + React UI
+### v0.2 — Council Chamber
+- Tauri 2 + React UI
 - 王座 / AI Council room
+- 密室奏议 → 开廷 → 最终奏议的可视流程
 - 实时事件动画
 - Position / confidence 状态
 - “谁说服了谁”的 revision 视图
