@@ -1,6 +1,6 @@
 {
   "name": "chatchat",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "Local-first AI Council: you ask, they debate.",
@@ -14,7 +14,7 @@
     "check:core": "tsc -p tsconfig.json --noEmit",
     "check:web": "tsc -p tsconfig.app.json --noEmit",
     "demo": "npm run build:core && node dist/src/demo.js",
-    "test": "npm run build:core && node dist/tests/core.test.js",
+    "test": "npm run build:core && node dist/tests/core.test.js && node dist/tests/provider-sdk.test.js",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
