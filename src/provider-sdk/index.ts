@@ -4,6 +4,7 @@ import type { ProviderProfileStore } from "./types.js";
 
 export * from "./catalog.js";
 export * from "./login-runtime.js";
+export * from "./probe-runtime.js";
 export * from "./profile.js";
 export * from "./types.js";
 
