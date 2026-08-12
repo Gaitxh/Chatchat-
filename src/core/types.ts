@@ -164,9 +164,15 @@ export interface CouncilReport {
   eventCount: number;
 }
 
+export interface CouncilPhaseUpdate {
+  phase: CouncilPhase;
+  round: number;
+}
+
 export interface CouncilRunOptions {
   maxRounds?: number;
   minDebateRounds?: number;
   convergenceThreshold?: number;
+  onPhase?: (update: CouncilPhaseUpdate) => void | Promise<void>;
   onEvent?: (event: CouncilEvent) => void | Promise<void>;
 }

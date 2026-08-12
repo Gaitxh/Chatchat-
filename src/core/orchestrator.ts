@@ -46,6 +46,8 @@ export class CouncilOrchestrator {
     const sessionId = createId("session");
     const blackboard = new Blackboard();
 
+    await options.onPhase?.({ phase: "sealed", round: 1 });
+
     const sealed = await Promise.all(
       this.#agents.map(async (agent) => ({
         agent,
@@ -76,6 +78,7 @@ export class CouncilOrchestrator {
     let lastRound = 1;
 
     for (let round = 2; round <= maxRounds; round += 1) {
+      await options.onPhase?.({ phase: "debate", round });
       const snapshot = [...blackboard.events];
       const turns = await Promise.all(
         this.#agents.map(async (agent) => ({
@@ -118,6 +121,9 @@ export class CouncilOrchestrator {
       }
     }
 
+    const finalRound = lastRound + 1;
+    await options.onPhase?.({ phase: "final", round: finalRound });
+
     const finalSnapshot = [...blackboard.events];
     const finalTurns = await Promise.all(
       this.#agents.map(async (agent) => ({
@@ -129,7 +135,7 @@ export class CouncilOrchestrator {
             sessionId,
             question,
             "final",
-            lastRound + 1,
+            finalRound,
             finalSnapshot,
           ),
         ),
@@ -142,7 +148,7 @@ export class CouncilOrchestrator {
         contributions.map((contribution) =>
           this.#materialize(
             sessionId,
-            lastRound + 1,
+            finalRound,
             agent.participant.id,
             contribution,
           ),
@@ -152,7 +158,7 @@ export class CouncilOrchestrator {
     );
 
     return {
-      report: this.#report(sessionId, question, lastRound + 1, blackboard),
+      report: this.#report(sessionId, question, finalRound, blackboard),
       blackboard,
     };
   }
