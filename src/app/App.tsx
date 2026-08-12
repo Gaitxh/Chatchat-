@@ -1,9 +1,11 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import avatarUrl from "../../assets/chatchat-avatar-pixel.png";
+import { captureProviderProofSnapshot, type ProviderProofSnapshot } from "../validation/proof-pack.js";
 import { AdvisorDock } from "./components/AdvisorDock.js";
 import { CouncilReportPanel } from "./components/CouncilReportPanel.js";
 import { DemoTheater } from "./components/DemoTheater.js";
 import { EventFeed } from "./components/EventFeed.js";
+import { GateBProofPanel } from "./components/GateBProofPanel.js";
 import { HistorianPanel } from "./components/HistorianPanel.js";
 import { RoundTable } from "./components/RoundTable.js";
 import { StageRail } from "./components/StageRail.js";
@@ -15,8 +17,29 @@ const DEMO_QUESTION =
 
 export default function App() {
   const [question, setQuestion] = useState(DEMO_QUESTION);
+  const [proofSnapshot, setProofSnapshot] = useState<ProviderProofSnapshot[] | null>(null);
   const providers = useProviderProfiles();
   const council = useCouncilSession(providers.seatedAgents);
+
+  useEffect(() => {
+    if (!council.report || council.resultSource !== "current") {
+      setProofSnapshot(null);
+      return;
+    }
+
+    setProofSnapshot(
+      captureProviderProofSnapshot({
+        profiles: providers.profiles,
+        recipes: providers.recipes,
+        speechResults: providers.speechResults,
+        bridgeResults: providers.bridgeResults,
+        providerHostProfileIds: providers.providerHostProfileIds,
+      }),
+    );
+    // The session id is the freeze trigger: once captured, later Provider
+    // window-health changes must not rewrite evidence for the completed run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [council.report?.sessionId, council.resultSource]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -44,7 +67,7 @@ export default function App() {
         </div>
         <div className="topbar-center">
           <span className="motto">YOU ASK · THEY DEBATE</span>
-          <span className="build-badge">v1 READINESS · PROVIDER HEALTH</span>
+          <span className="build-badge">v1 READINESS · GATE B PROOF</span>
           <span className={`build-badge council-mode-badge council-mode-badge--${council.mode}`}>{modeLabel}</span>
         </div>
         <div className="privacy-badge" title="ChatChat itself has no relay server"><i />LOCAL-FIRST</div>
@@ -65,6 +88,16 @@ export default function App() {
           />
 
           {council.report ? <CouncilReportPanel report={council.report} /> : null}
+
+          <GateBProofPanel
+            providerSnapshot={proofSnapshot}
+            report={council.report}
+            events={council.events}
+            mode={council.lastCompletedMode ?? council.mode}
+            currentRun={council.resultSource === "current"}
+            chatChatVersion={__CHATCHAT_VERSION__}
+          />
+
           {council.error ? <div className="error-banner"><strong>廷议中断</strong><span>{council.error}</span></div> : null}
 
           <form className="royal-command" onSubmit={submit}>
@@ -162,7 +195,7 @@ export default function App() {
         <span>NO CHATCHAT SERVER</span><span>•</span>
         <span>ROUND 1 SEALED</span><span>•</span>
         <span>WINDOW HEALTH ENFORCED</span><span>•</span>
-        <span>GHOST SEATS EVICTED</span><span>•</span>
+        <span>PROOF PACK EXCLUDES CONTENT</span><span>•</span>
         <span>{modeLabel}</span>
       </footer>
     </div>
@@ -171,10 +204,10 @@ export default function App() {
 
 function commandCopy(mode: ReturnType<typeof useCouncilSession>["mode"], liveSeatCount: number): string {
   if (mode === "live") {
-    return `${liveSeatCount} 位健康真实网页智囊已经入席。你只下令一次；之后 sealed → debate → final 全自动执行。任何 Provider 窗口掉线都会自动撤销该席位。`;
+    return `${liveSeatCount} 位健康真实网页智囊已经入席。你只下令一次；之后 sealed → debate → final 全自动执行。Council 结束后会生成不含正文的 Royal Proof Pack。`;
   }
   if (mode === "hybrid") {
     return "1 位健康真实网页智囊已入席：当前是 HYBRID REHEARSAL；再入席 1 位健康真实 AI 即解锁纯 LIVE COUNCIL。";
   }
-  return "当前没有健康真实席位，所以自动退回 deterministic Mock Demo。下面的 Demo Theater 会显示真实 Provider 从 URL 到健康入席的每一道门。";
+  return "当前没有健康真实席位，所以自动退回 deterministic Mock Demo。Demo 可以展示协议，但 Proof Pack 会明确标记为不可用于 Gate B。";
 }
