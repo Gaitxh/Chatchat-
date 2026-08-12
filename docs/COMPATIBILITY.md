@@ -50,9 +50,74 @@ isolated WebView
 
 It does **not** mean arbitrary sites will work. A site may require a provider-specific adapter for framework input events, new-chat navigation, generation detection, shadow DOM, canvas UI, anti-automation behavior or other special cases.
 
+## Royal Proof Pack — preferred Gate B evidence
+
+A current real Council can generate a **Royal Proof Pack** after completion.
+
+The Proof Pack is preferred over copying screenshots or transcripts because it intentionally contains only compatibility metadata:
+
+```text
+Provider id + public host
+Recipe/Test/Gate/Host/Seat booleans
+Council mode
+real participant count
+round count
+event-kind counts
+final-position count
+consensus ratio
+minority-opinion flag
+coarse duration
+ChatChat version
+environment label
+```
+
+It intentionally excludes:
+
+```text
+King's question
+model answers
+Blackboard text
+Teach selectors
+profile keys
+cookies/tokens/passwords
+account identifiers
+```
+
+Use **COPY ISSUE MARKDOWN** to paste the generated evidence into a Provider Compatibility Issue, or attach the JSON values after manually reviewing them.
+
+The versioned JSON schema is:
+
+```text
+schemas/gate-b-proof-v1.schema.json
+```
+
+Full format and privacy rules: [`GATE_B_PROOF.md`](GATE_B_PROOF.md).
+
+A `gate-b-candidate` verdict is not an automatic Official Support badge. It is a compact evidence package for maintainers to review.
+
 ## How a row earns Runtime-Validated
 
-Use the GitHub **Provider compatibility report** form and include:
+Preferred path:
+
+1. complete the Provider's local Invite/Login/Probe/Teach/Test/Gate/Seat flow;
+2. complete a current real Council;
+3. export Royal Proof Pack Markdown;
+4. review it for privacy;
+5. paste it into the GitHub **Provider compatibility report** form;
+6. add only genuinely necessary sanitized notes.
+
+A maintainer can then add a concise dated row such as:
+
+```text
+Claude · claude.ai
+ChatChat 0.9.x @ abc1234
+macOS 15.x
+Provider UI tested 2026-08-XX
+Proof Pack: gate-b-candidate
+Teach PASS · Test PASS · Gate PASS · Live PASS
+```
+
+If Proof Pack export is unavailable, a manual report may still include:
 
 ```text
 Provider
@@ -71,16 +136,6 @@ Fresh Session
 Hybrid Council
 LIVE Council (if tested)
 sanitized notes
-```
-
-A maintainer can then add a concise row such as:
-
-```text
-Claude · claude.ai
-ChatChat 0.9.x @ abc1234
-macOS 15.x
-Provider UI tested 2026-08-XX
-Teach PASS · Test PASS · Gate PASS · Hybrid PASS · Live PASS
 ```
 
 If the Provider UI later changes and breaks the recipe, keep the old dated evidence but mark current status accordingly. Compatibility with remote webpages is time-sensitive.
