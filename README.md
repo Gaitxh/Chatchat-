@@ -11,6 +11,12 @@
 
 </div>
 
+<p align="center">
+  <img src="assets/chatchat-council-chamber.webp" width="100%" alt="ChatChat v0.9 Council Chamber real production build screenshot" />
+</p>
+
+<p align="center"><sub>真实 production build 截图 · 当前画面是明确标注的 DEMO Council。LIVE 模式必须在用户本机完成 Provider 登录与 Council Gate 后解锁。</sub></p>
+
 ChatChat 不是“多开几个聊天窗口然后把答案拼起来”。它把不同 AI 变成一个有规则的智囊团：
 
 ```text
