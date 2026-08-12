@@ -30,9 +30,9 @@ export default function App() {
 
   const modeLabel =
     council.mode === "live"
-      ? `🔥 LIVE · ${providers.liveSeatCount} REAL`
+      ? `🔥 LIVE · ${providers.liveSeatCount} HEALTHY REAL`
       : council.mode === "hybrid"
-        ? "⚗️ HYBRID · 1 REAL"
+        ? "⚗️ HYBRID · 1 HEALTHY REAL"
         : "🎭 DEMO · MOCK";
 
   return (
@@ -44,7 +44,7 @@ export default function App() {
         </div>
         <div className="topbar-center">
           <span className="motto">YOU ASK · THEY DEBATE</span>
-          <span className="build-badge">v0.9 · REAL COUNCIL BRIDGE</span>
+          <span className="build-badge">v1 READINESS · PROVIDER HEALTH</span>
           <span className={`build-badge council-mode-badge council-mode-badge--${council.mode}`}>{modeLabel}</span>
         </div>
         <div className="privacy-badge" title="ChatChat itself has no relay server"><i />LOCAL-FIRST</div>
@@ -102,6 +102,7 @@ export default function App() {
             profiles={providers.profiles}
             recipes={providers.recipes}
             loginWindowProfileIds={providers.loginWindowProfileIds}
+            providerHostProfileIds={providers.providerHostProfileIds}
             speechResults={providers.speechResults}
             bridgeResults={providers.bridgeResults}
             liveSeatCount={providers.liveSeatCount}
@@ -117,6 +118,8 @@ export default function App() {
             error={providers.error}
             loginError={providers.loginError}
             loginWindowProfileIds={providers.loginWindowProfileIds}
+            providerHostProfileIds={providers.providerHostProfileIds}
+            windowHealth={providers.windowHealth}
             probeResults={providers.probeResults}
             probingProfileId={providers.probingProfileId}
             teaching={providers.teaching}
@@ -158,8 +161,8 @@ export default function App() {
       <footer className="app-footer">
         <span>NO CHATCHAT SERVER</span><span>•</span>
         <span>ROUND 1 SEALED</span><span>•</span>
-        <span>TAUGHT SELECTORS ONLY</span><span>•</span>
-        <span>COUNCIL GATE BEFORE READY</span><span>•</span>
+        <span>WINDOW HEALTH ENFORCED</span><span>•</span>
+        <span>GHOST SEATS EVICTED</span><span>•</span>
         <span>{modeLabel}</span>
       </footer>
     </div>
@@ -168,10 +171,10 @@ export default function App() {
 
 function commandCopy(mode: ReturnType<typeof useCouncilSession>["mode"], liveSeatCount: number): string {
   if (mode === "live") {
-    return `${liveSeatCount} 位真实网页智囊已经入席。你只下令一次；之后 sealed → debate → final 全自动执行。`;
+    return `${liveSeatCount} 位健康真实网页智囊已经入席。你只下令一次；之后 sealed → debate → final 全自动执行。任何 Provider 窗口掉线都会自动撤销该席位。`;
   }
   if (mode === "hybrid") {
-    return "1 位真实网页智囊已入席：当前是 HYBRID REHEARSAL，它会和 deterministic mocks 真正交锋；再入席 1 位真实 AI 即解锁纯 LIVE COUNCIL。";
+    return "1 位健康真实网页智囊已入席：当前是 HYBRID REHEARSAL；再入席 1 位健康真实 AI 即解锁纯 LIVE COUNCIL。";
   }
-  return "当前是 deterministic Mock Demo。下面的 Demo Theater 会实时告诉你怎样把真实 URL 一步步送上圆桌。";
+  return "当前没有健康真实席位，所以自动退回 deterministic Mock Demo。下面的 Demo Theater 会显示真实 Provider 从 URL 到健康入席的每一道门。";
 }
