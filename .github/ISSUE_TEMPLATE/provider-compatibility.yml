@@ -9,6 +9,8 @@ body:
 
         ChatChat uses precise compatibility language: recognized → teachable → test-passed → council-ready → runtime-validated → officially supported.
 
+        If you completed a current Council, the preferred evidence path is **Royal Proof Pack → COPY ISSUE MARKDOWN**. Review the generated text before posting it.
+
   - type: input
     id: provider
     attributes:
@@ -50,6 +52,17 @@ body:
       placeholder: YYYY-MM-DD
     validations:
       required: true
+
+  - type: textarea
+    id: proof-pack
+    attributes:
+      label: Royal Proof Pack (preferred for Hybrid/LIVE validation)
+      description: Paste the output from COPY ISSUE MARKDOWN after reviewing it. The v1 schema intentionally excludes questions, model replies, selectors and credentials.
+      placeholder: |
+        ## ChatChat Royal Proof Pack
+        **✅ Gate B candidate evidence**
+        ...
+      render: markdown
 
   - type: dropdown
     id: invite
@@ -144,7 +157,7 @@ body:
     attributes:
       label: Privacy check
       options:
-        - label: I removed passwords, cookies, tokens, account identifiers and private conversation content.
+        - label: I reviewed the Proof Pack / report and removed passwords, cookies, tokens, account identifiers and private conversation content.
           required: true
         - label: I understand a PASS on my machine does not automatically mean the Provider is officially supported.
           required: true
