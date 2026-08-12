@@ -10,9 +10,12 @@ import {
   createBrowserCouncilAgent,
   createProviderProfile,
   createProviderProfileStore,
+  healthFromEvent,
   openProviderLoginWindow,
   probeProviderPage,
   providerLoginRuntimeAvailable,
+  providerRuntimeMustBeInvalidated,
+  providerWindowUsable,
   readProviderTeachSelection,
   startProviderTeach,
   testProviderSpeech,
@@ -25,6 +28,8 @@ import {
   type ProviderProfile,
   type ProviderProfileBackend,
   type ProviderProfileStore,
+  type ProviderWindowHealth,
+  type ProviderWindowHealthEvent,
   type TeachRole,
 } from "../provider-sdk/index.js";
 
@@ -33,6 +38,7 @@ interface TeachEventPayload {
 }
 
 const MAX_LIVE_ADVISORS = 4;
+const WINDOW_HEALTH_EVENT = "provider-window-health";
 
 export function useProviderProfiles() {
   const storeRef = useRef<ProviderProfileStore | null>(null);
@@ -44,6 +50,7 @@ export function useProviderProfiles() {
   const [error, setError] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginWindowProfileIds, setLoginWindowProfileIds] = useState<string[]>([]);
+  const [windowHealth, setWindowHealth] = useState<Record<string, ProviderWindowHealth>>({});
   const [probeResults, setProbeResults] = useState<Record<string, ProviderPageProbe>>({});
   const [probingProfileId, setProbingProfileId] = useState<string | null>(null);
   const [teaching, setTeaching] = useState<{ profileId: string; role: TeachRole } | null>(null);
@@ -59,14 +66,19 @@ export function useProviderProfiles() {
     setProfiles(next);
   }, []);
 
+  const updateProfileInMemory = useCallback((next: ProviderProfile) => {
+    const updated = profilesRef.current.map((profile) =>
+      profile.profileId === next.profileId ? next : profile,
+    );
+    setProfileState(updated);
+  }, [setProfileState]);
+
   const normalizeRuntimeProfiles = useCallback(async (
     store: ProviderProfileStore,
     incoming: ProviderProfile[],
   ): Promise<ProviderProfile[]> => {
     const normalized: ProviderProfile[] = [];
     for (const profile of incoming) {
-      // Provider windows are runtime-local. A new app process must re-open the
-      // user's isolated WebView and pass Council Gate before a seat is active.
       const needsReset =
         profile.seatState === "seated" ||
         profile.authState === "ready" ||
@@ -98,21 +110,70 @@ export function useProviderProfiles() {
     setRecipes(Object.fromEntries(list.map((recipe) => [recipe.profileId, recipe])));
   }, []);
 
+  const clearRuntimeProof = useCallback((profileId: string) => {
+    setProbeResults((current) => {
+      const next = { ...current };
+      delete next[profileId];
+      return next;
+    });
+    setSpeechResults((current) => {
+      const next = { ...current };
+      delete next[profileId];
+      return next;
+    });
+    setBridgeResults((current) => {
+      const next = { ...current };
+      delete next[profileId];
+      return next;
+    });
+  }, []);
+
   const invalidateGate = useCallback(async (profile: ProviderProfile) => {
     const store = storeRef.current;
     if (!store) return;
     if (profile.authState === "login_required" && profile.seatState === "bench") return;
-    await store.save(cloneProviderProfile(profile, {
+    const next = cloneProviderProfile(profile, {
       authState: "login_required",
       seatState: "bench",
-    }));
-    setBridgeResults((current) => {
-      const next = { ...current };
-      delete next[profile.profileId];
-      return next;
     });
-    await refresh();
-  }, [refresh]);
+    await store.save(next);
+    updateProfileInMemory(next);
+    setBridgeResults((current) => {
+      const result = { ...current };
+      delete result[profile.profileId];
+      return result;
+    });
+  }, [updateProfileInMemory]);
+
+  const applyWindowHealth = useCallback(async (event: ProviderWindowHealthEvent) => {
+    const health = healthFromEvent(event);
+    setWindowHealth((current) => ({ ...current, [event.profileId]: health }));
+    setLoginWindowProfileIds((current) => {
+      if (health.open) {
+        return current.includes(event.profileId) ? current : [...current, event.profileId];
+      }
+      return current.filter((id) => id !== event.profileId);
+    });
+
+    if (!health.onProviderHost) {
+      clearRuntimeProof(event.profileId);
+      setTeaching((current) => current?.profileId === event.profileId ? null : current);
+      setProbingProfileId((current) => current === event.profileId ? null : current);
+      setTestingProfileId((current) => current === event.profileId ? null : current);
+      setVerifyingProfileId((current) => current === event.profileId ? null : current);
+    }
+
+    const profile = profilesRef.current.find((item) => item.profileId === event.profileId);
+    const store = storeRef.current;
+    if (!profile || !store || !providerRuntimeMustBeInvalidated(profile, event)) return;
+
+    const demoted = cloneProviderProfile(profile, {
+      authState: "login_required",
+      seatState: "bench",
+    });
+    await store.save(demoted);
+    updateProfileInMemory(demoted);
+  }, [clearRuntimeProof, updateProfileInMemory]);
 
   const saveTeachSelection = useCallback(async (profile: ProviderProfile) => {
     const recipeStore = recipeStoreRef.current;
@@ -123,18 +184,15 @@ export function useProviderProfiles() {
     const next = applyTeachSelection(current, profile.profileId, selection);
     await recipeStore.save(next);
     await refreshRecipes();
-    setSpeechResults((currentResults) => {
-      const nextResults = { ...currentResults };
-      delete nextResults[profile.profileId];
-      return nextResults;
-    });
+    clearRuntimeProof(profile.profileId);
     await invalidateGate(profile);
     setTeaching(null);
-  }, [invalidateGate, refreshRecipes]);
+  }, [clearRuntimeProof, invalidateGate, refreshRecipes]);
 
   useEffect(() => {
     let cancelled = false;
-    let unlisten: (() => void) | undefined;
+    let unlistenTeach: (() => void) | undefined;
+    let unlistenHealth: (() => void) | undefined;
     void (async () => {
       try {
         const [profileStore, recipeStore] = await Promise.all([
@@ -152,12 +210,17 @@ export function useProviderProfiles() {
         setRecipes(Object.fromEntries(recipeList.map((recipe) => [recipe.profileId, recipe])));
 
         if (canOpenLogin) {
-          unlisten = await listen<TeachEventPayload>("provider-teach-selected", (event) => {
+          unlistenTeach = await listen<TeachEventPayload>("provider-teach-selected", (event) => {
             const profile = profilesRef.current.find((item) => item.profileId === event.payload.profileId);
             if (!profile) return;
             void saveTeachSelection(profile).catch((caught) => {
               setLoginError(caught instanceof Error ? caught.message : String(caught));
               setTeaching(null);
+            });
+          });
+          unlistenHealth = await listen<ProviderWindowHealthEvent>(WINDOW_HEALTH_EVENT, (event) => {
+            void applyWindowHealth(event.payload).catch((caught) => {
+              setLoginError(caught instanceof Error ? caught.message : String(caught));
             });
           });
         }
@@ -167,8 +230,12 @@ export function useProviderProfiles() {
         if (!cancelled) setIsLoading(false);
       }
     })();
-    return () => { cancelled = true; unlisten?.(); };
-  }, [canOpenLogin, normalizeRuntimeProfiles, saveTeachSelection, setProfileState]);
+    return () => {
+      cancelled = true;
+      unlistenTeach?.();
+      unlistenHealth?.();
+    };
+  }, [applyWindowHealth, canOpenLogin, normalizeRuntimeProfiles, saveTeachSelection, setProfileState]);
 
   const invite = useCallback(async (url: string, displayName?: string) => {
     const store = storeRef.current;
@@ -192,7 +259,16 @@ export function useProviderProfiles() {
     }
   }, []);
 
+  const profileWindowUsable = useCallback((profileId: string) => {
+    const health = windowHealth[profileId];
+    if (health) return providerWindowUsable(health);
+    return loginWindowProfileIds.includes(profileId);
+  }, [loginWindowProfileIds, windowHealth]);
+
   const probe = useCallback(async (profile: ProviderProfile) => {
+    if (!profileWindowUsable(profile.profileId)) {
+      throw new Error("Provider window is not currently on its expected Provider host.");
+    }
     setLoginError(null);
     setProbingProfileId(profile.profileId);
     try {
@@ -205,9 +281,12 @@ export function useProviderProfiles() {
     } finally {
       setProbingProfileId(null);
     }
-  }, []);
+  }, [profileWindowUsable]);
 
   const teach = useCallback(async (profile: ProviderProfile, role: TeachRole) => {
+    if (!profileWindowUsable(profile.profileId)) {
+      throw new Error("Return the Provider WebView to its chat host before Teach Mode.");
+    }
     setLoginError(null);
     if (teaching) throw new Error("Finish or cancel the current Teach Mode selection first.");
     setTeaching({ profileId: profile.profileId, role });
@@ -218,7 +297,7 @@ export function useProviderProfiles() {
       setLoginError(caught instanceof Error ? caught.message : String(caught));
       throw caught;
     }
-  }, [teaching]);
+  }, [profileWindowUsable, teaching]);
 
   const cancelTeach = useCallback(async (profile: ProviderProfile) => {
     try { await cancelProviderTeach(profile); }
@@ -230,22 +309,16 @@ export function useProviderProfiles() {
     if (!recipe || !adapterRecipeComplete(recipe)) {
       throw new Error("Teach all three Adapter Recipe selectors before Test Speech.");
     }
+    if (!profileWindowUsable(profile.profileId)) {
+      throw new Error("Provider window is not on its expected host. Finish login first.");
+    }
     if (testingProfileId || verifyingProfileId) {
       throw new Error("Another advisor is already using the Provider execution channel.");
     }
 
     setLoginError(null);
     setTestingProfileId(profile.profileId);
-    setSpeechResults((current) => {
-      const next = { ...current };
-      delete next[profile.profileId];
-      return next;
-    });
-    setBridgeResults((current) => {
-      const next = { ...current };
-      delete next[profile.profileId];
-      return next;
-    });
+    clearRuntimeProof(profile.profileId);
     await invalidateGate(profile);
 
     try {
@@ -258,7 +331,7 @@ export function useProviderProfiles() {
     } finally {
       setTestingProfileId(null);
     }
-  }, [invalidateGate, recipes, testingProfileId, verifyingProfileId]);
+  }, [clearRuntimeProof, invalidateGate, profileWindowUsable, recipes, testingProfileId, verifyingProfileId]);
 
   const verifyCouncil = useCallback(async (profile: ProviderProfile) => {
     const store = storeRef.current;
@@ -269,8 +342,8 @@ export function useProviderProfiles() {
     if (!speechResults[profile.profileId]?.ok) {
       throw new Error("Pass Test Speech before opening Council Gate.");
     }
-    if (!loginWindowProfileIds.includes(profile.profileId)) {
-      throw new Error("Open the Provider login window before Council Gate.");
+    if (!profileWindowUsable(profile.profileId)) {
+      throw new Error("Provider window is not on its expected host before Council Gate.");
     }
     if (testingProfileId || verifyingProfileId) {
       throw new Error("Another advisor is already using the Provider execution channel.");
@@ -291,8 +364,8 @@ export function useProviderProfiles() {
         seatState: "bench",
       });
       await store.save(ready);
+      updateProfileInMemory(ready);
       setBridgeResults((current) => ({ ...current, [profile.profileId]: result }));
-      await refresh();
       return result;
     } catch (caught) {
       const failed = cloneProviderProfile(profile, {
@@ -300,13 +373,13 @@ export function useProviderProfiles() {
         seatState: "bench",
       });
       await store.save(failed);
-      await refresh();
+      updateProfileInMemory(failed);
       setLoginError(caught instanceof Error ? caught.message : String(caught));
       throw caught;
     } finally {
       setVerifyingProfileId(null);
     }
-  }, [loginWindowProfileIds, recipes, refresh, speechResults, testingProfileId, verifyingProfileId]);
+  }, [profileWindowUsable, recipes, speechResults, testingProfileId, updateProfileInMemory, verifyingProfileId]);
 
   const toggleSeat = useCallback(async (profile: ProviderProfile) => {
     const store = storeRef.current;
@@ -316,19 +389,20 @@ export function useProviderProfiles() {
       if (profile.authState !== "ready") {
         throw new Error("This advisor must pass Council Gate before taking a seat.");
       }
-      if (!loginWindowProfileIds.includes(profile.profileId)) {
-        throw new Error("Keep the Provider window open while the advisor is seated.");
+      if (!profileWindowUsable(profile.profileId)) {
+        throw new Error("Keep the Provider window on its expected host while the advisor is seated.");
       }
       const seatedCount = profilesRef.current.filter((item) => item.seatState === "seated").length;
       if (seatedCount >= MAX_LIVE_ADVISORS) {
-        throw new Error(`v0.9 supports at most ${MAX_LIVE_ADVISORS} live web advisors per Council.`);
+        throw new Error(`ChatChat supports at most ${MAX_LIVE_ADVISORS} live web advisors per Council.`);
       }
     }
-    await store.save(cloneProviderProfile(profile, {
+    const next = cloneProviderProfile(profile, {
       seatState: takingSeat ? "seated" : "bench",
-    }));
-    await refresh();
-  }, [loginWindowProfileIds, refresh]);
+    });
+    await store.save(next);
+    updateProfileInMemory(next);
+  }, [profileWindowUsable, updateProfileInMemory]);
 
   const remove = useCallback(async (profileId: string) => {
     const store = storeRef.current;
@@ -337,25 +411,31 @@ export function useProviderProfiles() {
     await store.remove(profileId);
     await recipeStoreRef.current?.remove(profileId);
     setLoginWindowProfileIds((current) => current.filter((id) => id !== profileId));
-    setProbeResults((current) => { const next = { ...current }; delete next[profileId]; return next; });
+    setWindowHealth((current) => { const next = { ...current }; delete next[profileId]; return next; });
+    clearRuntimeProof(profileId);
     setRecipes((current) => { const next = { ...current }; delete next[profileId]; return next; });
-    setSpeechResults((current) => { const next = { ...current }; delete next[profileId]; return next; });
-    setBridgeResults((current) => { const next = { ...current }; delete next[profileId]; return next; });
     await refresh();
-  }, [refresh]);
+  }, [clearRuntimeProof, refresh]);
+
+  const providerHostProfileIds = useMemo(() =>
+    profiles
+      .filter((profile) => profileWindowUsable(profile.profileId))
+      .map((profile) => profile.profileId),
+  [profileWindowUsable, profiles]);
 
   const seatedAgents = useMemo(() => profiles.flatMap((profile) => {
     const recipe = recipes[profile.profileId];
     if (
       profile.authState !== "ready" ||
       profile.seatState !== "seated" ||
+      !providerHostProfileIds.includes(profile.profileId) ||
       !recipe ||
       !adapterRecipeComplete(recipe)
     ) {
       return [];
     }
     return [createBrowserCouncilAgent(profile, recipe)];
-  }), [profiles, recipes]);
+  }), [profiles, providerHostProfileIds, recipes]);
 
   return {
     profiles,
@@ -364,6 +444,8 @@ export function useProviderProfiles() {
     error,
     loginError,
     loginWindowProfileIds,
+    providerHostProfileIds,
+    windowHealth,
     probeResults,
     probingProfileId,
     teaching,
