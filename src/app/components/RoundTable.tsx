@@ -1,12 +1,13 @@
 import type { CouncilEvent, CouncilParticipant } from "../../core/types.js";
 import { latestPosition } from "../council-view.js";
-import type { CouncilUiStage } from "../useCouncilSession.js";
+import type { CouncilRunMode, CouncilUiStage } from "../useCouncilSession.js";
 import { AgentSeat } from "./AgentSeat.js";
 
 interface RoundTableProps {
   participants: readonly CouncilParticipant[];
   events: readonly CouncilEvent[];
   stage: CouncilUiStage;
+  mode: CouncilRunMode;
   round: number;
   activeActorId: string | null;
   question: string;
@@ -21,7 +22,7 @@ const stageCopy: Record<
   idle: {
     eyebrow: "THE THRONE IS QUIET",
     title: "等待国王下令",
-    detail: "四位智囊已就座。",
+    detail: "智囊席位已经准备好。",
   },
   sealed: {
     eyebrow: "ROUND 1 · SEALED",
@@ -46,7 +47,22 @@ const stageCopy: Record<
   error: {
     eyebrow: "COUNCIL INTERRUPTED",
     title: "廷议中断",
-    detail: "请检查本地运行状态后重试。",
+    detail: "请检查本地 Provider 状态后重试。",
+  },
+};
+
+const modeCopy: Record<CouncilRunMode, { label: string; detail: string }> = {
+  demo: {
+    label: "DEMO COUNCIL",
+    detail: "4 deterministic mock advisors",
+  },
+  hybrid: {
+    label: "HYBRID REHEARSAL",
+    detail: "1 live web advisor + mock sparring partners",
+  },
+  live: {
+    label: "LIVE COUNCIL",
+    detail: "real web advisors only",
   },
 };
 
@@ -54,16 +70,23 @@ export function RoundTable({
   participants,
   events,
   stage,
+  mode,
   round,
   activeActorId,
   question,
 }: RoundTableProps) {
   const copy = stageCopy[stage];
+  const modeState = modeCopy[mode];
 
   return (
-    <section className={`round-table-scene stage-${stage}`}>
+    <section className={`round-table-scene stage-${stage} council-mode-${mode}`}>
       <div className="ambient-ring ring-one" />
       <div className="ambient-ring ring-two" />
+
+      <div className="council-mode-plaque">
+        <strong>{modeState.label}</strong>
+        <span>{modeState.detail}</span>
+      </div>
 
       <div className="council-table" aria-label="AI Council round table">
         <div className="table-inlay" />
