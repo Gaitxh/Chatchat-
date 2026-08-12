@@ -4,6 +4,7 @@ import {
   parseProviderCouncilResponse,
 } from "../src/provider-sdk/council-agent.js";
 import type { AdapterRecipe } from "../src/provider-sdk/recipe.js";
+import { providerCouncilStartUrl } from "../src/provider-sdk/session-runtime.js";
 import type { ProviderProfile } from "../src/provider-sdk/types.js";
 import type { CouncilContext, CouncilEvent } from "../src/core/types.js";
 
@@ -58,9 +59,12 @@ const ownEvent: CouncilEvent = {
   createdAt: "2026-08-12T00:00:02.000Z",
 };
 
-function context(phase: CouncilContext["phase"]): CouncilContext {
+function context(
+  phase: CouncilContext["phase"],
+  sessionId = "session-1",
+): CouncilContext {
   return {
-    sessionId: "session-1",
+    sessionId,
     question: "Which option is better?",
     phase,
     round: phase === "sealed" ? 1 : phase === "debate" ? 2 : 3,
@@ -133,6 +137,17 @@ try {
 }
 assert(rejectedWrongPhase, "Round 1 must reject debate-only event kinds.");
 
+let rejectedMultipleFinals = false;
+try {
+  parseProviderCouncilResponse(
+    '{"contributions":[{"kind":"final_position","stance":"A","content":"A","confidence":0.5},{"kind":"final_position","stance":"B","content":"B","confidence":0.5}]}',
+    context("final"),
+  );
+} catch {
+  rejectedMultipleFinals = true;
+}
+assert(rejectedMultipleFinals, "Each advisor must submit exactly one final position.");
+
 const agent = new BrowserCouncilAgent(
   profile,
   recipe,
@@ -141,5 +156,55 @@ const agent = new BrowserCouncilAgent(
 const fallback = await agent.respond(context("debate"));
 assert(fallback.length === 1 && fallback[0]?.kind === "uncertain", "Malformed live provider output should degrade to uncertainty instead of crashing the whole Council.");
 assert(fallback[0]?.kind === "uncertain" && fallback[0].confidence === 0, "A bridge failure must never fabricate confidence.");
+
+let repairCalls = 0;
+const repairedAgent = new BrowserCouncilAgent(
+  profile,
+  recipe,
+  async () => {
+    repairCalls += 1;
+    return {
+      responseText: repairCalls === 1
+        ? "I forgot the envelope."
+        : '<CHATCHAT_COUNCIL_JSON>{"contributions":[{"kind":"argument","stance":"Option A","content":"Corrected structured answer.","confidence":0.8}]}</CHATCHAT_COUNCIL_JSON>',
+    };
+  },
+);
+const repaired = await repairedAgent.respond(context("sealed"));
+assert(repairCalls === 2, "A malformed Provider answer should receive exactly one structured repair attempt.");
+assert(repaired[0]?.kind === "argument", "A successful repair attempt should recover the real advisor turn.");
+
+let prepareCalls = 0;
+const preparedAgent = new BrowserCouncilAgent(
+  profile,
+  recipe,
+  async () => ({
+    responseText: '<CHATCHAT_COUNCIL_JSON>{"contributions":[{"kind":"argument","stance":"Option A","content":"Prepared answer.","confidence":0.7}]}</CHATCHAT_COUNCIL_JSON>',
+  }),
+  async () => {
+    prepareCalls += 1;
+  },
+);
+await preparedAgent.respond(context("sealed", "fresh-session-a"));
+await preparedAgent.respond(context("sealed", "fresh-session-a"));
+assert(prepareCalls === 1, "A Provider page should be prepared once per Council session, not once per turn.");
+await preparedAgent.respond(context("sealed", "fresh-session-b"));
+assert(prepareCalls === 2, "A new Council session should prepare a clean Provider page again.");
+
+const knownChatProfile: ProviderProfile = {
+  ...profile,
+  providerId: "openai-chatgpt",
+  adapterId: "web.chatgpt",
+  url: "https://chatgpt.com/c/old-conversation-id",
+  origin: "https://chatgpt.com",
+};
+assert(
+  providerCouncilStartUrl(knownChatProfile) === "https://chatgpt.com/",
+  "Built-in providers should start Councils from their catalog root instead of reopening a specific old conversation.",
+);
+assert(
+  providerCouncilStartUrl(profile) === profile.url,
+  "Custom providers should keep the user's chosen new-chat landing URL.",
+);
 
 console.log("✓ ChatChat real Council Bridge tests passed");
