@@ -1,56 +1,362 @@
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{Emitter, Manager, WebviewUrl};
 use tauri_plugin_sql::{Migration, MigrationKind};
-const DATABASE_URL:&str="sqlite:chatchat.db";
-const PROVIDER_PROBE_SCRIPT:&str=include_str!("provider_probe.js");
 
-#[derive(Debug,Deserialize)]#[serde(rename_all="camelCase")]struct ProviderLoginRequest{profile_id:String,profile_key:String,url:String,display_name:String}
-#[derive(Debug,Deserialize)]#[serde(rename_all="camelCase")]struct ProviderProbeRequest{profile_id:String,expected_origin:String}
-#[derive(Debug,Deserialize)]#[serde(rename_all="camelCase")]struct ProviderTeachRequest{profile_id:String,expected_origin:String,role:String}
-#[derive(Debug,Deserialize)]#[serde(rename_all="camelCase")]struct ProviderTeachReadRequest{profile_id:String,expected_origin:String}
-#[derive(Debug,Serialize)]struct ProviderLoginWindowResult{label:String,reused:bool}
-#[derive(Debug,Clone,Serialize)]#[serde(rename_all="camelCase")]struct ProviderTeachEvent{profile_id:String}
+#[cfg(target_os = "macos")]
+use sha2::{Digest, Sha256};
 
-#[tauri::command]async fn open_provider_login(app_handle:tauri::AppHandle,webview_window:tauri::WebviewWindow,request:ProviderLoginRequest)->Result<ProviderLoginWindowResult,String>{ensure_main_caller(&webview_window)?;let url=tauri::Url::parse(&request.url).map_err(|e|e.to_string())?;if !matches!(url.scheme(),"http"|"https"){return Err("Provider login only supports http/https URLs.".into())}let label=provider_window_label(&request.profile_id);if let Some(existing)=app_handle.get_webview_window(&label){existing.show().map_err(|e|e.to_string())?;existing.set_focus().map_err(|e|e.to_string())?;return Ok(ProviderLoginWindowResult{label,reused:true})}let nav_app=app_handle.clone();let nav_profile=request.profile_id.clone();let mut builder=tauri::WebviewWindowBuilder::new(&app_handle,&label,WebviewUrl::External(url)).title(format!("ChatChat Login — {}",request.display_name)).inner_size(1180.0,820.0).min_inner_size(760.0,620.0).resizable(true).center().on_navigation(move|url|{if url.scheme()=="chatchat-teach"{let _=nav_app.emit_to("main","provider-teach-selected",ProviderTeachEvent{profile_id:nav_profile.clone()});return false}matches!(url.scheme(),"http"|"https")});
-#[cfg(any(target_os="windows",target_os="linux"))]{let data_dir=app_handle.path().app_data_dir().map_err(|e|e.to_string())?.join("provider-webviews").join(&request.profile_key);std::fs::create_dir_all(&data_dir).map_err(|e|e.to_string())?;builder=builder.data_directory(data_dir)}
-#[cfg(target_os="macos")]{builder=builder.data_store_identifier(profile_store_identifier(&request.profile_key))}
-builder.build().map_err(|e|e.to_string())?;Ok(ProviderLoginWindowResult{label,reused:false})}
+const DATABASE_URL: &str = "sqlite:chatchat.db";
+const PROVIDER_PROBE_SCRIPT: &str = include_str!("provider_probe.js");
+const PROVIDER_TEACH_SCRIPT: &str = include_str!("provider_teach.js");
 
-#[tauri::command]async fn probe_provider_page(app_handle:tauri::AppHandle,webview_window:tauri::WebviewWindow,request:ProviderProbeRequest)->Result<serde_json::Value,String>{ensure_main_caller(&webview_window)?;let provider=provider_window_for_host(&app_handle,&request.profile_id,&request.expected_origin)?;eval_json(&provider,PROVIDER_PROBE_SCRIPT).await}
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProviderLoginRequest {
+    profile_id: String,
+    profile_key: String,
+    url: String,
+    display_name: String,
+}
 
-#[tauri::command]async fn start_provider_teach(app_handle:tauri::AppHandle,webview_window:tauri::WebviewWindow,request:ProviderTeachRequest)->Result<(),String>{ensure_main_caller(&webview_window)?;if !matches!(request.role.as_str(),"composer"|"send"|"response"){return Err("Unknown Teach Mode role.".into())}let provider=provider_window_for_host(&app_handle,&request.profile_id,&request.expected_origin)?;let role=serde_json::to_string(&request.role).map_err(|e|e.to_string())?;provider.eval(build_teach_script(&role)).map_err(|e|e.to_string())?;provider.set_focus().map_err(|e|e.to_string())?;Ok(())}
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProviderProbeRequest {
+    profile_id: String,
+    expected_origin: String,
+}
 
-#[tauri::command]async fn read_provider_teach(app_handle:tauri::AppHandle,webview_window:tauri::WebviewWindow,request:ProviderTeachReadRequest)->Result<serde_json::Value,String>{ensure_main_caller(&webview_window)?;let provider=provider_window_for_host(&app_handle,&request.profile_id,&request.expected_origin)?;eval_json(&provider,"(() => { const value = window.__CHATCHAT_TEACH_SELECTION__ ?? null; window.__CHATCHAT_TEACH_SELECTION__ = null; return value; })()").await}
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProviderTeachRequest {
+    profile_id: String,
+    expected_origin: String,
+    role: String,
+}
 
-#[tauri::command]async fn cancel_provider_teach(app_handle:tauri::AppHandle,webview_window:tauri::WebviewWindow,request:ProviderTeachReadRequest)->Result<(),String>{ensure_main_caller(&webview_window)?;let provider=provider_window_for_host(&app_handle,&request.profile_id,&request.expected_origin)?;provider.eval("(() => { window.__CHATCHAT_TEACH_CLEANUP__?.(); window.__CHATCHAT_TEACH_SELECTION__ = null; })()").map_err(|e|e.to_string())}
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProviderTeachReadRequest {
+    profile_id: String,
+    expected_origin: String,
+}
 
-#[tauri::command]async fn close_provider_login(app_handle:tauri::AppHandle,webview_window:tauri::WebviewWindow,profile_id:String)->Result<(),String>{ensure_main_caller(&webview_window)?;if let Some(window)=app_handle.get_webview_window(&provider_window_label(&profile_id)){window.close().map_err(|e|e.to_string())?}Ok(())}
+#[derive(Debug, Serialize)]
+struct ProviderLoginWindowResult {
+    label: String,
+    reused: bool,
+}
 
-fn provider_window_for_host(app:&tauri::AppHandle,profile_id:&str,expected_origin:&str)->Result<tauri::WebviewWindow,String>{let window=app.get_webview_window(&provider_window_label(profile_id)).ok_or("Provider login window is not open.")?;let current=window.url().map_err(|e|e.to_string())?;let expected=tauri::Url::parse(expected_origin).map_err(|e|e.to_string())?;if !same_provider_host(&current,&expected){return Err(format!("Provider is currently on {}. Navigate back to {} before using the Adapter Lab.",current.origin().ascii_serialization(),expected.origin().ascii_serialization()))}Ok(window)}
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProviderTeachEvent {
+    profile_id: String,
+}
 
-async fn eval_json(window:&tauri::WebviewWindow,script:impl Into<String>)->Result<serde_json::Value,String>{let(tx,rx)=tokio::sync::oneshot::channel::<String>();let tx=Arc::new(Mutex::new(Some(tx)));let cb=Arc::clone(&tx);window.eval_with_callback(script,move|result|{if let Ok(mut guard)=cb.lock(){if let Some(tx)=guard.take(){let _=tx.send(result)}}}).map_err(|e|e.to_string())?;let raw=tokio::time::timeout(Duration::from_secs(8),rx).await.map_err(|_|"Provider callback timed out.".to_string())?.map_err(|_|"Provider callback closed before returning.".to_string())?;serde_json::from_str(&raw).map_err(|e|format!("Provider callback returned invalid JSON: {e}"))}
+#[tauri::command]
+async fn open_provider_login(
+    app_handle: tauri::AppHandle,
+    webview_window: tauri::WebviewWindow,
+    request: ProviderLoginRequest,
+) -> Result<ProviderLoginWindowResult, String> {
+    ensure_main_caller(&webview_window)?;
 
-fn build_teach_script(role_json:&str)->String{format!(r#"(() => {{
-  window.__CHATCHAT_TEACH_CLEANUP__?.();
-  window.__CHATCHAT_TEACH_SELECTION__ = null;
-  const role = {role_json};
-  const marker = document.createElement('div'); marker.textContent = 'ChatChat Teach Mode · ' + role + ' · click one element'; Object.assign(marker.style, {{position:'fixed',top:'12px',left:'50%',transform:'translateX(-50%)',zIndex:'2147483647',padding:'8px 12px',borderRadius:'8px',background:'#102330',color:'#f2d28f',border:'1px solid #caa85f',font:'600 12px system-ui',pointerEvents:'none'}}); document.documentElement.appendChild(marker);
-  let hovered = null;
-  const esc = (value) => CSS.escape(value);
-  const attr = (value) => String(value).replace(/\\/g,'\\\\').replace(/"/g,'\\"');
-  const unique = (selector) => {{ try {{ return document.querySelectorAll(selector).length === 1; }} catch {{ return false; }} }};
-  const targetFor = (raw) => {{ if (!(raw instanceof Element)) return null; if (role === 'composer') return raw.closest('textarea, input, [contenteditable="true"]'); if (role === 'send') return raw.closest('button, [role="button"]'); return raw.closest('[data-message-author-role], [data-testid], article, [role="article"], [role="listitem"]') || raw; }};
-  const selectorFor = (el) => {{ if (el.id) {{ const s = '#' + esc(el.id); if (unique(s)) return s; }} const attrs = ['data-testid','data-message-author-role','aria-label']; for (const name of attrs) {{ const value = el.getAttribute(name); if (value) {{ const s = el.tagName.toLowerCase() + '[' + name + '="' + attr(value) + '"]'; if (unique(s) || name === 'data-message-author-role') return s; }} }} if (el.getAttribute('role')) {{ const s = el.tagName.toLowerCase() + '[role="' + attr(el.getAttribute('role')) + '"]'; if (unique(s)) return s; }} const parts=[]; let node=el; for(let depth=0;node&&node!==document.body&&depth<6;depth++,node=node.parentElement){{let part=node.tagName.toLowerCase();const siblings=node.parentElement?Array.from(node.parentElement.children).filter(x=>x.tagName===node.tagName):[];if(siblings.length>1)part+=':nth-of-type('+(siblings.indexOf(node)+1)+')';parts.unshift(part);const candidate=parts.join(' > ');if(unique(candidate))return candidate;}} return parts.join(' > '); }};
-  const clear = () => {{ if (hovered) hovered.style.outline=''; marker.remove(); document.removeEventListener('pointermove',move,true); document.removeEventListener('click',pick,true); window.__CHATCHAT_TEACH_CLEANUP__ = null; }};
-  const move = (event) => {{ const target = targetFor(event.target); if (target === hovered) return; if (hovered) hovered.style.outline=''; hovered=target; if (hovered) hovered.style.outline='2px solid #e4bd68'; }};
-  const pick = (event) => {{ const target=targetFor(event.target); if(!target)return; event.preventDefault(); event.stopImmediatePropagation(); const inputType=target.getAttribute('type'); const sensitive=inputType&&inputType.toLowerCase()==='password'; window.__CHATCHAT_TEACH_SELECTION__ = sensitive ? {{role,selector:'',tag:target.tagName.toLowerCase(),id:target.id||null,ariaLabel:target.getAttribute('aria-label'),dataTestId:target.getAttribute('data-testid'),dataMessageAuthorRole:target.getAttribute('data-message-author-role'),inputType,contentEditable:target.isContentEditable===true,selectedAt:new Date().toISOString(),error:'Password fields cannot be taught.'}} : {{role,selector:selectorFor(target),tag:target.tagName.toLowerCase(),id:target.id||null,ariaLabel:target.getAttribute('aria-label'),dataTestId:target.getAttribute('data-testid'),dataMessageAuthorRole:target.getAttribute('data-message-author-role'),inputType,contentEditable:target.isContentEditable===true,selectedAt:new Date().toISOString()}}; clear(); setTimeout(()=>{{ window.location.href='chatchat-teach://selected'; }},0); }};
-  window.__CHATCHAT_TEACH_CLEANUP__=clear; document.addEventListener('pointermove',move,true); document.addEventListener('click',pick,true); return {{armed:true,role}};
-}})()"#)}
-fn same_provider_host(current:&tauri::Url,expected:&tauri::Url)->bool{if !matches!(current.scheme(),"http"|"https"){return false}let(Some(c),Some(e))=(current.host_str(),expected.host_str())else{return false};c.eq_ignore_ascii_case(e)||c.to_ascii_lowercase().ends_with(&format!(".{}",e.to_ascii_lowercase()))}
-fn ensure_main_caller(window:&tauri::WebviewWindow)->Result<(),String>{if window.label()!="main"{Err("Provider commands may only be called by the main ChatChat window.".into())}else{Ok(())}}
-fn provider_window_label(id:&str)->String{let safe:String=id.chars().map(|c|if c.is_ascii_alphanumeric()||matches!(c,'-'|'_'|':'|'/'){c}else{'_'}).collect();format!("provider-{safe}")}
-#[cfg(target_os="macos")]fn profile_store_identifier(key:&str)->[u8;16]{let digest=Sha256::digest(key.as_bytes());let mut id=[0u8;16];id.copy_from_slice(&digest[..16]);id}
-#[cfg_attr(mobile,tauri::mobile_entry_point)]pub fn run(){let migrations=vec![Migration{version:1,description:"create_council_history",sql:include_str!("../migrations/0001_council_history.sql"),kind:MigrationKind::Up},Migration{version:2,description:"create_provider_profiles",sql:include_str!("../migrations/0002_provider_profiles.sql"),kind:MigrationKind::Up},Migration{version:3,description:"create_adapter_recipes",sql:include_str!("../migrations/0003_adapter_recipes.sql"),kind:MigrationKind::Up}];tauri::Builder::default().plugin(tauri_plugin_sql::Builder::default().add_migrations(DATABASE_URL,migrations).build()).invoke_handler(tauri::generate_handler![open_provider_login,probe_provider_page,start_provider_teach,read_provider_teach,cancel_provider_teach,close_provider_login]).run(tauri::generate_context!()).expect("error while running ChatChat")}
+    let url = tauri::Url::parse(&request.url).map_err(|error| error.to_string())?;
+    if !matches!(url.scheme(), "http" | "https") {
+        return Err("Provider login only supports http/https URLs.".into());
+    }
+
+    let label = provider_window_label(&request.profile_id);
+    if let Some(existing) = app_handle.get_webview_window(&label) {
+        existing.show().map_err(|error| error.to_string())?;
+        existing.set_focus().map_err(|error| error.to_string())?;
+        return Ok(ProviderLoginWindowResult {
+            label,
+            reused: true,
+        });
+    }
+
+    let navigation_app = app_handle.clone();
+    let navigation_profile = request.profile_id.clone();
+    let mut builder = tauri::WebviewWindowBuilder::new(
+        &app_handle,
+        &label,
+        WebviewUrl::External(url),
+    )
+    .title(format!("ChatChat Login — {}", request.display_name))
+    .inner_size(1180.0, 820.0)
+    .min_inner_size(760.0, 620.0)
+    .resizable(true)
+    .center()
+    .on_navigation(move |url| {
+        if url.scheme() == "chatchat-teach" {
+            let _ = navigation_app.emit_to(
+                "main",
+                "provider-teach-selected",
+                ProviderTeachEvent {
+                    profile_id: navigation_profile.clone(),
+                },
+            );
+            return false;
+        }
+
+        matches!(url.scheme(), "http" | "https")
+    });
+
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    {
+        let data_dir = app_handle
+            .path()
+            .app_data_dir()
+            .map_err(|error| error.to_string())?
+            .join("provider-webviews")
+            .join(&request.profile_key);
+        std::fs::create_dir_all(&data_dir).map_err(|error| error.to_string())?;
+        builder = builder.data_directory(data_dir);
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.data_store_identifier(profile_store_identifier(&request.profile_key));
+    }
+
+    builder.build().map_err(|error| error.to_string())?;
+
+    Ok(ProviderLoginWindowResult {
+        label,
+        reused: false,
+    })
+}
+
+#[tauri::command]
+async fn probe_provider_page(
+    app_handle: tauri::AppHandle,
+    webview_window: tauri::WebviewWindow,
+    request: ProviderProbeRequest,
+) -> Result<serde_json::Value, String> {
+    ensure_main_caller(&webview_window)?;
+    let provider = provider_window_for_host(
+        &app_handle,
+        &request.profile_id,
+        &request.expected_origin,
+    )?;
+    eval_json(&provider, PROVIDER_PROBE_SCRIPT).await
+}
+
+#[tauri::command]
+async fn start_provider_teach(
+    app_handle: tauri::AppHandle,
+    webview_window: tauri::WebviewWindow,
+    request: ProviderTeachRequest,
+) -> Result<(), String> {
+    ensure_main_caller(&webview_window)?;
+    if !matches!(request.role.as_str(), "composer" | "send" | "response") {
+        return Err("Unknown Teach Mode role.".into());
+    }
+
+    let provider = provider_window_for_host(
+        &app_handle,
+        &request.profile_id,
+        &request.expected_origin,
+    )?;
+    let role_json = serde_json::to_string(&request.role).map_err(|error| error.to_string())?;
+
+    provider
+        .eval(build_teach_script(&role_json))
+        .map_err(|error| error.to_string())?;
+    provider.set_focus().map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn read_provider_teach(
+    app_handle: tauri::AppHandle,
+    webview_window: tauri::WebviewWindow,
+    request: ProviderTeachReadRequest,
+) -> Result<serde_json::Value, String> {
+    ensure_main_caller(&webview_window)?;
+    let provider = provider_window_for_host(
+        &app_handle,
+        &request.profile_id,
+        &request.expected_origin,
+    )?;
+
+    eval_json(
+        &provider,
+        "(() => { const value = window.__CHATCHAT_TEACH_SELECTION__ ?? null; window.__CHATCHAT_TEACH_SELECTION__ = null; return value; })()",
+    )
+    .await
+}
+
+#[tauri::command]
+async fn cancel_provider_teach(
+    app_handle: tauri::AppHandle,
+    webview_window: tauri::WebviewWindow,
+    request: ProviderTeachReadRequest,
+) -> Result<(), String> {
+    ensure_main_caller(&webview_window)?;
+    let provider = provider_window_for_host(
+        &app_handle,
+        &request.profile_id,
+        &request.expected_origin,
+    )?;
+
+    provider
+        .eval(
+            "(() => { window.__CHATCHAT_TEACH_CLEANUP__?.(); window.__CHATCHAT_TEACH_SELECTION__ = null; })()",
+        )
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn close_provider_login(
+    app_handle: tauri::AppHandle,
+    webview_window: tauri::WebviewWindow,
+    profile_id: String,
+) -> Result<(), String> {
+    ensure_main_caller(&webview_window)?;
+    if let Some(window) = app_handle.get_webview_window(&provider_window_label(&profile_id)) {
+        window.close().map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn provider_window_for_host(
+    app_handle: &tauri::AppHandle,
+    profile_id: &str,
+    expected_origin: &str,
+) -> Result<tauri::WebviewWindow, String> {
+    let window = app_handle
+        .get_webview_window(&provider_window_label(profile_id))
+        .ok_or("Provider login window is not open.")?;
+    let current = window.url().map_err(|error| error.to_string())?;
+    let expected = tauri::Url::parse(expected_origin).map_err(|error| error.to_string())?;
+
+    if !same_provider_host(&current, &expected) {
+        return Err(format!(
+            "Provider is currently on {}. Navigate back to {} before using the Adapter Lab.",
+            current.origin().ascii_serialization(),
+            expected.origin().ascii_serialization(),
+        ));
+    }
+
+    Ok(window)
+}
+
+async fn eval_json(
+    window: &tauri::WebviewWindow,
+    script: impl Into<String>,
+) -> Result<serde_json::Value, String> {
+    let (sender, receiver) = tokio::sync::oneshot::channel::<String>();
+    let sender = Arc::new(Mutex::new(Some(sender)));
+    let callback_sender = Arc::clone(&sender);
+
+    window
+        .eval_with_callback(script, move |result| {
+            if let Ok(mut guard) = callback_sender.lock() {
+                if let Some(sender) = guard.take() {
+                    let _ = sender.send(result);
+                }
+            }
+        })
+        .map_err(|error| error.to_string())?;
+
+    let raw = tokio::time::timeout(Duration::from_secs(8), receiver)
+        .await
+        .map_err(|_| "Provider callback timed out.".to_string())?
+        .map_err(|_| "Provider callback closed before returning.".to_string())?;
+
+    serde_json::from_str(&raw)
+        .map_err(|error| format!("Provider callback returned invalid JSON: {error}"))
+}
+
+fn build_teach_script(role_json: &str) -> String {
+    PROVIDER_TEACH_SCRIPT.replace("__CHATCHAT_ROLE_JSON__", role_json)
+}
+
+fn same_provider_host(current: &tauri::Url, expected: &tauri::Url) -> bool {
+    if !matches!(current.scheme(), "http" | "https") {
+        return false;
+    }
+
+    let (Some(current_host), Some(expected_host)) = (current.host_str(), expected.host_str()) else {
+        return false;
+    };
+
+    current_host.eq_ignore_ascii_case(expected_host)
+        || current_host
+            .to_ascii_lowercase()
+            .ends_with(&format!(".{}", expected_host.to_ascii_lowercase()))
+}
+
+fn ensure_main_caller(window: &tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "main" {
+        Err("Provider commands may only be called by the main ChatChat window.".into())
+    } else {
+        Ok(())
+    }
+}
+
+fn provider_window_label(profile_id: &str) -> String {
+    let safe: String = profile_id
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | ':' | '/') {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    format!("provider-{safe}")
+}
+
+#[cfg(target_os = "macos")]
+fn profile_store_identifier(profile_key: &str) -> [u8; 16] {
+    let digest = Sha256::digest(profile_key.as_bytes());
+    let mut identifier = [0u8; 16];
+    identifier.copy_from_slice(&digest[..16]);
+    identifier
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    let migrations = vec![
+        Migration {
+            version: 1,
+            description: "create_council_history",
+            sql: include_str!("../migrations/0001_council_history.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "create_provider_profiles",
+            sql: include_str!("../migrations/0002_provider_profiles.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 3,
+            description: "create_adapter_recipes",
+            sql: include_str!("../migrations/0003_adapter_recipes.sql"),
+            kind: MigrationKind::Up,
+        },
+    ];
+
+    tauri::Builder::default()
+        .plugin(
+            tauri_plugin_sql::Builder::default()
+                .add_migrations(DATABASE_URL, migrations)
+                .build(),
+        )
+        .invoke_handler(tauri::generate_handler![
+            open_provider_login,
+            probe_provider_page,
+            start_provider_teach,
+            read_provider_teach,
+            cancel_provider_teach,
+            close_provider_login,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running ChatChat");
+}
