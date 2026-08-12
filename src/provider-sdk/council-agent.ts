@@ -5,6 +5,7 @@ import type {
   CouncilEvent,
 } from "../core/types.js";
 import { adapterRecipeComplete, type AdapterRecipe } from "./recipe.js";
+import { prepareProviderCouncilSession } from "./session-runtime.js";
 import {
   runProviderCouncilSpeech,
   type AdapterSpeechResult,
@@ -30,22 +31,32 @@ export type ProviderCouncilTransport = (
   prompt: string,
 ) => Promise<ProviderCouncilTransportResult>;
 
+export type ProviderCouncilSessionPreparer = (
+  profile: ProviderProfile,
+  recipe: AdapterRecipe,
+) => Promise<unknown>;
+
 export interface CouncilBridgeVerificationResult {
   ok: true;
   contributionCount: number;
   elapsedMs: number;
 }
 
+const noopPrepare: ProviderCouncilSessionPreparer = async () => undefined;
+
 export class BrowserCouncilAgent implements CouncilAgent {
   readonly participant;
   readonly #profile: ProviderProfile;
   readonly #recipe: AdapterRecipe;
   readonly #transport: ProviderCouncilTransport;
+  readonly #prepareSession: ProviderCouncilSessionPreparer;
+  #preparedSessionId: string | null = null;
 
   constructor(
     profile: ProviderProfile,
     recipe: AdapterRecipe,
     transport: ProviderCouncilTransport = defaultCouncilTransport,
+    prepareSession: ProviderCouncilSessionPreparer = noopPrepare,
   ) {
     if (!adapterRecipeComplete(recipe)) {
       throw new Error("A real Council advisor requires a complete 3/3 Adapter Recipe.");
@@ -53,6 +64,7 @@ export class BrowserCouncilAgent implements CouncilAgent {
     this.#profile = profile;
     this.#recipe = recipe;
     this.#transport = transport;
+    this.#prepareSession = prepareSession;
     this.participant = {
       id: profile.profileId,
       name: profile.displayName,
@@ -63,6 +75,13 @@ export class BrowserCouncilAgent implements CouncilAgent {
 
   async respond(context: CouncilContext): Promise<readonly CouncilContribution[]> {
     try {
+      if (
+        context.sessionId !== "council-gate" &&
+        context.sessionId !== this.#preparedSessionId
+      ) {
+        await this.#prepareSession(this.#profile, this.#recipe);
+        this.#preparedSessionId = context.sessionId;
+      }
       return await runStructuredCouncilTurn(
         this.#profile,
         this.#recipe,
@@ -79,7 +98,12 @@ export function createBrowserCouncilAgent(
   profile: ProviderProfile,
   recipe: AdapterRecipe,
 ): CouncilAgent {
-  return new BrowserCouncilAgent(profile, recipe);
+  return new BrowserCouncilAgent(
+    profile,
+    recipe,
+    defaultCouncilTransport,
+    prepareProviderCouncilSession,
+  );
 }
 
 export async function verifyProviderCouncilBridge(
