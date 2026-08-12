@@ -67,6 +67,7 @@
             "realEventCount",
             "eventKinds",
             "finalPositionCount",
+            "zeroConfidenceFinalCount",
             "consensusRatio",
             "minorityOpinionPresent",
             "durationMs"
@@ -107,6 +108,7 @@
               }
             },
             "finalPositionCount": { "type": "integer", "minimum": 0 },
+            "zeroConfidenceFinalCount": { "type": "integer", "minimum": 0 },
             "consensusRatio": { "type": "number", "minimum": 0, "maximum": 1 },
             "minorityOpinionPresent": { "type": "boolean" },
             "durationMs": {
