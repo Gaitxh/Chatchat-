@@ -1,16 +1,36 @@
 {
   "name": "chatchat",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Local-first AI Council: you ask, they debate.",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "check": "tsc -p tsconfig.json --noEmit",
-    "demo": "npm run build && node dist/src/demo.js",
-    "test": "npm run build && node dist/tests/core.test.js"
+    "dev": "npm run dev:web",
+    "dev:web": "vite --host 127.0.0.1 --port 1420",
+    "build": "npm run build:core && npm run build:web",
+    "build:core": "tsc -p tsconfig.json",
+    "build:web": "tsc -p tsconfig.app.json --noEmit && vite build",
+    "check": "npm run check:core && npm run check:web",
+    "check:core": "tsc -p tsconfig.json --noEmit",
+    "check:web": "tsc -p tsconfig.app.json --noEmit",
+    "demo": "npm run build:core && node dist/src/demo.js",
+    "test": "npm run build:core && node dist/tests/core.test.js",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "typescript": "^5.8.3"
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^6.0.2",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.16"
   }
 }

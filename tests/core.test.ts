@@ -4,6 +4,7 @@ import type {
   CouncilAgent,
   CouncilContext,
   CouncilContribution,
+  CouncilPhaseUpdate,
 } from "../src/core/types.js";
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -84,9 +85,13 @@ const council = new CouncilOrchestrator([
   agent("a3", "A", "A"),
 ]);
 
+const phaseUpdates: CouncilPhaseUpdate[] = [];
 const { report } = await council.run("test", {
   maxRounds: 2,
   minDebateRounds: 1,
+  onPhase: (update) => {
+    phaseUpdates.push(update);
+  },
 });
 
 assert(
@@ -97,6 +102,11 @@ assert(report.consensusStance === "A", "Final consensus should be A.");
 assert(
   Math.abs(report.consensusRatio - 1) < Number.EPSILON,
   "All three final positions should converge on A.",
+);
+assert(
+  phaseUpdates.map(({ phase, round }) => `${phase}:${round}`).join(",") ===
+    "sealed:1,debate:2,final:3",
+  "Orchestrator should expose deterministic phase lifecycle updates.",
 );
 
 console.log("✓ ChatChat council-core tests passed");

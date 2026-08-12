@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  council-core:
+  council-core-and-ui:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -23,5 +23,8 @@ jobs:
       - name: Type check
         run: npm run check
 
-      - name: Test
+      - name: Core tests
         run: npm test
+
+      - name: Build Council Chamber
+        run: npm run build:web

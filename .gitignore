@@ -1,12 +1,15 @@
 node_modules/
 dist/
-.DS_Store
+dist-ui/
+src-tauri/target/
+src-tauri/gen/
 *.log
 .env
 .env.*
 !.env.example
-
-# Local ChatChat state must never be committed.
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
 .chatchat/
 profiles/
-sessions/
