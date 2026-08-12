@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import avatarUrl from "../../assets/chatchat-avatar-pixel.png";
 import { CouncilReportPanel } from "./components/CouncilReportPanel.js";
 import { EventFeed } from "./components/EventFeed.js";
+import { HistorianPanel } from "./components/HistorianPanel.js";
 import { RoundTable } from "./components/RoundTable.js";
 import { StageRail } from "./components/StageRail.js";
 import { useCouncilSession } from "./useCouncilSession.js";
@@ -18,6 +19,11 @@ export default function App() {
     void council.convene(question);
   };
 
+  const openArchive = async (sessionId: string) => {
+    const archive = await council.openHistory(sessionId);
+    if (archive) setQuestion(archive.question);
+  };
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -30,7 +36,7 @@ export default function App() {
         </div>
         <div className="topbar-center">
           <span className="motto">YOU ASK · THEY DEBATE</span>
-          <span className="build-badge">v0.2 COUNCIL CHAMBER</span>
+          <span className="build-badge">v0.3 · THE HISTORIAN</span>
         </div>
         <div className="privacy-badge" title="ChatChat itself has no relay server">
           <i />
@@ -66,7 +72,7 @@ export default function App() {
             <div className="command-heading">
               <span>👑 KING'S COMMAND</span>
               <small>
-                v0.2 使用 deterministic mock council 演示协议；真实 Provider 在后续版本接入。
+                当前仍由 deterministic mock council 演示协议；v0.3 会在本机自动保存完整廷议。
               </small>
             </div>
             <div className="command-row">
@@ -107,6 +113,17 @@ export default function App() {
               ) : null}
             </div>
           </form>
+
+          <HistorianPanel
+            entries={council.history}
+            backend={council.historyBackend}
+            error={council.historyError}
+            activeSessionId={council.report?.sessionId ?? null}
+            disabled={council.isRunning}
+            onOpen={(sessionId) => {
+              void openArchive(sessionId);
+            }}
+          />
         </div>
 
         <EventFeed
@@ -118,6 +135,8 @@ export default function App() {
 
       <footer className="app-footer">
         <span>NO CHATCHAT SERVER</span>
+        <span>•</span>
+        <span>Local Council archive</span>
         <span>•</span>
         <span>Round 1 stays sealed from peer models</span>
         <span>•</span>
