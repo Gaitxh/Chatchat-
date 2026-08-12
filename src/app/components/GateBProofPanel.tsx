@@ -52,10 +52,10 @@ export function GateBProofPanel(props: GateBProofPanelProps) {
   const exportEnabled = props.currentRun && props.mode !== "demo";
   const verdictCopy =
     pack.verdict === "gate-b-candidate"
-      ? { icon: "✅", label: "GATE B CANDIDATE", detail: "这场 LIVE Council 已满足本地证据包的结构条件。" }
+      ? { icon: "✅", label: "GATE B CANDIDATE", detail: "这场 LIVE Council 满足本地证据结构，并且没有 uncertainty / 0-confidence final / Mock 事件污染。" }
       : pack.verdict === "demo-only"
         ? { icon: "🎭", label: "DEMO ONLY", detail: "Mock Council 不能作为真实 Provider 兼容性证据。" }
-        : { icon: "⚠️", label: "EVIDENCE INCOMPLETE", detail: "至少还缺一个真实席位门槛，或这场不是完整 LIVE Council。" };
+        : { icon: "⚠️", label: "EVIDENCE INCOMPLETE", detail: "至少缺一个真实席位门槛，或 Council 出现降级/不完整 final/非真实事件。" };
 
   const copy = async (format: "markdown" | "json") => {
     const text = format === "markdown" ? gateBProofMarkdown(pack) : gateBProofJson(pack);
@@ -123,11 +123,13 @@ export function GateBProofPanel(props: GateBProofPanelProps) {
           {pack.council ? (
             <dl className="proof-stats">
               <div><dt>Real advisors</dt><dd>{pack.council.realParticipantCount}</dd></div>
-              <div><dt>Real events</dt><dd>{pack.council.realEventCount}</dd></div>
+              <div><dt>Real events</dt><dd>{pack.council.realEventCount}/{pack.council.eventCount}</dd></div>
               <div><dt>Challenges</dt><dd>{pack.council.eventKinds.challenge}</dd></div>
               <div><dt>Evidence</dt><dd>{pack.council.eventKinds.evidence}</dd></div>
               <div><dt>Revisions</dt><dd>{pack.council.eventKinds.revision}</dd></div>
+              <div><dt>Uncertain</dt><dd>{pack.council.eventKinds.uncertain}</dd></div>
               <div><dt>Final positions</dt><dd>{pack.council.finalPositionCount}</dd></div>
+              <div><dt>0-conf finals</dt><dd>{pack.council.zeroConfidenceFinalCount}</dd></div>
               <div><dt>Consensus</dt><dd>{Math.round(pack.council.consensusRatio * 100)}%</dd></div>
               <div><dt>Minority</dt><dd>{pack.council.minorityOpinionPresent ? "YES" : "NO"}</dd></div>
             </dl>
