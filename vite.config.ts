@@ -4,9 +4,13 @@ import react from "@vitejs/plugin-react";
 import process from "node:process";
 
 const host = process.env.TAURI_DEV_HOST;
+const chatChatVersion = process.env.npm_package_version ?? "dev";
 
 export default defineConfig(() => ({
   plugins: [react()],
+  define: {
+    __CHATCHAT_VERSION__: JSON.stringify(chatChatVersion),
+  },
   clearScreen: false,
   server: {
     port: 1420,
