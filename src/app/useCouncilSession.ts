@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CouncilOrchestrator } from "../core/orchestrator.js";
 import type {
   CouncilEvent,
@@ -6,6 +6,13 @@ import type {
   CouncilPhase,
   CouncilReport,
 } from "../core/types.js";
+import {
+  createArchive,
+  createCouncilHistoryStore,
+  type ArchivedCouncil,
+  type CouncilHistorySummary,
+  type HistoryBackend,
+} from "../history/index.js";
 import { createMockCouncil } from "../providers/mock-council.js";
 
 export type CouncilUiStage =
@@ -28,6 +35,7 @@ export function useCouncilSession() {
     () => createMockCouncil().map((agent) => agent.participant),
     [],
   );
+  const historyStorePromise = useMemo(() => createCouncilHistoryStore(), []);
   const [events, setEvents] = useState<CouncilEvent[]>([]);
   const [report, setReport] = useState<CouncilReport | null>(null);
   const [stage, setStage] = useState<CouncilUiStage>("idle");
@@ -36,6 +44,26 @@ export function useCouncilSession() {
   const [activeQuestion, setActiveQuestion] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [history, setHistory] = useState<CouncilHistorySummary[]>([]);
+  const [historyBackend, setHistoryBackend] = useState<HistoryBackend | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  const refreshHistory = useCallback(async () => {
+    try {
+      const store = await historyStorePromise;
+      setHistoryBackend(store.backend);
+      setHistory(await store.list(12));
+      setHistoryError(null);
+    } catch (caught) {
+      setHistoryError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    }
+  }, [historyStorePromise]);
+
+  useEffect(() => {
+    void refreshHistory();
+  }, [refreshHistory]);
 
   const convene = useCallback(async (question: string) => {
     const trimmed = question.trim();
@@ -81,6 +109,16 @@ export function useCouncilSession() {
       setStage("complete");
       setRound(result.report.rounds);
       setActiveActorId(null);
+
+      try {
+        const store = await historyStorePromise;
+        await store.save(createArchive(result.report, result.blackboard.events));
+        await refreshHistory();
+      } catch (caught) {
+        setHistoryError(
+          caught instanceof Error ? caught.message : String(caught),
+        );
+      }
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : String(caught);
       setError(message);
@@ -88,7 +126,33 @@ export function useCouncilSession() {
     } finally {
       setIsRunning(false);
     }
-  }, [isRunning]);
+  }, [historyStorePromise, isRunning, refreshHistory]);
+
+  const openHistory = useCallback(async (
+    sessionId: string,
+  ): Promise<ArchivedCouncil | null> => {
+    if (isRunning) return null;
+
+    try {
+      const store = await historyStorePromise;
+      const archive = await store.load(sessionId);
+      if (!archive) return null;
+
+      setEvents(archive.events);
+      setReport(archive.report);
+      setActiveQuestion(archive.question);
+      setRound(archive.rounds);
+      setStage("complete");
+      setActiveActorId(null);
+      setError(null);
+      return archive;
+    } catch (caught) {
+      setHistoryError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+      return null;
+    }
+  }, [historyStorePromise, isRunning]);
 
   const reset = useCallback(() => {
     if (isRunning) return;
@@ -111,7 +175,11 @@ export function useCouncilSession() {
     activeQuestion,
     error,
     isRunning,
+    history,
+    historyBackend,
+    historyError,
     convene,
+    openHistory,
     reset,
   };
 }

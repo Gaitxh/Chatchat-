@@ -22,6 +22,7 @@
     "src/app/**/*.ts",
     "src/app/**/*.tsx",
     "src/core/**/*.ts",
+    "src/history/**/*.ts",
     "src/providers/**/*.ts"
   ]
 }
