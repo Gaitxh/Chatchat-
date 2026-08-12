@@ -12,8 +12,12 @@ interface AdvisorDockProps {
   profiles: readonly ProviderProfile[];
   backend: ProviderProfileBackend | null;
   error: string | null;
+  loginError: string | null;
+  loginWindowProfileIds: readonly string[];
+  canOpenLogin: boolean;
   disabled: boolean;
   onInvite(url: string, displayName?: string): Promise<ProviderProfile>;
+  onLogin(profile: ProviderProfile): Promise<void>;
   onRemove(profileId: string): Promise<void>;
 }
 
@@ -21,8 +25,12 @@ export function AdvisorDock({
   profiles,
   backend,
   error,
+  loginError,
+  loginWindowProfileIds,
+  canOpenLogin,
   disabled,
   onInvite,
+  onLogin,
   onRemove,
 }: AdvisorDockProps) {
   const [open, setOpen] = useState(false);
@@ -32,11 +40,7 @@ export function AdvisorDock({
   const [saving, setSaving] = useState(false);
 
   const detection = useMemo<ProviderDetection | null>(() => {
-    try {
-      return detectProviderUrl(url);
-    } catch {
-      return null;
-    }
+    try { return detectProviderUrl(url); } catch { return null; }
   }, [url]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -60,17 +64,18 @@ export function AdvisorDock({
         <div>
           <span className="eyebrow">ADVISOR ROSTER · 智囊名册</span>
           <h2>Invite an AI to court</h2>
-          <p>建立本地 Provider Profile。v0.4 不读取密码、Cookie，也不会假装已经登录。</p>
+          <p>
+            v0.5 桌面版已经能打开真实 Provider 登录窗口；账户仍属于 Provider，ChatChat 不接收密码或 Cookie。
+          </p>
         </div>
         <div className="advisor-dock__tools">
           <span className="provider-backend">{backend === "sqlite" ? "SQLITE · LOCAL" : "BROWSER · LOCAL"}</span>
-          <button type="button" className="invite-button" onClick={() => setOpen(true)} disabled={disabled}>
-            + INVITE AI
-          </button>
+          <button type="button" className="invite-button" onClick={() => setOpen(true)} disabled={disabled}>+ INVITE AI</button>
         </div>
       </header>
 
       {error ? <div className="provider-error">Provider profiles: {error}</div> : null}
+      {loginError ? <div className="provider-error">Login gate: {loginError}</div> : null}
 
       <div className="advisor-roster">
         {profiles.length === 0 ? (
@@ -78,73 +83,72 @@ export function AdvisorDock({
             <strong>圆桌外还没有真实智囊。</strong>
             <span>先邀请 ChatGPT、Claude、Gemini、DeepSeek，或任意自定义 AI URL。</span>
           </div>
-        ) : (
-          profiles.map((profile) => (
+        ) : profiles.map((profile) => {
+          const loginOpen = loginWindowProfileIds.includes(profile.profileId);
+          const adapterMissing = profile.authState === "adapter_required";
+          return (
             <article className="advisor-profile" key={profile.profileId}>
               <div className="advisor-profile__avatar">{profile.displayName.slice(0, 2).toUpperCase()}</div>
               <div className="advisor-profile__body">
                 <div className="advisor-profile__title">
                   <strong>{profile.displayName}</strong>
-                  <span className={`auth-state auth-state--${profile.authState}`}>
-                    {authLabel(profile.authState)}
-                  </span>
+                  <span className={`auth-state auth-state--${profile.authState}`}>{authLabel(profile.authState)}</span>
+                  {loginOpen ? <span className="login-window-badge">LOGIN WINDOW OPEN</span> : null}
                 </div>
                 <span className="advisor-origin">{profile.origin}</span>
-                <small>{profile.adapterId} · local profile {shortKey(profile.profileKey)}</small>
+                <small>{profile.adapterId} · isolated local profile {shortKey(profile.profileKey)}</small>
+                {loginOpen ? (
+                  <span className="login-window-hint">请在独立窗口中亲自登录。登录成功并不等于 Adapter 已验证，因此暂时仍不会自动入席。</span>
+                ) : null}
               </div>
               <div className="advisor-profile__actions">
-                <button type="button" disabled title="真实网页登录在 v0.5 接入">LOGIN · v0.5</button>
-                <button type="button" className="remove-advisor" onClick={() => void onRemove(profile.profileId)} disabled={disabled}>
-                  移除
+                <button
+                  type="button"
+                  className="login-advisor"
+                  disabled={disabled || adapterMissing || !canOpenLogin}
+                  title={
+                    adapterMissing
+                      ? "Custom Provider 需要 Adapter"
+                      : canOpenLogin
+                        ? "Open an isolated local provider login window"
+                        : "Provider login windows require the Tauri desktop app"
+                  }
+                  onClick={() => void onLogin(profile)}
+                >
+                  {loginOpen ? "FOCUS LOGIN" : "LOGIN"}
                 </button>
+                <button type="button" className="remove-advisor" onClick={() => void onRemove(profile.profileId)} disabled={disabled}>移除</button>
               </div>
             </article>
-          ))
-        )}
+          );
+        })}
       </div>
 
       <div className="provider-catalog-strip" aria-label="Built-in provider catalog">
-        {BUILT_IN_PROVIDER_MANIFESTS.map((manifest) => (
-          <span key={manifest.id}>{manifest.monogram} · {manifest.displayName}</span>
-        ))}
+        {BUILT_IN_PROVIDER_MANIFESTS.map((manifest) => <span key={manifest.id}>{manifest.monogram} · {manifest.displayName}</span>)}
         <span>+ Custom URL</span>
+        <span>{canOpenLogin ? "Desktop Login Gate · READY" : "Desktop Login Gate · Tauri only"}</span>
       </div>
 
       {open ? (
         <div className="provider-modal-backdrop" role="presentation" onMouseDown={() => !saving && setOpen(false)}>
           <div className="provider-modal" role="dialog" aria-modal="true" aria-labelledby="invite-advisor-title" onMouseDown={(event) => event.stopPropagation()}>
             <div className="provider-modal__heading">
-              <div>
-                <span className="eyebrow">SUMMON AN ADVISOR</span>
-                <h2 id="invite-advisor-title">邀请一位 AI 智囊</h2>
-              </div>
+              <div><span className="eyebrow">SUMMON AN ADVISOR</span><h2 id="invite-advisor-title">邀请一位 AI 智囊</h2></div>
               <button type="button" className="modal-close" onClick={() => setOpen(false)} disabled={saving}>×</button>
             </div>
-
             <form onSubmit={(event) => void submit(event)}>
-              <label>
-                <span>Model URL</span>
-                <input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://chatgpt.com" autoFocus />
-              </label>
-              <label>
-                <span>Display name <small>optional</small></span>
-                <input value={name} onChange={(event) => setName(event.target.value)} placeholder={detection?.displayName ?? "My AI"} />
-              </label>
-
+              <label><span>Model URL</span><input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://chatgpt.com" autoFocus /></label>
+              <label><span>Display name <small>optional</small></span><input value={name} onChange={(event) => setName(event.target.value)} placeholder={detection?.displayName ?? "My AI"} /></label>
               <DetectionCard detection={detection} />
-
               <div className="local-profile-note">
                 <strong>🔒 Local profile only</strong>
-                <span>本版只保存 Provider 元数据和隔离 profile key；不会保存账户密码，也不会读取浏览器登录态。</span>
+                <span>ChatChat 保存本地 Provider 元数据与隔离 profile key。真正登录发生在独立 Provider WebView 内，不要求你把密码或 Cookie 粘贴给 ChatChat。</span>
               </div>
-
               {submitError ? <div className="provider-error">{submitError}</div> : null}
-
               <div className="provider-modal__actions">
                 <button type="button" onClick={() => setOpen(false)} disabled={saving}>取消</button>
-                <button type="submit" className="invite-confirm" disabled={!detection || saving}>
-                  {saving ? "召集中…" : "INVITE TO COURT"}
-                </button>
+                <button type="submit" className="invite-confirm" disabled={!detection || saving}>{saving ? "召集中…" : "INVITE TO COURT"}</button>
               </div>
             </form>
           </div>
@@ -155,20 +159,14 @@ export function AdvisorDock({
 }
 
 function DetectionCard({ detection }: { detection: ProviderDetection | null }) {
-  if (!detection) {
-    return <div className="provider-detection provider-detection--invalid">等待一个有效的 http/https URL…</div>;
-  }
+  if (!detection) return <div className="provider-detection provider-detection--invalid">等待一个有效的 http/https URL…</div>;
   return (
     <div className={`provider-detection provider-detection--${detection.kind}`}>
       <div className="provider-detection__mark">{detection.manifest?.monogram ?? "?"}</div>
       <div>
         <strong>{detection.kind === "known" ? `${detection.displayName} detected` : "Custom AI detected"}</strong>
         <span>{detection.origin}</span>
-        <small>
-          {detection.kind === "known"
-            ? `${detection.adapterId} · login flow planned for v0.5`
-            : "No built-in adapter yet · community/custom adapter required"}
-        </small>
+        <small>{detection.kind === "known" ? `${detection.adapterId} · managed desktop login available` : "No built-in adapter yet · community/custom adapter required"}</small>
       </div>
     </div>
   );
@@ -183,6 +181,4 @@ function authLabel(state: ProviderProfile["authState"]): string {
   }
 }
 
-function shortKey(profileKey: string): string {
-  return profileKey.slice(-7).toUpperCase();
-}
+function shortKey(profileKey: string): string { return profileKey.slice(-7).toUpperCase(); }
