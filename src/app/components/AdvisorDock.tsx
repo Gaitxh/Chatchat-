@@ -11,10 +11,12 @@ import {
   type ProviderPageProbe,
   type ProviderProfile,
   type ProviderProfileBackend,
+  type ProviderWindowHealth,
   type TeachRole,
 } from "../../provider-sdk/index.js";
 import { TestSpeechPanel } from "./TestSpeechPanel.js";
 import "../provider.css";
+import "../provider-health.css";
 
 interface AdvisorDockProps {
   profiles: readonly ProviderProfile[];
@@ -23,6 +25,8 @@ interface AdvisorDockProps {
   error: string | null;
   loginError: string | null;
   loginWindowProfileIds: readonly string[];
+  providerHostProfileIds: readonly string[];
+  windowHealth: Readonly<Record<string, ProviderWindowHealth>>;
   probeResults: Readonly<Record<string, ProviderPageProbe>>;
   probingProfileId: string | null;
   teaching: { profileId: string; role: TeachRole } | null;
@@ -84,13 +88,15 @@ export function AdvisorDock(props: AdvisorDockProps) {
           <span className="eyebrow">ADVISOR ROSTER · 智囊名册</span>
           <h2>Summon → Teach → Gate → Seat</h2>
           <p>
-            真实 URL 现在走完整入席链：登录 → 御前试音 → 3/3 Teach Recipe → 试奏 → Council Gate → TAKE A SEAT。
-            内置品牌和任意 Custom http/https AI 页面都使用同一套本地 Browser Council Bridge。
+            真实 URL 走完整入席链。v1 readiness 还会实时盯住 Provider WebView：窗口被关掉、离开 Provider host 或回到认证页时，READY / SEATED 会自动失效，不留“幽灵智囊”。
           </p>
         </div>
         <div className="advisor-dock__tools">
           <span className="provider-backend">
             {props.backend === "sqlite" ? "SQLITE · LOCAL" : "BROWSER · LOCAL"}
+          </span>
+          <span className="provider-health-counter">
+            🫀 {props.providerHostProfileIds.length}/{props.loginWindowProfileIds.length || 0} HEALTHY
           </span>
           <span className="live-seat-counter">🪑 {props.liveSeatCount}/4 LIVE</span>
           <button type="button" className="invite-button" onClick={() => setOpen(true)} disabled={props.disabled}>
@@ -106,6 +112,8 @@ export function AdvisorDock(props: AdvisorDockProps) {
       <div className="advisor-roster">
         {props.profiles.length === 0 ? <EmptyRoster /> : props.profiles.map((profile) => {
           const loginOpen = props.loginWindowProfileIds.includes(profile.profileId);
+          const onProviderHost = props.providerHostProfileIds.includes(profile.profileId);
+          const health = props.windowHealth[profile.profileId];
           const probe = props.probeResults[profile.profileId];
           const recipe = props.recipes[profile.profileId];
           const probing = props.probingProfileId === profile.profileId;
@@ -123,13 +131,13 @@ export function AdvisorDock(props: AdvisorDockProps) {
           );
 
           return (
-            <article className={`advisor-profile ${seated ? "advisor-profile--seated" : ""}`} key={profile.profileId}>
+            <article className={`advisor-profile ${seated ? "advisor-profile--seated" : ""} ${onProviderHost ? "advisor-profile--healthy" : ""}`} key={profile.profileId}>
               <div className="advisor-profile__avatar">{profile.displayName.slice(0, 2).toUpperCase()}</div>
               <div className="advisor-profile__body">
                 <div className="advisor-profile__title">
                   <strong>{profile.displayName}</strong>
+                  <HealthBadge health={health} fallbackOpen={loginOpen} />
                   <span className={`auth-state auth-state--${profile.authState}`}>{authLabel(profile.authState)}</span>
-                  {loginOpen ? <span className="login-window-badge">WEBVIEW OPEN</span> : null}
                   {probe?.ok ? <span className="audition-badge">DOM PROBED</span> : null}
                   {recipeReady ? <span className="recipe-ready-badge">RECIPE 3/3</span> : null}
                   {testPassed ? <span className="recipe-ready-badge">TEST PASSED</span> : null}
@@ -138,8 +146,9 @@ export function AdvisorDock(props: AdvisorDockProps) {
                 </div>
                 <span className="advisor-origin">{profile.origin}</span>
                 <small>{profile.adapterId} · isolated local profile {shortKey(profile.profileKey)}</small>
+                <HealthDetail health={health} profile={profile} />
                 {probe ? <ProbeSummary probe={probe} /> : null}
-                {loginOpen ? (
+                {onProviderHost ? (
                   <RecipeCard
                     profile={profile}
                     recipe={recipe}
@@ -148,8 +157,12 @@ export function AdvisorDock(props: AdvisorDockProps) {
                     onTeach={props.onTeach}
                     onCancel={props.onCancelTeach}
                   />
+                ) : loginOpen ? (
+                  <div className="provider-health-warning">
+                    ⚠️ WebView 仍开着，但已经离开预期 Provider host。完成登录/认证并回到聊天页面后，ChatChat 才会恢复 Teach / Test / Gate。
+                  </div>
                 ) : null}
-                {loginOpen && recipe && recipeReady ? (
+                {onProviderHost && recipe && recipeReady ? (
                   <TestSpeechPanel
                     profile={profile}
                     recipe={recipe}
@@ -159,20 +172,20 @@ export function AdvisorDock(props: AdvisorDockProps) {
                     onRun={props.onTestSpeech}
                   />
                 ) : null}
-                {testPassed ? (
+                {testPassed && onProviderHost ? (
                   <div className={`council-gate ${gatePassed ? "council-gate--passed" : ""}`}>
                     <div>
                       <strong>⚖️ Council Gate · 议会门</strong>
                       <span>
                         {gatePassed
                           ? `结构化协议已通过${bridgeResult ? ` · ${bridgeResult.contributionCount} contribution · ${Math.round(bridgeResult.elapsedMs / 100) / 10}s` : ""}`
-                          : "向真实网页发送一次 sealed-phase 结构化握手；只有能返回合法 CouncilContribution 的智囊才能 READY。"}
+                          : "向真实网页发送 sealed-phase 结构化握手；只有能返回合法 CouncilContribution 的智囊才能 READY。"}
                       </span>
                     </div>
                     {!gatePassed ? (
                       <button
                         type="button"
-                        disabled={props.disabled || !loginOpen || verifying || channelBusy}
+                        disabled={props.disabled || !onProviderHost || verifying || channelBusy}
                         onClick={() => void run(() => props.onVerifyCouncil(profile))}
                       >
                         {verifying ? "验身中…" : "OPEN COUNCIL GATE"}
@@ -181,7 +194,7 @@ export function AdvisorDock(props: AdvisorDockProps) {
                       <button
                         type="button"
                         className={seated ? "leave-seat" : "take-seat"}
-                        disabled={props.disabled || !loginOpen || channelBusy}
+                        disabled={props.disabled || !onProviderHost || channelBusy}
                         onClick={() => void run(() => props.onToggleSeat(profile))}
                       >
                         {seated ? "LEAVE SEAT" : "TAKE A SEAT"}
@@ -202,7 +215,7 @@ export function AdvisorDock(props: AdvisorDockProps) {
                 <button
                   type="button"
                   className="probe-advisor"
-                  disabled={props.disabled || !loginOpen || probing || channelBusy}
+                  disabled={props.disabled || !onProviderHost || probing || channelBusy}
                   onClick={() => void run(() => props.onProbe(profile))}
                 >
                   {probing ? "试音中…" : "御前试音"}
@@ -226,9 +239,10 @@ export function AdvisorDock(props: AdvisorDockProps) {
           <span key={manifest.id}>{manifest.monogram} · {manifest.displayName}</span>
         ))}
         <span>? · ANY HTTP(S) AI</span>
+        <span>🫀 WINDOW HEALTH</span>
         <span>Teach Mode · 3 clicks</span>
         <span>Council Gate · structured handshake</span>
-        <span>LIVE COUNCIL · ≥2 real seats</span>
+        <span>LIVE COUNCIL · ≥2 healthy real seats</span>
       </div>
 
       {open ? (
@@ -246,6 +260,32 @@ export function AdvisorDock(props: AdvisorDockProps) {
       ) : null}
     </section>
   );
+}
+
+function HealthBadge({ health, fallbackOpen }: { health: ProviderWindowHealth | undefined; fallbackOpen: boolean }) {
+  if (!health) {
+    return fallbackOpen
+      ? <span className="window-health-badge window-health-badge--unknown">WEBVIEW OPEN</span>
+      : <span className="window-health-badge window-health-badge--closed">WINDOW CLOSED</span>;
+  }
+  if (health.state === "provider" && health.onProviderHost) {
+    return <span className="window-health-badge window-health-badge--healthy">● PROVIDER HOST</span>;
+  }
+  if (health.state === "external") {
+    return <span className="window-health-badge window-health-badge--external">◐ AUTH / EXTERNAL</span>;
+  }
+  return <span className="window-health-badge window-health-badge--closed">○ WINDOW CLOSED</span>;
+}
+
+function HealthDetail({ health, profile }: { health: ProviderWindowHealth | undefined; profile: ProviderProfile }) {
+  if (!health) return null;
+  if (health.state === "provider") {
+    return <div className="provider-health-detail provider-health-detail--healthy">🫀 WebView healthy · {health.url ?? profile.origin}</div>;
+  }
+  if (health.state === "external") {
+    return <div className="provider-health-detail provider-health-detail--external">🫀 WebView off-host · {health.url ?? "external/auth page"} · runtime proof invalidated</div>;
+  }
+  return <div className="provider-health-detail provider-health-detail--closed">🫀 WebView closed · READY / SEATED automatically revoked</div>;
 }
 
 function RecipeCard({
@@ -323,14 +363,14 @@ function InviteModal(props: {
 }) {
   return (
     <div className="provider-modal-backdrop" role="presentation" onMouseDown={() => !props.saving && props.onClose()}>
-      <div className="provider-modal" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="provider-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
         <div className="provider-modal__heading">
           <div><span className="eyebrow">SUMMON AN ADVISOR</span><h2>邀请一位 AI 智囊</h2></div>
           <button type="button" className="modal-close" onClick={props.onClose}>×</button>
         </div>
-        <form onSubmit={(e) => void props.onSubmit(e)}>
-          <label><span>Model URL</span><input value={props.url} onChange={(e) => props.onUrl(e.target.value)} autoFocus /></label>
-          <label><span>Display name <small>optional</small></span><input value={props.name} onChange={(e) => props.onName(e.target.value)} placeholder={props.detection?.displayName ?? "My AI"} /></label>
+        <form onSubmit={(event) => void props.onSubmit(event)}>
+          <label><span>Model URL</span><input value={props.url} onChange={(event) => props.onUrl(event.target.value)} autoFocus /></label>
+          <label><span>Display name <small>optional</small></span><input value={props.name} onChange={(event) => props.onName(event.target.value)} placeholder={props.detection?.displayName ?? "My AI"} /></label>
           <DetectionCard detection={props.detection} />
           <div className="local-profile-note"><strong>🔒 Local WebView</strong><span>登录态、Recipe 和议会配置都留在本机。ChatChat 没有中转服务器。</span></div>
           {props.error ? <div className="provider-error">{props.error}</div> : null}
