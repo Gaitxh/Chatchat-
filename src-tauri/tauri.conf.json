@@ -1,10 +1,1 @@
-{
-  "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ChatChat",
-  "version": "0.6.0",
-  "identifier": "dev.chatchat.council",
-  "build": { "beforeDevCommand": "npm run dev:web", "devUrl": "http://localhost:1420", "beforeBuildCommand": "npm run build:web", "frontendDist": "../dist-ui" },
-  "app": { "windows": [{ "label": "main", "title": "ChatChat — AI Council", "width": 1320, "height": 860, "minWidth": 980, "minHeight": 660, "resizable": true, "fullscreen": false }], "security": { "csp": null } },
-  "plugins": { "sql": { "preload": ["sqlite:chatchat.db"] } },
-  "bundle": { "active": false, "targets": "all" }
-}
+{"$schema":"https://schema.tauri.app/config/2","productName":"ChatChat","version":"0.7.0","identifier":"dev.chatchat.council","build":{"beforeDevCommand":"npm run dev:web","devUrl":"http://localhost:1420","beforeBuildCommand":"npm run build:web","frontendDist":"../dist-ui"},"app":{"windows":[{"label":"main","title":"ChatChat — AI Council","width":1320,"height":860,"minWidth":980,"minHeight":660,"resizable":true,"fullscreen":false}],"security":{"csp":null}},"plugins":{"sql":{"preload":["sqlite:chatchat.db"]}},"bundle":{"active":false,"targets":"all"}}
