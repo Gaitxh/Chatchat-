@@ -1,0 +1,86 @@
+name: ChatChat bug report
+description: Report a reproducible bug in the Council, local UI, history, or Provider runtime.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please sanitize logs and screenshots. Never post passwords, cookies, tokens, private Provider chats or account identifiers.
+
+        For a site-specific Provider compatibility problem, prefer the Provider compatibility form.
+
+  - type: input
+    id: version
+    attributes:
+      label: ChatChat version or commit
+      placeholder: v0.9.0 / abc1234
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: macOS 15 / Windows 11 / Ubuntu 24.04
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Council Protocol / Blackboard
+        - Council Chamber UI
+        - Provider Profile / WebView
+        - Teach Mode
+        - Test Speech
+        - Council Gate / Real Council Bridge
+        - Provider Window Health
+        - SQLite / Court Chronicle
+        - Build / CI / packaging
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include sanitized errors/logs if useful.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: If a Provider is involved, use hostname only unless a path is essential and contains no private identifiers.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: I removed passwords, cookies, tokens, account identifiers and private conversation content.
+          required: true

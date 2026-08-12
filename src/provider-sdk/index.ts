@@ -15,6 +15,7 @@ export * from "./session-runtime.js";
 export * from "./speech.js";
 export * from "./teach-runtime.js";
 export * from "./types.js";
+export * from "./window-health.js";
 
 export async function createProviderProfileStore(): Promise<ProviderProfileStore> {
   if (isTauriRuntime()) {

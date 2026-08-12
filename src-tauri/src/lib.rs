@@ -1,5 +1,7 @@
+mod provider_health;
 mod provider_session;
 
+use provider_health::{emit_closed_health, emit_page_health};
 use provider_session::prepare_provider_council_session;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
@@ -109,9 +111,18 @@ async fn open_provider_login(
     if !matches!(url.scheme(), "http" | "https") {
         return Err("Provider login only supports http/https URLs.".into());
     }
+    let expected_origin = url.origin().ascii_serialization();
 
     let label = provider_window_label(&request.profile_id);
     if let Some(existing) = app_handle.get_webview_window(&label) {
+        if let Ok(current) = existing.url() {
+            emit_page_health(
+                &app_handle,
+                &request.profile_id,
+                &expected_origin,
+                &current,
+            );
+        }
         existing.show().map_err(|error| error.to_string())?;
         existing.set_focus().map_err(|error| error.to_string())?;
         return Ok(ProviderLoginWindowResult {
@@ -122,6 +133,10 @@ async fn open_provider_login(
 
     let navigation_app = app_handle.clone();
     let navigation_profile = request.profile_id.clone();
+    let page_health_app = app_handle.clone();
+    let page_health_profile = request.profile_id.clone();
+    let page_health_origin = expected_origin.clone();
+
     let mut builder = tauri::WebviewWindowBuilder::new(
         &app_handle,
         &label,
@@ -144,6 +159,14 @@ async fn open_provider_login(
             return false;
         }
         matches!(url.scheme(), "http" | "https")
+    })
+    .on_page_load(move |_window, payload| {
+        emit_page_health(
+            &page_health_app,
+            &page_health_profile,
+            &page_health_origin,
+            payload.url(),
+        );
     });
 
     #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -163,7 +186,23 @@ async fn open_provider_login(
         builder = builder.data_store_identifier(profile_store_identifier(&request.profile_key));
     }
 
-    builder.build().map_err(|error| error.to_string())?;
+    let provider_window = builder.build().map_err(|error| error.to_string())?;
+    let close_health_app = app_handle.clone();
+    let close_health_profile = request.profile_id.clone();
+    provider_window.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Destroyed) {
+            emit_closed_health(&close_health_app, &close_health_profile);
+        }
+    });
+    if let Ok(current) = provider_window.url() {
+        emit_page_health(
+            &app_handle,
+            &request.profile_id,
+            &expected_origin,
+            &current,
+        );
+    }
+
     Ok(ProviderLoginWindowResult {
         label,
         reused: false,

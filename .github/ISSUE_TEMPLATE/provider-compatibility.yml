@@ -1,0 +1,150 @@
+name: Provider compatibility report
+description: Report or validate a real AI website through ChatChat's local Provider pipeline.
+title: "[Provider] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing a real Provider. Please remove account emails, cookies, tokens, private chats and sensitive screenshots before submitting.
+
+        ChatChat uses precise compatibility language: recognized → teachable → test-passed → council-ready → runtime-validated → officially supported.
+
+  - type: input
+    id: provider
+    attributes:
+      label: Provider
+      description: Product/site name only.
+      placeholder: Claude
+    validations:
+      required: true
+
+  - type: input
+    id: host
+    attributes:
+      label: Host
+      description: Hostname only. Do not include account-specific paths/query strings.
+      placeholder: claude.ai
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: ChatChat version or commit
+      placeholder: v0.9.0 / abc1234
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: macOS 15 / Windows 11 / Ubuntu 24.04
+    validations:
+      required: true
+
+  - type: input
+    id: ui-date
+    attributes:
+      label: Provider UI date tested
+      placeholder: YYYY-MM-DD
+    validations:
+      required: true
+
+  - type: dropdown
+    id: invite
+    attributes:
+      label: Invite URL
+      options: [PASS, FAIL, NOT TESTED]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: login
+    attributes:
+      label: Isolated login WebView
+      options: [PASS, FAIL, NOT TESTED]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: health
+    attributes:
+      label: Provider Window Health
+      description: Does ChatChat correctly show Provider-host / external-auth / closed state?
+      options: [PASS, FAIL, NOT TESTED]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: probe
+    attributes:
+      label: Metadata DOM probe
+      options: [PASS, FAIL, NOT TESTED]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: teach
+    attributes:
+      label: Teach Recipe 3/3
+      options: [PASS, FAIL, NOT TESTED]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: speech
+    attributes:
+      label: Test Speech
+      options: [PASS, FAIL, NOT TESTED]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: gate
+    attributes:
+      label: Council Gate
+      options: [PASS, FAIL, NOT TESTED]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: fresh
+    attributes:
+      label: Fresh Council session
+      options: [PASS, FAIL, NOT TESTED]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: hybrid
+    attributes:
+      label: Hybrid rehearsal
+      options: [PASS, FAIL, NOT TESTED]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: live
+    attributes:
+      label: LIVE Council with a second real Provider
+      options: [PASS, FAIL, NOT TESTED]
+    validations:
+      required: true
+
+  - type: textarea
+    id: failure
+    attributes:
+      label: Failure stage / sanitized notes
+      description: Include the narrowest failure stage and sanitized error. Do not paste secrets or private chat content.
+      placeholder: "Teach Response selector no longer matches after Provider UI update..."
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed passwords, cookies, tokens, account identifiers and private conversation content.
+          required: true
+        - label: I understand a PASS on my machine does not automatically mean the Provider is officially supported.
+          required: true
