@@ -27,9 +27,17 @@ ChatChat 把多个 AI 变成一个会独立奏议、互相质疑、举证、改�
 
 > **共识不是目的，接近事实才是目的。**
 
-## v0.6 — Adapter Lab · 御前试音
+## v0.7 — Teach Mode · 教会 ChatChat
 
-真实 Provider 现在不仅可以被邀请并在独立本地 WebView 中登录，ChatChat 的宿主还可以对它执行一个 **metadata-only DOM probe**，为真正的 Adapter 找到页面结构线索。
+现在用户可以在自己的 Provider 页面里，亲手教 ChatChat 三件事：
+
+```text
+✍️ 输入框 / Composer
+➤ 发送按钮 / Send
+💬 回答区域 / Response
+```
+
+流程：
 
 ```text
 Provider URL
@@ -40,9 +48,13 @@ LOGIN · isolated WebView
     ↓
 🎙 御前试音
     ↓
-composer / action metadata
+教我 Composer → user clicks
+教我 Send     → user clicks
+教我 Response → user clicks
     ↓
-Provider Adapter
+🧩 Adapter Recipe · 3/3
+    ↓
+Browser Adapter execution layer
     ↓
 CouncilAgent
     ↓
@@ -51,38 +63,54 @@ CouncilAgent
 
 当前已完成：
 
-- ✅ `+ INVITE AI` 创建本地 Provider Profile
-- ✅ ChatGPT / Claude / Gemini / DeepSeek URL detection
-- ✅ Custom AI URL fallback
-- ✅ SQLite Provider Profiles + Council history
+- ✅ Council Protocol / Blackboard / 自动廷议
+- ✅ Tauri + React Council Chamber
+- ✅ 本地 SQLite 史册
+- ✅ Provider Profile / URL detection / Custom AI fallback
 - ✅ 真实 Provider Login WebView
 - ✅ 每个 Provider 独立持久化 WebView profile
 - ✅ Provider 远程页面不获得 ChatChat remote capability
-- ✅ Host-side `WebviewWindow::eval_with_callback`
-- ✅ `御前试音` / Adapter Lab UI
-- ✅ 只在 Provider 返回预期 host 后允许 probe
-- ✅ composer/action 结构候选展示
-- ✅ Rust callback timeout / error handling
-- ✅ TypeScript / Provider SDK / Council / Tauri CI
+- ✅ metadata-only `御前试音` DOM probe
+- ✅ Teach Mode 点选高亮
+- ✅ `composer / send / response` 三步教学
+- ✅ 自动生成本地 CSS selector recipe
+- ✅ SQLite `adapter_recipes` + browser-local fallback
+- ✅ Profile 删除时同步删除 Recipe
+- ✅ 密码字段双层拒绝
+- ✅ TypeScript / Provider SDK / Teach Mode / Council / Tauri CI
 
-### Probe 明确不会读取
+### Teach Mode 不读取什么？
+
+它的目的只是生成定位配方，不是抓取用户隐私。
+
+不会故意读取或保存：
 
 - `document.cookie`
 - localStorage / sessionStorage
-- input / textarea 的 `.value`
+- 输入框当前值
 - 密码内容
 - 页面正文
 - 聊天消息正文
 
-它只读取结构元数据，例如：`tag`、`id`、`role`、`aria-label`、`placeholder`、`data-testid`、input type、disabled/contenteditable 状态和元素数量。
+被选中的元素会记录 selector 和少量结构属性，例如 `id`、`data-testid`、`aria-label`、`data-message-author-role`。密码输入框会在注入脚本和 TypeScript Recipe 校验两层被拒绝。
 
-详见 [`docs/ADAPTER_HARNESS.md`](docs/ADAPTER_HARNESS.md)。
+详见 [`docs/TEACH_MODE.md`](docs/TEACH_MODE.md) 和 [`docs/ADAPTER_HARNESS.md`](docs/ADAPTER_HARNESS.md)。
 
 ### 仍然没有假装完成的部分
 
-`LOGIN WINDOW OPEN` 不等于 `READY`，`DOM PROBED` 也不等于“已经能发言”。
+**3/3 Recipe 不等于真实 AI 已经能在 Council 发言。**
 
-当前圆桌仍使用 deterministic mock council。下一阶段要把 Adapter Lab 发展成 **Teach Mode**：让用户在自己的 Provider 页面上教 ChatChat 哪个是输入框、发送按钮、回答区域，再由通用 Browser Adapter 完成 `ProviderProfile → CouncilAgent`。
+当前圆桌仍使用 deterministic mock council。Teach Mode 解决了“元素在哪里”，下一阶段的 Browser Adapter 还必须真正完成：
+
+1. 验证三个 selector 仍然存在；
+2. 把 Council turn 写进 taught composer；
+3. 正确触发页面输入事件；
+4. 点击 taught send；
+5. 判断生成开始与结束；
+6. 只从 taught response surface 读取最新 AI 回答；
+7. 做 timeout / size limit / failure handling；
+8. 转换成 `CouncilContribution[]`；
+9. 最终才允许 `ProviderProfile → CouncilAgent`。
 
 ## 运行
 
@@ -95,9 +123,7 @@ npm test
 npm run dev
 ```
 
-网页版可以试玩 Council、史册与 Provider 名册，但托管 Provider WebView、登录和御前试音只在 Tauri 桌面版启用。
-
-桌面版：
+网页版可以试玩 Council、史册与 Provider 名册；托管 Provider WebView、登录、御前试音和 Teach Mode 需要 Tauri 桌面版：
 
 ```bash
 npm install
@@ -115,7 +141,8 @@ npm run tauri:dev
 │  ├── SQLite Chronicle               │
 │  ├── Provider Profiles              │
 │  ├── Isolated Provider WebViews     │
-│  └── Adapter Lab                    │
+│  ├── Adapter Lab                    │
+│  └── Local Adapter Recipes          │
 └──────────┬─────────┬─────────┬───────┘
            │         │         │
            ▼         ▼         ▼
@@ -157,9 +184,10 @@ Blackboard 使用结构化事件：
 - ✅ **v0.4 — Invite Advisors**
 - ✅ **v0.5 — Login Gate**：真实 Provider WebView + 本地隔离登录 profile
 - ✅ **v0.6 — Adapter Lab**：metadata-only DOM probe / 御前试音
-- 🔜 **v0.7 — Teach Mode**：用户在页面上标注 composer / send / response，生成本地 Adapter Recipe
-- 🔜 **v0.8 — First Speaking Advisor**：通用 Browser Adapter 驱动第一位真实 Advisor 正式入席
-- 🔭 **Later**：社区 Adapter、Provider health tests、Council replay / persuasion graph
+- ✅ **v0.7 — Teach Mode**：3 次点选 → 本地 Adapter Recipe
+- 🔜 **v0.8 — Test Speech / 试奏**：通用 Browser Adapter 用 Recipe 发送一条测试消息并读取 taught response
+- 🔜 **v0.9 — First Speaking Advisor**：真实 `ProviderProfile → CouncilAgent`，第一位真人模型正式入席
+- 🔭 **Later**：社区 Recipe / Adapter、Provider health tests、Council replay、persuasion graph
 
 ## 设计原则
 
@@ -172,8 +200,9 @@ Blackboard 使用结构化事件：
 7. **Recognized is not integrated.**
 8. **Logged in is not verified.**
 9. **Probed is not trusted.**
-10. **Provider pages are untrusted external content.**
-11. **The UI can be theatrical; the protocol must stay sober.**
+10. **Taught is not executable until validated.**
+11. **Provider pages are untrusted external content.**
+12. **The UI can be theatrical; the protocol must stay sober.**
 
 > **外面是宫廷，里面是科研。**
 
