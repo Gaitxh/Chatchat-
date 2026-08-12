@@ -1,0 +1,16 @@
+{
+  "name": "chatchat",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first AI Council: you ask, they debate.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "demo": "npm run build && node dist/src/demo.js",
+    "test": "npm run build && node dist/tests/core.test.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
