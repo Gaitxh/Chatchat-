@@ -24,6 +24,7 @@
     "src/core/**/*.ts",
     "src/history/**/*.ts",
     "src/provider-sdk/**/*.ts",
-    "src/providers/**/*.ts"
+    "src/providers/**/*.ts",
+    "src/theater/**/*.ts"
   ]
 }
