@@ -13,8 +13,10 @@ import {
   providerLoginRuntimeAvailable,
   readProviderTeachSelection,
   startProviderTeach,
+  testProviderSpeech,
   type AdapterRecipe,
   type AdapterRecipeStore,
+  type AdapterSpeechResult,
   type ProviderPageProbe,
   type ProviderProfile,
   type ProviderProfileBackend,
@@ -37,6 +39,8 @@ export function useProviderProfiles() {
   const [probeResults, setProbeResults] = useState<Record<string, ProviderPageProbe>>({});
   const [probingProfileId, setProbingProfileId] = useState<string | null>(null);
   const [teaching, setTeaching] = useState<{ profileId: string; role: TeachRole } | null>(null);
+  const [speechResults, setSpeechResults] = useState<Record<string, AdapterSpeechResult>>({});
+  const [testingProfileId, setTestingProfileId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const canOpenLogin = providerLoginRuntimeAvailable();
 
@@ -67,6 +71,11 @@ export function useProviderProfiles() {
     const next = applyTeachSelection(current, profile.profileId, selection);
     await recipeStore.save(next);
     await refreshRecipes();
+    setSpeechResults((currentResults) => {
+      const nextResults = { ...currentResults };
+      delete nextResults[profile.profileId];
+      return nextResults;
+    });
     setTeaching(null);
   }, [refreshRecipes]);
 
@@ -151,6 +160,33 @@ export function useProviderProfiles() {
     try { await cancelProviderTeach(profile); } finally { setTeaching(null); }
   }, []);
 
+  const testSpeech = useCallback(async (profile: ProviderProfile, message: string) => {
+    const recipe = recipes[profile.profileId];
+    if (!recipe || !adapterRecipeComplete(recipe)) {
+      throw new Error("Teach all three Adapter Recipe selectors before Test Speech.");
+    }
+    if (testingProfileId) throw new Error("Another advisor is already performing a Test Speech.");
+
+    setLoginError(null);
+    setTestingProfileId(profile.profileId);
+    setSpeechResults((current) => {
+      const next = { ...current };
+      delete next[profile.profileId];
+      return next;
+    });
+
+    try {
+      const result = await testProviderSpeech(profile, recipe, message);
+      setSpeechResults((current) => ({ ...current, [profile.profileId]: result }));
+      return result;
+    } catch (caught) {
+      setLoginError(caught instanceof Error ? caught.message : String(caught));
+      throw caught;
+    } finally {
+      setTestingProfileId(null);
+    }
+  }, [recipes, testingProfileId]);
+
   const remove = useCallback(async (profileId: string) => {
     const store = storeRef.current;
     if (!store) return;
@@ -160,6 +196,7 @@ export function useProviderProfiles() {
     setLoginWindowProfileIds((current) => current.filter((id) => id !== profileId));
     setProbeResults((current) => { const next = { ...current }; delete next[profileId]; return next; });
     setRecipes((current) => { const next = { ...current }; delete next[profileId]; return next; });
+    setSpeechResults((current) => { const next = { ...current }; delete next[profileId]; return next; });
     await refresh();
   }, [refresh]);
 
@@ -173,6 +210,8 @@ export function useProviderProfiles() {
     probeResults,
     probingProfileId,
     teaching,
+    speechResults,
+    testingProfileId,
     isLoading,
     canOpenLogin,
     invite,
@@ -180,6 +219,7 @@ export function useProviderProfiles() {
     probe,
     teach,
     cancelTeach,
+    testSpeech,
     remove,
     refresh,
     adapterRecipeComplete,
