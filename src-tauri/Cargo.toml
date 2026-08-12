@@ -1,6 +1,6 @@
 [package]
 name = "chatchat"
-version = "0.3.0"
+version = "0.4.0"
 description = "ChatChat local-first AI Council desktop shell"
 authors = ["ChatChat contributors"]
 edition = "2021"
