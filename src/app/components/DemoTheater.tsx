@@ -12,6 +12,7 @@ interface DemoTheaterProps {
   profiles: readonly ProviderProfile[];
   recipes: Readonly<Record<string, AdapterRecipe>>;
   loginWindowProfileIds: readonly string[];
+  providerHostProfileIds: readonly string[];
   speechResults: Readonly<Record<string, AdapterSpeechResult>>;
   bridgeResults: Readonly<Record<string, CouncilBridgeVerificationResult>>;
   liveSeatCount: number;
@@ -44,6 +45,7 @@ const SCENARIOS = [
 export function DemoTheater(props: DemoTheaterProps) {
   const invited = props.profiles.length;
   const openWindows = props.loginWindowProfileIds.length;
+  const healthyWindows = props.providerHostProfileIds.length;
   const taught = props.profiles.filter((profile) =>
     adapterRecipeComplete(props.recipes[profile.profileId]),
   ).length;
@@ -53,12 +55,12 @@ export function DemoTheater(props: DemoTheaterProps) {
 
   const steps = [
     { key: "invite", icon: "➕", title: "Invite URL", detail: `${invited} advisor profile${invited === 1 ? "" : "s"}`, done: invited > 0 },
-    { key: "login", icon: "🔐", title: "Open isolated WebView", detail: `${openWindows} open`, done: openWindows > 0 },
+    { key: "login", icon: "🔐", title: "Provider Health", detail: `${healthyWindows} healthy · ${openWindows} open`, done: healthyWindows > 0 },
     { key: "teach", icon: "🧩", title: "Teach 3 selectors", detail: `${taught} recipe${taught === 1 ? "" : "s"} 3/3`, done: taught > 0 },
     { key: "test", icon: "🎻", title: "Test Speech", detail: `${tested} real round-trip${tested === 1 ? "" : "s"}`, done: tested > 0 },
     { key: "gate", icon: "⚖️", title: "Council Gate", detail: `${gated} structured advisor${gated === 1 ? "" : "s"}`, done: gated > 0 },
-    { key: "seat", icon: "🪑", title: "Take a seat", detail: `${props.liveSeatCount}/4 live seats`, done: props.liveSeatCount > 0 },
-    { key: "live", icon: "🔥", title: "LIVE COUNCIL", detail: liveUnlocked ? "real advisors only" : "needs 2 live seats", done: liveUnlocked },
+    { key: "seat", icon: "🪑", title: "Healthy Seat", detail: `${props.liveSeatCount}/4 live seats`, done: props.liveSeatCount > 0 },
+    { key: "live", icon: "🔥", title: "LIVE COUNCIL", detail: liveUnlocked ? "real advisors only" : "needs 2 healthy live seats", done: liveUnlocked },
   ];
 
   return (
@@ -68,8 +70,8 @@ export function DemoTheater(props: DemoTheaterProps) {
           <span className="eyebrow">DEMO THEATER · 真实演示台</span>
           <h2>Watch the palace come alive</h2>
           <p>
-            这里不伪造“已连接”状态：每个绿灯都直接来自当前 Provider / Recipe / Test / Gate / Seat 的真实运行状态。
-            录制 README GIF 时，从左到右走一遍就是完整的 ChatChat 故事。
+            这里不伪造“已连接”状态：绿灯来自当前 Provider / WebView Health / Recipe / Test / Gate / Seat 的真实运行状态。
+            如果真实 Provider 窗口被关掉或离开预期 host，席位会自动熄灭，Demo Theater 也会同步退回。
           </p>
         </div>
         <ModeOrb mode={props.mode} liveSeatCount={props.liveSeatCount} />
@@ -94,13 +96,13 @@ export function DemoTheater(props: DemoTheaterProps) {
           <h3>90 秒真实 Demo 剧本</h3>
           <ol>
             <li><b>0:00</b><span>点击 <strong>+ INVITE AI</strong>，粘贴一个真实 AI URL。</span></li>
-            <li><b>0:10</b><span>打开隔离 WebView，用户自己登录；ChatChat 不接触密码。</span></li>
+            <li><b>0:10</b><span>打开隔离 WebView，用户自己登录；回到 Provider chat host 后健康灯变绿。</span></li>
             <li><b>0:20</b><span>三次 <strong>教我</strong>：点输入框、发送按钮、回答区域。</span></li>
             <li><b>0:35</b><span>点击 <strong>试奏</strong>，真实网页回一句话，出现 TEST PASSED。</span></li>
             <li><b>0:45</b><span>打开 <strong>Council Gate</strong>，AI 返回结构化 ChatChat envelope。</span></li>
-            <li><b>0:55</b><span>点击 <strong>TAKE A SEAT</strong>；第二个真实 AI 同样入席。</span></li>
+            <li><b>0:55</b><span>点击 <strong>TAKE A SEAT</strong>；第二个健康真实 AI 同样入席。</span></li>
             <li><b>1:05</b><span>国王只下令一次。Round 1 密封，然后真实 AI 自动互相质询。</span></li>
-            <li><b>1:25</b><span>展示 Changed Mind / Minority Report / Court Chronicle。</span></li>
+            <li><b>1:25</b><span>展示 Changed Mind / Minority Report / Court Chronicle；顺手关一个 Provider 窗口，展示席位自动被撤销。</span></li>
           </ol>
         </div>
 
@@ -126,8 +128,9 @@ export function DemoTheater(props: DemoTheaterProps) {
 
       <footer className="demo-theater__footer">
         <span>DEMO = mocks</span>
-        <span>HYBRID = 1 live + mocks</span>
-        <span>LIVE = 2–4 real web advisors</span>
+        <span>HYBRID = 1 healthy live + mocks</span>
+        <span>LIVE = 2–4 healthy real web advisors</span>
+        <span>GHOST SEATS = EVICTED</span>
         <span>NO CHATCHAT SERVER</span>
       </footer>
     </section>
@@ -136,9 +139,9 @@ export function DemoTheater(props: DemoTheaterProps) {
 
 function ModeOrb({ mode, liveSeatCount }: { mode: CouncilRunMode; liveSeatCount: number }) {
   const copy = mode === "live"
-    ? { icon: "🔥", title: "LIVE COUNCIL", detail: `${liveSeatCount} real advisors` }
+    ? { icon: "🔥", title: "LIVE COUNCIL", detail: `${liveSeatCount} healthy real advisors` }
     : mode === "hybrid"
-      ? { icon: "⚗️", title: "HYBRID", detail: "1 real + mock sparring" }
+      ? { icon: "⚗️", title: "HYBRID", detail: "1 healthy real + mock sparring" }
       : { icon: "🎭", title: "DEMO", detail: "deterministic mocks" };
   return (
     <div className={`mode-orb mode-orb--${mode}`}>
