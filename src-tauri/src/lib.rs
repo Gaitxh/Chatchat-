@@ -1,3 +1,6 @@
+mod provider_session;
+
+use provider_session::prepare_provider_council_session;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -572,6 +575,7 @@ pub fn run() {
             cancel_provider_teach,
             test_provider_speech,
             run_provider_council_turn,
+            prepare_provider_council_session,
             close_provider_login
         ])
         .run(tauri::generate_context!())
