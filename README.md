@@ -9,23 +9,16 @@
 
 </div>
 
-ChatChat 不是把几个模型的回答并排放在一起，而是把 AI 变成一群会独立思考、公开质疑、举证、改口并保留少数意见的智囊。
-
-用户是“国王”。你只下达一次命令，之后由系统自动主持整场廷议：
+ChatChat 把多个 AI 变成一个会独立奏议、互相质疑、举证、改口并保留少数意见的智囊团。用户是“国王”：你只下达一次命令，后续廷议自动进行。
 
 ```text
 👑 King's Command
       ↓
-🕯️ Round 1 · Sealed Opinions
+🕯️ Sealed Opinions
       ↓
 🔔 Open Council
       ↓
-⚔️ Challenge   📎 Evidence
-🛡️ Defense     🤝 Support
-      ↓
-🔄 Revision / Concede
-      ↓
-📜 Final Positions
+⚔️ Challenge · 📎 Evidence · 🔄 Revision
       ↓
 ⚖️ Council Report + Minority Report
       ↓
@@ -34,42 +27,56 @@ ChatChat 不是把几个模型的回答并排放在一起，而是把 AI 变成�
 
 > **共识不是目的，接近事实才是目的。**
 
-## v0.4 — Invite Advisors
+## v0.5 — Login Gate
 
-ChatChat 现在已经有了真正的 **Provider Profile / 智囊名册**：
+真实 Provider 页面现在第一次进入 ChatChat 桌面应用。
 
-- ✅ 输入 AI 网站 URL
+- ✅ `+ INVITE AI` 创建本地 Provider Profile
 - ✅ 识别 ChatGPT / Claude / Gemini / DeepSeek
-- ✅ 未知 HTTP(S) URL 自动变成 Custom AI
-- ✅ 为每个 Provider 创建独立本地 profile key
-- ✅ Provider Profile 写入本机 SQLite
-- ✅ 浏览器开发模式使用 localStorage fallback
-- ✅ `+ INVITE AI` 邀请界面
-- ✅ `LOGIN REQUIRED / ADAPTER NEEDED / READY / ERROR` 状态模型
-- ✅ Provider Adapter SDK 契约
-- ✅ Provider SDK 自动测试
-- ✅ 完整 Council 历史仍然本地保存
-- ✅ 没有 ChatChat 中央服务器
+- ✅ Custom AI URL fallback
+- ✅ Provider Profiles + Council History 存在本机 SQLite
+- ✅ 点击 `LOGIN` 打开真实 Provider URL
+- ✅ 每个 Provider 使用独立、持久化的本地 WebView profile
+- ✅ Windows / Linux 使用独立 webview data directory
+- ✅ macOS 使用独立 WebKit data-store identifier
+- ✅ 已打开的登录窗口会被重新聚焦，而不是重复创建
+- ✅ 只允许 HTTP(S) 导航
+- ✅ Rust 后端验证登录命令只能由 ChatChat `main` 窗口发起
+- ✅ Provider 远程页面不获得 ChatChat remote capability
+- ✅ ChatChat 不要求用户粘贴密码或 Cookie
 
-**重要：v0.4 还没有伪装成“真实网页模型已经接入”。**
+### 仍然没有假装完成的部分
 
-现在圆桌上的 GPT / Claude / Gemini / DeepSeek 仍然是 deterministic mock council。邀请进来的真实 Provider 会先进入候场区；只有后续 Adapter 真能把它转换成 `CouncilAgent`，它才允许入席。
+`LOGIN WINDOW OPEN` **不等于** `READY`。
+
+当前圆桌仍使用 deterministic mock council。真实 Provider 虽然可以在本地独立 WebView 中完成登录，但它还需要 Provider-specific Adapter 去：
+
+1. 验证登录状态；
+2. 创建/切换会话；
+3. 发送 Council turn；
+4. 捕获完整回答；
+5. 转换成 `CouncilContribution[]`；
+6. 最终产出真正的 `CouncilAgent`。
+
+只有做到这一步，真实智囊才允许从候场区正式入席。
 
 ```text
-Provider Manifest
-      ↓
+Provider URL
+    ↓
 Provider Profile
-      ↓
+    ↓
+LOGIN · isolated WebView
+    ↓
 Provider Adapter
-      ↓
+    ↓
 CouncilAgent
-      ↓
-AI takes a seat
+    ↓
+🪑 TAKE A SEAT
 ```
 
-## 试玩网页版
+## 运行
 
-需要 Node.js 20+：
+需要 Node.js 20+。
 
 ```bash
 npm install
@@ -78,22 +85,41 @@ npm test
 npm run dev
 ```
 
-网页版会使用浏览器本地存储保存 Council 历史和 Provider Profiles。
+网页版可以试玩 Council、史册与 Provider 名册，但受浏览器环境限制，不会开启托管的桌面登录窗口。
 
-## 运行桌面版
-
-准备 Rust 与 Tauri 2 的系统依赖后：
+桌面版：
 
 ```bash
 npm install
 npm run tauri:dev
 ```
 
-桌面版使用 Tauri 2 + React/Vite + SQLite。`sqlite:chatchat.db` 当前保存 Council Sessions、完整 Blackboard Events、Council Reports 和 Provider Profiles。
+桌面版才会启用真正的 Provider Login Gate。
+
+## Local First
+
+```text
+┌──────────── User Computer ────────────┐
+│ ChatChat                             │
+│  ├── Council Engine                 │
+│  ├── Blackboard                     │
+│  ├── Council Chamber                │
+│  ├── SQLite Chronicle               │
+│  ├── Provider Profiles              │
+│  └── Isolated Provider WebViews     │
+└──────────┬─────────┬─────────┬───────┘
+           │         │         │
+           ▼         ▼         ▼
+       Provider   Provider  Local Model
+```
+
+不存在 `User → ChatChat Server → Providers` 这一层。在线模型仍然会收到用户主动发给它们的内容，但 ChatChat 自己不增加中央中转服务。
 
 ## Provider SDK
 
-详细设计见 [`docs/PROVIDER_SDK.md`](docs/PROVIDER_SDK.md)。社区 Adapter 最终实现：
+详见 [`docs/PROVIDER_SDK.md`](docs/PROVIDER_SDK.md)。
+
+核心边界：
 
 ```ts
 interface ProviderAdapter {
@@ -109,11 +135,11 @@ interface ProviderAdapterSession {
 }
 ```
 
-因此未来同一个 Council 可以混合网页模型、官方 API、OpenAI-compatible endpoint、Ollama、LM Studio、vLLM、企业内部 AI 和社区自定义 Adapter。
+> **A provider is not a seat. A provider becomes a seat only when an adapter can create a CouncilAgent.**
 
 ## Council Protocol
 
-Blackboard 不是普通 Chat Log，而是结构化事件流：
+Blackboard 使用结构化事件，而不是一大串无法分析的 chat message：
 
 ```text
 💬 ARGUMENT
@@ -128,35 +154,17 @@ Blackboard 不是普通 Chat Log，而是结构化事件流：
 📜 FINAL_POSITION
 ```
 
-协议草案见 [`docs/CHATCHAT_PROTOCOL.md`](docs/CHATCHAT_PROTOCOL.md)。Round 1 完全封存，Round 2+ 使用 `snapshot → parallel turns → publish batch`，尽量降低最先发言者的锚定效应。
-
-## Local First
-
-```text
-┌──────────── User Computer ────────────┐
-│ ChatChat                             │
-│  ├── Council Engine                 │
-│  ├── Blackboard                     │
-│  ├── Council Chamber                │
-│  ├── SQLite Chronicle               │
-│  ├── Provider Profiles              │
-│  └── Provider Adapters              │
-└──────────┬─────────┬─────────┬───────┘
-           │         │         │
-           ▼         ▼         ▼
-       Provider   Provider  Local Model
-```
-
-没有 `User → ChatChat Server → Providers` 这一层。但隐私边界必须说清楚：未来如果用户把在线模型加入会议，发给那个模型的内容仍然会直接发送给对应 AI 服务商。
+协议草案见 [`docs/CHATCHAT_PROTOCOL.md`](docs/CHATCHAT_PROTOCOL.md)。
 
 ## Roadmap
 
-- ✅ **v0.1 — Council Protocol**：sealed Round 1、Blackboard、自动廷议、Council Report
-- ✅ **v0.2 — Council Chamber**：Tauri + React 圆桌 UI、可视化 Challenge / Evidence / Revision
-- ✅ **v0.3 — The Historian**：SQLite Council archive、完整事件保存、历史廷议重开
-- ✅ **v0.4 — Invite Advisors**：Provider SDK、Provider Profiles、URL detection、Advisor Roster、Custom AI fallback
-- 🚧 **v0.5 — First Real Advisor**：本地隔离 Provider WebView、用户自己登录、登录状态检测、第一份真实网页 Adapter、`ProviderProfile → CouncilAgent`
-- 🔭 **Later — Teach ChatChat**：对未知 AI URL 可视化标注输入框、发送按钮、回答区域等，在本地生成 Custom Adapter
+- ✅ **v0.1 — Council Protocol**
+- ✅ **v0.2 — Council Chamber**
+- ✅ **v0.3 — The Historian**
+- ✅ **v0.4 — Invite Advisors**
+- 🚧 **v0.5 — Login Gate**：真实 Provider 登录 WebView + 本地隔离 profile
+- 🔜 **v0.6 — First Speaking Advisor**：第一份 Provider-specific Adapter，真实 `ProviderProfile → CouncilAgent`
+- 🔭 **Later — Teach ChatChat**：让用户对未知 AI URL 可视化标注输入框、发送按钮、回答区域，在本地生成 Custom Adapter
 
 ## 设计原则
 
@@ -165,19 +173,13 @@ Blackboard 不是普通 Chat Log，而是结构化事件流：
 3. **Accuracy over persuasion.**
 4. **Changing your mind is a feature.**
 5. **Minority opinions survive.**
-6. **Verify what can be verified.**
-7. **Local first.**
-8. **Recognized is not the same as integrated.**
+6. **Local first.**
+7. **Recognized is not integrated.**
+8. **Logged in is not verified.**
 9. **Provider pages are untrusted external content.**
 10. **The UI can be theatrical; the protocol must stay sober.**
 
 > **外面是宫廷，里面是科研。**
-
-## Status
-
-🚧 **Very early / playable / provider foundation in place**
-
-下一件真正刺激的事：让第一位真实 AI 智囊通过本地网页登录，然后正式坐上圆桌。
 
 ## License
 
