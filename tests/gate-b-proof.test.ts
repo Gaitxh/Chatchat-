@@ -179,6 +179,7 @@ assert(pack.environment === "macOS 15.x Apple Silicon", "Environment labels shou
 assert(pack.council?.eventKinds.challenge === 1, "Challenge counts should be preserved without challenge text.");
 assert(pack.council?.eventKinds.revision === 1, "Revision counts should be preserved without revision text.");
 assert(pack.council?.finalPositionCount === 2, "Two real final positions should be counted.");
+assert(pack.council?.zeroConfidenceFinalCount === 0, "Healthy final positions should not be marked degraded.");
 assert(pack.council?.realEventCount === events.length, "All test events should be recognized as real-provider events.");
 
 const exported = `${gateBProofJson(pack)}\n${gateBProofMarkdown(pack)}`;
@@ -200,6 +201,74 @@ for (const secret of [
 assert(exported.includes("chatgpt.com"), "Public Provider hosts belong in compatibility evidence.");
 assert(exported.includes("openai-chatgpt"), "Provider ids belong in compatibility evidence.");
 assert(exported.includes("challenge=1"), "Markdown should expose event-kind counts, not event content.");
+
+const degradedFinalReport: CouncilReport = {
+  ...report,
+  positions: report.positions.map((position, index) =>
+    index === 0 ? { ...position, confidence: 0 } : position,
+  ),
+};
+const degradedFinalPack = buildGateBProofPack({
+  providers: providerSnapshot,
+  report: degradedFinalReport,
+  events,
+  mode: "live",
+  chatChatVersion: "0.9.0",
+  environment: "macOS",
+  generatedAt: "2026-08-13T00:10:00.000Z",
+});
+assert(degradedFinalPack.council?.zeroConfidenceFinalCount === 1, "Zero-confidence final positions should be counted without exporting their text.");
+assert(degradedFinalPack.verdict === "incomplete", "A graceful zero-confidence final fallback must not be mistaken for Provider compatibility success.");
+
+const uncertainEvents: CouncilEvent[] = [
+  ...events,
+  {
+    id: "event-a-uncertain",
+    sessionId: "session-private-fingerprint-1234567890",
+    round: 2,
+    actorId: profileA.profileId,
+    kind: "uncertain",
+    content: "PRIVATE TRANSPORT FAILURE DETAIL",
+    confidence: 0,
+    createdAt: "2026-08-13T00:00:03.500Z",
+  },
+];
+const uncertainPack = buildGateBProofPack({
+  providers: providerSnapshot,
+  report,
+  events: uncertainEvents,
+  mode: "live",
+  chatChatVersion: "0.9.0",
+  environment: "Windows",
+  generatedAt: "2026-08-13T00:10:00.000Z",
+});
+assert(uncertainPack.council?.eventKinds.uncertain === 1, "Uncertainty should be counted as metadata.");
+assert(uncertainPack.verdict === "incomplete", "A Council containing a graceful uncertainty fallback must not be Gate B candidate evidence.");
+assert(!gateBProofJson(uncertainPack).includes("PRIVATE TRANSPORT FAILURE DETAIL"), "Failure content must remain private even when uncertainty metadata is exported.");
+
+const mixedEvents: CouncilEvent[] = [
+  ...events,
+  {
+    id: "mock-event",
+    sessionId: "session-private-fingerprint-1234567890",
+    round: 2,
+    actorId: "mock-gpt",
+    kind: "question",
+    content: "MOCK CONTENT MUST NOT QUALIFY A LIVE RUN",
+    createdAt: "2026-08-13T00:00:03.750Z",
+  },
+];
+const mixedPack = buildGateBProofPack({
+  providers: providerSnapshot,
+  report,
+  events: mixedEvents,
+  mode: "live",
+  chatChatVersion: "0.9.0",
+  environment: "Linux",
+  generatedAt: "2026-08-13T00:10:00.000Z",
+});
+assert(mixedPack.council?.realEventCount === events.length, "Mock events should not be counted as real-provider events.");
+assert(mixedPack.verdict === "incomplete", "A LIVE evidence pack contaminated by Mock events must fail closed.");
 
 const demoPack = buildGateBProofPack({
   providers: [],
