@@ -10,6 +10,7 @@ export * from "./login-runtime.js";
 export * from "./probe-runtime.js";
 export * from "./profile.js";
 export * from "./recipe.js";
+export * from "./speech.js";
 export * from "./teach-runtime.js";
 export * from "./types.js";
 
