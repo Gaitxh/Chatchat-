@@ -41,6 +41,7 @@ export interface GateBProofPack {
     realEventCount: number;
     eventKinds: Record<CouncilEventKind, number>;
     finalPositionCount: number;
+    zeroConfidenceFinalCount: number;
     consensusRatio: number;
     minorityOpinionPresent: boolean;
     durationMs: number | null;
@@ -126,7 +127,10 @@ export function buildGateBProofPack(
     council &&
       council.mode === "live" &&
       council.realParticipantCount >= 2 &&
-      council.finalPositionCount >= 2 &&
+      council.finalPositionCount === council.realParticipantCount &&
+      council.zeroConfidenceFinalCount === 0 &&
+      council.eventKinds.uncertain === 0 &&
+      council.realEventCount === council.eventCount &&
       council.rounds >= 3,
   );
 
@@ -207,6 +211,7 @@ export function gateBProofMarkdown(pack: GateBProofPack): string {
           `- Rounds: **${council.rounds}**`,
           `- Events: **${council.eventCount}** total / **${council.realEventCount}** from real advisors`,
           `- Final positions: **${council.finalPositionCount}**`,
+          `- Zero-confidence finals: **${council.zeroConfidenceFinalCount}**`,
           `- Consensus ratio: **${Math.round(council.consensusRatio * 100)}%**`,
           `- Minority opinion present: **${council.minorityOpinionPresent ? "yes" : "no"}**`,
           `- Event kinds: \`${eventSummary}\``,
@@ -242,10 +247,11 @@ function buildCouncilEvidence(
   const eventKinds = Object.fromEntries(
     EVENT_KINDS.map((kind) => [kind, 0]),
   ) as Record<CouncilEventKind, number>;
+  const realPositions = report.positions.filter(
+    (position) => position.participant.provider !== "mock",
+  );
   const realActorIds = new Set(
-    report.positions
-      .filter((position) => position.participant.provider !== "mock")
-      .map((position) => position.participant.id),
+    realPositions.map((position) => position.participant.id),
   );
 
   let realEventCount = 0;
@@ -270,6 +276,9 @@ function buildCouncilEvidence(
     realEventCount,
     eventKinds,
     finalPositionCount: eventKinds.final_position,
+    zeroConfidenceFinalCount: realPositions.filter(
+      (position) => position.confidence <= 0,
+    ).length,
     consensusRatio: report.consensusRatio,
     minorityOpinionPresent: report.disagreements.length > 0,
     durationMs,
