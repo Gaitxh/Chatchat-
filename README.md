@@ -9,7 +9,7 @@
 
 </div>
 
-ChatChat 不是把几个模型的答案并排展示，而是让多个 AI 智囊完成一次真正可观察的议事过程：
+ChatChat 不是把几个模型的答案并排展示，而是让多个 AI 智囊完成一次真正可观察、可回放的议事过程：
 
 **密室独立奏议 → 公开廷议 → 质疑 → 举证 → 答辩 → 改口 → 少数意见 → 最终奏议。**
 
@@ -19,28 +19,30 @@ ChatChat 不是把几个模型的答案并排展示，而是让多个 AI 智囊�
 
 模型可以挑战别人，也必须可以公开改口、承认不确定，并在最终结果中保留少数意见。
 
-## v0.2 — Council Chamber
+## v0.3 — The Historian / 史官
 
-现在已经可以进入议政厅了。
+ChatChat 现在不仅会开会，还会在**本机记档**。
 
-- ✅ Tauri 2 桌面壳
-- ✅ React + Vite Council Chamber
-- ✅ 四位 Mock 智囊围桌就座
+- ✅ Tauri 2 + React + Vite Council Chamber
+- ✅ 四位 deterministic Mock 智囊围桌就座
 - ✅ King's Command：用户只发送一次
 - ✅ Round 1 sealed opinions：第一轮彼此不可见
 - ✅ Round 2+ 自动开廷
 - ✅ 结构化 Public Blackboard
 - ✅ Challenge / Evidence / Support / Defense / Revision / Concede
 - ✅ 「Changed Mind」可视事件
-- ✅ Position / confidence 状态
-- ✅ Final Council Report
-- ✅ Minority Report
-- ✅ Council 生命周期 `onPhase` / `onEvent`
-- ✅ CI：Core 类型检查、测试、前端构建
+- ✅ Final Council Report + Minority Report
+- ✅ 桌面版 SQLite 本地历史
+- ✅ Rust migration 管理数据库 schema
+- ✅ 每次保存完整 Blackboard event stream + Council Report
+- ✅ Court Chronicle / 史官面板
+- ✅ 点击旧案重新展开事件流与最终奏议
+- ✅ 浏览器开发模式自动使用 localStorage fallback
+- ✅ CI 同时验证 Core / Web UI / Tauri Rust shell
 
-当前的 GPT / Claude / Gemini / DeepSeek 座位是 **deterministic mocks**，只用来验证 Council Protocol 和 UI 流程；它们不是对真实模型行为或观点的宣称。真实网页 Provider 仍在后续里程碑。
+当前的 GPT / Claude / Gemini / DeepSeek 座位仍然是 **deterministic mocks**，只用来验证 Council Protocol、UI 和本地数据层；它们不是对真实模型行为或观点的宣称。真实 Provider 接入是下一阶段。
 
-## 先试玩网页版议政厅
+## 试玩议政厅
 
 需要 Node.js 20+。
 
@@ -53,35 +55,43 @@ npm run dev
 
 浏览器打开 Vite 输出的本地地址，然后点击 **「下令」**。
 
-默认演示问题会让四位智囊讨论 ChatChat 自己应该选择 Tauri 还是 Electron。你会看到：
-
-```text
-👑 King's Command
-      ↓
-🕯️ 密室奏议
-      ↓
-🔔 Open Council
-      ↓
-⚔️ Challenge   📎 Evidence
-🛡️ Defense     🤝 Support
-      ↓
-🔄 Changed Mind
-      ↓
-📜 Final Positions
-      ↓
-⚖️ Council Report + Minority Report
-```
+浏览器试玩模式的历史保存在当前浏览器的 localStorage；真正的桌面版会使用 SQLite。
 
 ## 运行桌面版
 
-先准备 Rust 和当前系统上的 Tauri 2 开发依赖，然后：
+准备 Rust 和当前系统需要的 Tauri 2 开发依赖，然后：
 
 ```bash
 npm install
 npm run tauri:dev
 ```
 
-v0.2 暂时关闭 installer/bundle 输出；这一阶段先验证桌面窗口与 Council Chamber。正式安装包、平台图标和 release pipeline 会在后续打开。
+桌面版会打开本地 `sqlite:chatchat.db`，并自动执行版本化 migration。数据库用于保存：
+
+```text
+Council Session
+├── King's Question
+├── Council Report
+├── consensus / confidence / rounds
+└── Blackboard Events
+    ├── argument
+    ├── challenge
+    ├── evidence
+    ├── support
+    ├── defense
+    ├── revision
+    ├── concede
+    ├── uncertain
+    └── final_position
+```
+
+这意味着以后可以在不改变历史格式的前提下继续做：
+
+- Debate Replay
+- 谁说服了谁
+- 哪位智囊最常第一个发现错误
+- 哪些观点经常被撤回
+- Council benchmark
 
 ## Council 不是普通 Chat Log
 
@@ -100,7 +110,7 @@ Blackboard 使用结构化事件：
 📜 FINAL_POSITION
 ```
 
-所以 ChatChat 能知道“谁在反驳谁”“哪条证据导致谁改变观点”，而不是事后从一整段聊天文本里猜。
+所以 ChatChat 知道“谁在反驳谁”“哪条证据导致谁改变观点”，而不是事后从一整段自然语言聊天记录里猜。
 
 协议草案见 [`docs/CHATCHAT_PROTOCOL.md`](docs/CHATCHAT_PROTOCOL.md)。
 
@@ -108,7 +118,7 @@ Blackboard 使用结构化事件：
 
 Round 1 所有智囊并行独立回答，互相看不到结果。完成后才一次性公开到 Blackboard。
 
-Round 2+ 也采用 **snapshot → parallel turns → publish batch**：
+Round 2+ 同样采用：
 
 ```text
 Blackboard Snapshot N
@@ -124,11 +134,11 @@ Blackboard Snapshot N
 Blackboard Snapshot N+1
 ```
 
-这样尽量降低“第一个发言者把后面的模型全部带跑”的顺序偏差。
+尽量降低“第一个发言者把后面的模型全部带跑”的顺序偏差。
 
 ## 本地优先
 
-ChatChat 的方向是 **no ChatChat server**：
+ChatChat 的方向始终是 **no ChatChat server**：
 
 ```text
 ┌──────────────── User Computer ────────────────┐
@@ -136,41 +146,31 @@ ChatChat 的方向是 **no ChatChat server**：
 │   ├── Council Engine                         │
 │   ├── Council Chamber                        │
 │   ├── Blackboard                             │
-│   ├── Local history / SQLite (planned)       │
-│   ├── Provider profiles (planned)            │
-│   └── Provider adapters (planned)            │
+│   ├── SQLite Council Archive                 │
+│   ├── Provider profiles (next)               │
+│   └── Provider adapters (next)               │
 └───────────────┬───────────────┬──────────────┘
                 │               │
                 ▼               ▼
            AI Provider      Local Model
 ```
 
-隐私边界必须讲清楚：**ChatChat 自己不设中央转发服务器**，但如果用户把在线模型加入会议，发给该模型的内容仍会直接发送到对应服务商。未来本地模型可以组成完全离线的 Council。
+隐私边界必须讲清楚：**ChatChat 自己不设中央转发服务器**，但未来如果用户把在线模型加入会议，发给该模型的内容仍会直接发送到对应服务商。历史记录和 ChatChat 自己的配置留在用户设备上；未来本地模型可以组成完全离线的 Council。
 
 ## 当前代码结构
 
 ```text
 src/
-├── app/
-│   ├── components/
-│   ├── App.tsx
-│   ├── council-view.ts
-│   ├── styles.css
-│   └── useCouncilSession.ts
-├── core/
-│   ├── blackboard.ts
-│   ├── format.ts
-│   ├── ids.ts
-│   ├── orchestrator.ts
-│   └── types.ts
-├── providers/
-│   ├── provider.ts
-│   └── mock-council.ts
+├── app/                 # Council Chamber / Historian UI
+├── core/                # Council Protocol + Orchestrator + Blackboard
+├── history/             # SQLite + browser-local archive abstraction
+├── providers/           # deterministic mock agents for now
 └── demo.ts
 
 src-tauri/
+├── migrations/          # versioned SQLite schema
+├── capabilities/        # narrow Tauri permissions
 ├── src/
-├── capabilities/
 ├── Cargo.toml
 └── tauri.conf.json
 
@@ -183,16 +183,9 @@ docs/
 
 ## Roadmap
 
-### v0.3 — Local persistence
-- SQLite
-- Council Session / Blackboard event store
-- Local settings
-- 本地议会历史
-- Provider profiles
+### v0.4 — Provider SDK + Provider Profiles
 
-### v0.4 — Provider SDK
-
-目标接口：
+下一步开始给真正的智囊准备“座位接口”：
 
 ```ts
 interface ProviderAdapter {
@@ -204,14 +197,17 @@ interface ProviderAdapter {
 }
 ```
 
-### v0.5 — Real providers
+同时增加本地 Provider Profile：URL、适配器类型、显示名称、登录状态和独立浏览器 Profile 元数据。
 
-先做少量 Adapter，验证：
+### v0.5 — First real provider
+
+先只接一个真实网页 Provider，把最难的链路做透：
 
 - 用户自己添加 URL
-- 每个 Provider 独立本地浏览器 Profile
+- Provider 独立本地浏览器 Profile
 - 用户自己完成网页登录
-- 输入 / 发送 / 流式回答捕获
+- 输入 / 发送
+- 流式回答捕获
 - 新建会话
 - 页面升级后的兼容性策略
 - 登录态不上传到 ChatChat 服务器（因为根本没有 ChatChat 服务器）
@@ -235,9 +231,9 @@ interface ProviderAdapter {
 
 ## Status
 
-🚧 **Very early / playable Council Chamber**
+🚧 **Very early / playable Council Chamber + local archive**
 
-现在最重要的是把“议会体验”和本地基础设施做扎实，然后才让真实模型坐上这些座位。
+现在核心协议、可玩 UI 和本地历史地基都已经在了。下一道真正有挑战的门，就是让第一个真实模型坐上桌。
 
 ## License
 
