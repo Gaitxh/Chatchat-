@@ -2,6 +2,7 @@ import type { CouncilEvent, CouncilParticipant } from "../../core/types.js";
 import { latestPosition } from "../council-view.js";
 import type { CouncilRunMode, CouncilUiStage } from "../useCouncilSession.js";
 import { AgentSeat } from "./AgentSeat.js";
+import "../council-live.css";
 
 interface RoundTableProps {
   participants: readonly CouncilParticipant[];
