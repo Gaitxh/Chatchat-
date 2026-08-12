@@ -175,6 +175,7 @@ assert(repairCalls === 2, "A malformed Provider answer should receive exactly on
 assert(repaired[0]?.kind === "argument", "A successful repair attempt should recover the real advisor turn.");
 
 let prepareCalls = 0;
+const prepareCallCount = () => prepareCalls;
 const preparedAgent = new BrowserCouncilAgent(
   profile,
   recipe,
@@ -187,9 +188,9 @@ const preparedAgent = new BrowserCouncilAgent(
 );
 await preparedAgent.respond(context("sealed", "fresh-session-a"));
 await preparedAgent.respond(context("sealed", "fresh-session-a"));
-assert(prepareCalls === 1, "A Provider page should be prepared once per Council session, not once per turn.");
+assert(prepareCallCount() === 1, "A Provider page should be prepared once per Council session, not once per turn.");
 await preparedAgent.respond(context("sealed", "fresh-session-b"));
-assert(prepareCalls === 2, "A new Council session should prepare a clean Provider page again.");
+assert(prepareCallCount() === 2, "A new Council session should prepare a clean Provider page again.");
 
 const knownChatProfile: ProviderProfile = {
   ...profile,
