@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import avatarUrl from "../../assets/chatchat-avatar-pixel.png";
 import { AdvisorDock } from "./components/AdvisorDock.js";
 import { CouncilReportPanel } from "./components/CouncilReportPanel.js";
+import { CouncilTheater } from "./components/CouncilTheater.js";
 import { DemoTheater } from "./components/DemoTheater.js";
 import { EventFeed } from "./components/EventFeed.js";
 import { HistorianPanel } from "./components/HistorianPanel.js";
@@ -44,7 +45,7 @@ export default function App() {
         </div>
         <div className="topbar-center">
           <span className="motto">YOU ASK · THEY DEBATE</span>
-          <span className="build-badge">v1 READINESS · PROVIDER HEALTH</span>
+          <span className="build-badge">COUNCIL THEATER · INFLUENCE + REPLAY</span>
           <span className={`build-badge council-mode-badge council-mode-badge--${council.mode}`}>{modeLabel}</span>
         </div>
         <div className="privacy-badge" title="ChatChat itself has no relay server"><i />LOCAL-FIRST</div>
@@ -64,7 +65,16 @@ export default function App() {
             question={council.activeQuestion}
           />
 
-          {council.report ? <CouncilReportPanel report={council.report} /> : null}
+          {council.report ? (
+            <>
+              <CouncilReportPanel report={council.report} />
+              <CouncilTheater
+                participants={council.report.positions.map((position) => position.participant)}
+                events={council.events}
+                report={council.report}
+              />
+            </>
+          ) : null}
           {council.error ? <div className="error-banner"><strong>廷议中断</strong><span>{council.error}</span></div> : null}
 
           <form className="royal-command" onSubmit={submit}>
@@ -161,8 +171,8 @@ export default function App() {
       <footer className="app-footer">
         <span>NO CHATCHAT SERVER</span><span>•</span>
         <span>ROUND 1 SEALED</span><span>•</span>
-        <span>WINDOW HEALTH ENFORCED</span><span>•</span>
-        <span>GHOST SEATS EVICTED</span><span>•</span>
+        <span>INFLUENCE EDGES ARE EVENT-DERIVED</span><span>•</span>
+        <span>REPLAY NEVER CALLS PROVIDERS</span><span>•</span>
         <span>{modeLabel}</span>
       </footer>
     </div>
@@ -171,10 +181,10 @@ export default function App() {
 
 function commandCopy(mode: ReturnType<typeof useCouncilSession>["mode"], liveSeatCount: number): string {
   if (mode === "live") {
-    return `${liveSeatCount} 位健康真实网页智囊已经入席。你只下令一次；之后 sealed → debate → final 全自动执行。任何 Provider 窗口掉线都会自动撤销该席位。`;
+    return `${liveSeatCount} 位健康真实网页智囊已经入席。你只下令一次；之后 sealed → debate → final 全自动执行。廷议结束后可以回放并查看可追溯的说服关系图。`;
   }
   if (mode === "hybrid") {
-    return "1 位健康真实网页智囊已入席：当前是 HYBRID REHEARSAL；再入席 1 位健康真实 AI 即解锁纯 LIVE COUNCIL。";
+    return "1 位健康真实网页智囊已入席：当前是 HYBRID REHEARSAL；结束后 Council Theater 会把真实与 Mock 的影响边分开标记。";
   }
-  return "当前没有健康真实席位，所以自动退回 deterministic Mock Demo。下面的 Demo Theater 会显示真实 Provider 从 URL 到健康入席的每一道门。";
+  return "当前没有健康真实席位，所以自动退回 deterministic Mock Demo。先跑一次，就能在 Council Theater 看到 Changed Mind Trail 和完整本地回放。";
 }
