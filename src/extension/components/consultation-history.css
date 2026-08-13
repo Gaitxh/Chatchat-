@@ -1,0 +1,58 @@
+.consultation-history {
+  display: grid;
+  gap: 10px;
+  margin: 11px 0;
+  padding: 15px;
+  border: 1px solid #dce4dd;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(76, 137, 89, .11), transparent 26%),
+    linear-gradient(180deg, rgba(255,255,255,.96), rgba(247,250,247,.98));
+  box-shadow: 0 10px 30px rgba(42, 57, 45, .06);
+}
+
+.consultation-history__header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+.consultation-history__header > div:first-child > span { color: #61816a; font-size: 8px; font-weight: 850; letter-spacing: .11em; text-transform: uppercase; }
+.consultation-history__header h2 { margin: 3px 0 0; font-size: 16px; line-height: 1.15; letter-spacing: -.025em; }
+.consultation-history__header p { margin: 6px 0 0; color: #6f786f; font-size: 8px; line-height: 1.5; }
+.history-local-badge { display: grid; justify-items: end; gap: 3px; padding: 7px 8px; border-radius: 10px; background: #e8f1e8; color: #47634d; }
+.history-local-badge strong { font-size: 7px; letter-spacing: .06em; }
+.history-local-badge small { font-size: 6.5px; color: #708174; }
+
+.history-replay-banner { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 9px; border-radius: 11px; background: #eef2fb; border: 1px solid #dce4f5; }
+.history-replay-banner > div { display: grid; gap: 2px; }
+.history-replay-banner b { color: #536b94; font-size: 8px; }
+.history-replay-banner span { color: #8491a8; font-size: 6.5px; line-height: 1.4; }
+.history-replay-banner button { flex: 0 0 auto; border: 0; border-radius: 7px; padding: 6px 7px; background: #dfe7f6; color: #536986; font-size: 6.5px; font-weight: 800; }
+
+.history-list { display: grid; gap: 6px; }
+.history-entry { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 6px; padding: 7px; border: 1px solid #e8e8e2; border-radius: 11px; background: #fff; transition: border-color .15s ease, background .15s ease; }
+.history-entry.is-active { border-color: #acc9b2; background: #f3f8f3; }
+.history-entry__main { min-width: 0; border: 0; padding: 2px; background: transparent; color: inherit; text-align: left; }
+.history-entry__topline { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.history-entry__topline time { color: #99958d; font-size: 6.5px; }
+.history-entry__topline span { max-width: 48%; padding: 3px 5px; border-radius: 6px; background: #e8f0e8; color: #4d6d54; font-size: 6.5px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-entry__main > strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 5px; color: #4f514d; font-size: 8px; line-height: 1.45; }
+.history-entry__meta { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 7px; }
+.history-entry__meta span { padding: 3px 5px; border-radius: 6px; background: #f1f0eb; color: #858078; font-size: 6px; }
+.history-entry__meta span.is-minority { background: #fff0de; color: #7b613c; }
+.history-entry__actions { display: grid; align-content: center; gap: 4px; }
+.history-entry__actions button { border: 0; border-radius: 7px; padding: 5px 6px; background: #e8eee8; color: #57705b; font-size: 6px; font-weight: 800; }
+.history-entry__actions button.danger { background: #f5e8e8; color: #8a5a5a; }
+
+.history-empty { display: grid; justify-items: center; gap: 4px; padding: 18px 8px; border: 1px dashed #d7ded7; border-radius: 12px; color: #818981; text-align: center; }
+.history-empty > b { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: #ebf1eb; color: #66816b; font-size: 14px; }
+.history-empty strong { margin-top: 4px; color: #596159; font-size: 9px; }
+.history-empty p { margin: 0; max-width: 250px; font-size: 7px; line-height: 1.5; }
+
+.consultation-history__footer { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding-top: 7px; border-top: 1px solid #e8ece7; }
+.consultation-history__footer > span { max-width: 72%; color: #8a928b; font-size: 6.5px; line-height: 1.4; }
+.history-clear { border: 0; border-radius: 7px; padding: 6px 7px; background: #f0e8e7; color: #825c59; font-size: 6.5px; font-weight: 800; }
+
+@media (max-width: 390px) {
+  .consultation-history { padding: 12px; }
+  .consultation-history__header { grid-template-columns: 1fr; }
+  .history-local-badge { justify-items: start; width: max-content; }
+  .history-entry { grid-template-columns: 1fr; }
+  .history-entry__actions { grid-template-columns: repeat(2, auto); justify-content: start; }
+}
