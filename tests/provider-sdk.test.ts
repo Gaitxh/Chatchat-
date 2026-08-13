@@ -14,6 +14,11 @@ assert(chatgpt.manifest?.capabilities.councilTurns === true, "Built-in web provi
 const claude = detectProviderUrl("https://claude.ai/new");
 assert(claude.adapterId === "web.claude", "Claude URL should select the Claude adapter id.");
 
+const qwen = detectProviderUrl("https://chat.qwen.ai/");
+assert(qwen.kind === "known", "Qwen Studio should be recognized as a built-in Provider.");
+assert(qwen.providerId === "qwen-chat", "Qwen Provider id should remain stable.");
+assert(qwen.manifest?.defaultUrl === "https://chat.qwen.ai/", "Qwen should open its official Studio web entry.");
+
 const custom = detectProviderUrl("https://mycompany-ai.example.com/chat");
 assert(custom.kind === "custom", "Unknown hosts should become custom provider profiles.");
 assert(custom.adapterId === "custom.browser", "Unknown hosts should use the generic taught browser adapter.");
