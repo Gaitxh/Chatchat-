@@ -3,15 +3,23 @@ import { createRoot } from "react-dom/client";
 import { CouncilOrchestrator } from "../core/orchestrator.js";
 import type {
   CouncilEvent,
+  CouncilParticipant,
   CouncilReport,
   CouncilRunOptions,
 } from "../core/types.js";
 import { normalizeLocale, type Locale } from "../i18n/index.js";
 import { ConsultationTheater } from "./components/ConsultationTheater.js";
+import { LiveMoments } from "./components/LiveMoments.js";
 import "./consultation-theater-portal.css";
 
+const LIVE_EVENT = "chatchat:consultation-live";
 const COMPLETE_EVENT = "chatchat:consultation-complete";
-const PATCH_MARKER = "__chatchatConsultationTheaterObserverV1" as const;
+const PATCH_MARKER = "__chatchatConsultationTheaterObserverV2" as const;
+
+interface ConsultationLiveDetail {
+  participants: CouncilParticipant[];
+  events: CouncilEvent[];
+}
 
 interface ConsultationCompletionDetail {
   report: CouncilReport;
@@ -25,19 +33,29 @@ type ObservablePrototype = typeof CouncilOrchestrator.prototype & {
 installReadOnlyObserver();
 
 function ConsultationTheaterPortal() {
+  const [live, setLive] = useState<ConsultationLiveDetail | null>(null);
   const [completion, setCompletion] = useState<ConsultationCompletionDetail | null>(null);
   const [locale, setLocale] = useState<Locale>(() => normalizeLocale(document.documentElement.lang));
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   useEffect(() => {
+    const onLive = (event: Event) => {
+      const detail = (event as CustomEvent<ConsultationLiveDetail>).detail;
+      if (!Array.isArray(detail?.participants) || !Array.isArray(detail?.events)) return;
+      setLive({ participants: [...detail.participants], events: [...detail.events] });
+    };
     const onComplete = (event: Event) => {
       const detail = (event as CustomEvent<ConsultationCompletionDetail>).detail;
       if (!detail?.report || !Array.isArray(detail.events)) return;
       setCompletion({ report: detail.report, events: [...detail.events] });
       setSelectedEventId(null);
     };
+    window.addEventListener(LIVE_EVENT, onLive);
     window.addEventListener(COMPLETE_EVENT, onComplete);
-    return () => window.removeEventListener(COMPLETE_EVENT, onComplete);
+    return () => {
+      window.removeEventListener(LIVE_EVENT, onLive);
+      window.removeEventListener(COMPLETE_EVENT, onComplete);
+    };
   }, []);
 
   useEffect(() => {
@@ -49,25 +67,47 @@ function ConsultationTheaterPortal() {
   }, []);
 
   useEffect(() => {
-    if (!completion) return;
     const theaterRoot = document.getElementById("consultation-theater-root");
-    const setup = document.querySelector(".consultation-app .setup-card");
-    const app = setup?.parentElement ?? document.querySelector(".consultation-app");
-    if (!theaterRoot || !app) return;
-    if (setup) {
-      app.insertBefore(theaterRoot, setup);
-    } else {
-      app.append(theaterRoot);
+    if (!theaterRoot) return;
+
+    if (completion) {
+      const setup = document.querySelector(".consultation-app .setup-card");
+      const app = setup?.parentElement ?? document.querySelector(".consultation-app");
+      if (!app) return;
+      if (setup) app.insertBefore(theaterRoot, setup);
+      else app.append(theaterRoot);
+      return;
     }
-  }, [completion]);
+
+    if (live?.events.length) {
+      const liveRoom = document.querySelector(".consultation-app .live-room-card");
+      if (liveRoom && theaterRoot.parentElement !== liveRoom) liveRoom.append(theaterRoot);
+    }
+  }, [completion, live?.events.length]);
 
   const selectedEvent = useMemo(
     () => completion?.events.find((event) => event.id === selectedEventId) ?? null,
     [completion, selectedEventId],
   );
 
-  if (!completion) return null;
+  if (!completion && !live?.events.length) return null;
 
+  if (!completion && live) {
+    return (
+      <div className="consultation-theater-portal">
+        <LiveMoments
+          participants={live.participants.map((participant) => ({
+            id: participant.id,
+            name: participant.name,
+          }))}
+          events={live.events}
+          locale={locale}
+        />
+      </div>
+    );
+  }
+
+  if (!completion) return null;
   const participants = completion.report.positions.map((position) => position.participant);
   return (
     <div className="consultation-theater-portal">
@@ -162,7 +202,23 @@ function installReadOnlyObserver() {
     question: string,
     options: CouncilRunOptions = {},
   ) {
-    const result = await originalRun.call(this, question, options);
+    const liveEvents: CouncilEvent[] = [];
+    const participants = [...this.participants];
+    const observedOptions: CouncilRunOptions = {
+      ...options,
+      onEvent: async (event) => {
+        await options.onEvent?.(event);
+        liveEvents.push(event);
+        window.dispatchEvent(new CustomEvent<ConsultationLiveDetail>(LIVE_EVENT, {
+          detail: {
+            participants,
+            events: [...liveEvents],
+          },
+        }));
+      },
+    };
+
+    const result = await originalRun.call(this, question, observedOptions);
     window.dispatchEvent(new CustomEvent<ConsultationCompletionDetail>(COMPLETE_EVENT, {
       detail: {
         report: result.report,

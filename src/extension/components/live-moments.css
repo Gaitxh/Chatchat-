@@ -1,0 +1,22 @@
+.live-moments{position:relative;z-index:1;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}
+.live-moments__heading{display:grid;grid-template-columns:minmax(0,1fr) 104px;gap:12px;align-items:start}
+.live-moments__heading>div:first-child>span{display:block;color:#f2c979;font-size:8px;font-weight:850;letter-spacing:.12em}
+.live-moments__heading h3{margin:3px 0 4px;color:#fff;font-size:13px;letter-spacing:-.02em}
+.live-moments__heading p{margin:0;color:#aeb6c3;font-size:8px;line-height:1.45}
+.heat-gauge{padding:8px;border-radius:10px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.06)}
+.heat-gauge>div:first-child{display:flex;align-items:baseline;justify-content:space-between;gap:5px}
+.heat-gauge>div:first-child span{color:#9fa8b6;font-size:6px;font-weight:800;letter-spacing:.08em}
+.heat-gauge>div:first-child b{color:#fff1d2;font-size:16px;line-height:1}
+.heat-track{height:3px;margin:6px 0;overflow:hidden;border-radius:999px;background:rgba(255,255,255,.08)}
+.heat-track i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#7da0d2,#e7ba67 72%,#de7867);transition:width .35s ease}
+.heat-gauge>strong{display:block;color:#dce2eb;font-size:7px}.heat-gauge>small{display:block;margin-top:2px;color:#788392;font-size:6px;line-height:1.3}
+.moment-reel{display:grid;gap:6px;margin-top:9px}.moment-card{display:grid;grid-template-columns:32px minmax(0,1fr);gap:8px;align-items:center;padding:8px 9px;border-radius:11px;border:1px solid rgba(255,255,255,.065);background:rgba(255,255,255,.045);opacity:.72;transform:scale(.992)}
+.moment-card.is-latest{opacity:1;transform:none;background:rgba(255,255,255,.075);box-shadow:0 8px 20px rgba(0,0,0,.08)}
+.moment-icon{width:32px;height:32px;display:grid;place-items:center;border-radius:10px;background:rgba(255,255,255,.07);font-size:14px}
+.moment-clash .moment-icon,.moment-evidence_challenged .moment-icon{background:rgba(209,105,89,.16)}
+.moment-evidence_drop .moment-icon,.moment-evidence_turn .moment-icon{background:rgba(72,133,194,.17)}
+.moment-plot_twist .moment-icon{background:rgba(165,103,190,.18)}.moment-alliance .moment-icon{background:rgba(80,153,105,.18)}.moment-concession .moment-icon{background:rgba(190,151,79,.16)}
+.moment-lone_dissenter .moment-icon,.moment-split_room .moment-icon{background:rgba(221,132,69,.16)}.moment-alignment_surge .moment-icon,.moment-full_alignment .moment-icon{background:rgba(101,166,132,.17)}
+.moment-main{min-width:0}.moment-topline{display:flex;align-items:center;gap:6px}.moment-topline strong{color:#f4f5f7;font-size:8px;letter-spacing:.05em}.moment-topline span{margin-left:auto;color:#7f8997;font-size:6px}
+.moment-main p{margin:3px 0 0;color:#bec5cf;font-size:8px;line-height:1.4}.moment-main>small{display:block;margin-top:3px;color:#e2bf79;font-size:6px}.moment-empty{margin:9px 0 0;padding:9px;border-radius:10px;background:rgba(255,255,255,.035);color:#929cab;font-size:8px;line-height:1.45}
+@media(max-width:400px){.live-moments__heading{grid-template-columns:1fr}.heat-gauge{display:grid;grid-template-columns:auto 1fr;column-gap:8px}.heat-gauge>div:first-child,.heat-track{grid-column:1/-1}}
