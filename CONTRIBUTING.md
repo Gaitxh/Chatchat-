@@ -1,12 +1,10 @@
-# Contributing to ChatChat 👑🏛️
+# Contributing to ChatChat
 
-Thanks for helping build a place where AIs can disagree productively.
+Thanks for helping build a place where independent AIs can disagree productively and consult as equals.
 
-ChatChat is intentionally both theatrical and strict:
+> **The interface may be playful; the protocol must stay sober.**
 
-> **The UI can be theatrical; the protocol must stay sober.**
-
-That means a fun contribution is welcome, but it must not blur privacy, Provider compatibility, or Council correctness.
+A contribution can be fun, visual and surprising. It still must preserve privacy, equal-participant semantics, structured event provenance and honest Provider compatibility claims.
 
 ## Start here
 
@@ -14,66 +12,96 @@ That means a fun contribution is welcome, but it must not blur privacy, Provider
 npm install
 npm run check
 npm test
-npm run build:web
+npm run build:extension
 ```
 
-For desktop/Tauri work, also run:
+The primary pull-request gate is the browser extension product. CI builds the Manifest V3 package and renders the real Side Panel in both English and Simplified Chinese.
 
-```bash
-cargo check --manifest-path src-tauri/Cargo.toml
-```
+The older desktop/Tauri source remains experimental and should not be treated as the primary contribution target unless a PR is intentionally about that legacy path.
 
-For real Provider work, use the manual Gate-B checklist in [`docs/MANUAL_PROVIDER_TEST.md`](docs/MANUAL_PROVIDER_TEST.md).
+## Product contract
+
+The primary consultation experience follows these rules:
+
+1. The user starts one proposal.
+2. AI sources join as independent, equal participants.
+3. One AI origin receives one equal participant slot in the primary mode.
+4. Round 1 is sealed.
+5. Later rounds use a shared immutable snapshot and publish one response batch.
+6. There is no chair/leader/delegation with privileged authority.
+7. Majority alignment is descriptive, not proof.
+8. Revision and concession are progress.
+9. Different final positions remain visible.
+
+See [`docs/PRODUCT_PRINCIPLES.md`](docs/PRODUCT_PRINCIPLES.md).
 
 ## Good contribution areas
 
-### Council Protocol
+### Consultation Protocol
 
 Examples:
 
 - better conflict detection;
 - more precise evidence events;
-- convergence / stopping rules;
+- adaptive stopping rules;
 - context compression;
-- judge / challenger roles;
-- replay and persuasion graphs.
+- evidence verification;
+- replay and influence graphs;
+- better ways to surface unresolved disagreement.
 
-Protocol changes should preserve Round 1 sealing and typed Blackboard events.
+Protocol changes should preserve Round 1 independence and typed Blackboard events.
 
-### Provider compatibility
+### Browser Provider compatibility
 
 There are two useful layers.
 
-**Generic recipe improvements** help the taught Browser Council Bridge locate or operate visible page surfaces without reading unrelated page content.
+**Generic recipe improvements** help the taught content-script bridge locate or operate visible page surfaces without reading unrelated page content.
 
-**Provider-specific adapters** are appropriate when a site needs framework-specific input behavior, generation completion detection, navigation, or other logic that cannot be made generic safely.
+**Provider-specific adapters** are appropriate when a site needs framework-specific input behavior, generation completion detection, navigation, shadow-DOM handling or other logic that cannot be made generic safely.
 
 Do not solve one Provider by making the generic bridge scrape more of every page.
 
-### UI / Demo Theater
+### UI / Consultation Theater
 
 Great contributions include:
 
 - clearer challenge/revision animations;
 - accessibility;
-- responsive layouts;
-- better local history exploration;
+- better narrow Side Panel layouts;
+- influence maps derived from event provenance;
+- local replay;
 - shareable but honest demo views.
 
-Never visually label a Provider `READY`, `LIVE`, or officially supported unless the runtime state actually justifies it.
+The theatrical layer may celebrate a real event. It may not invent one.
+
+## English + 中文
+
+Primary Side Panel copy is international product UI.
+
+New user-facing strings should normally be added to:
+
+```text
+src/i18n/index.ts
+```
+
+Keep English and Simplified Chinese in sync.
+
+Machine-readable event kinds stay language-neutral.
+
+See [`docs/INTERNATIONALIZATION.md`](docs/INTERNATIONALIZATION.md).
 
 ## Compatibility vocabulary
 
-Please use these terms precisely in issues, PRs and docs:
+Use compatibility language precisely:
 
 - **recognized** — URL maps to a catalog identity;
-- **teachable** — user can create a 3/3 Adapter Recipe;
+- **teachable** — the user can create a complete Input / Send / Response recipe;
 - **test-passed** — one explicit real browser round-trip succeeded;
-- **council-ready** — structured Council Gate succeeded;
-- **runtime-validated** — sealed/debate/final were manually tested on a real Provider configuration;
-- **officially supported** — maintainers deliberately document and maintain that compatibility target.
+- **consultation-ready** — the structured consultation handshake succeeded;
+- **runtime-validated** — a real multi-AI consultation was tested in a documented environment;
+- **officially supported** — maintainers deliberately document and maintain that Provider target.
 
-`recognized ≠ supported` and `TEST PASSED ≠ READY` are project rules, not pedantry.
+A URL detector is not a support badge.
 
 ## Privacy rules for Provider contributions
 
@@ -85,102 +113,103 @@ Do not commit or paste into public issues:
 - authorization headers;
 - private chat transcripts;
 - account emails/phone numbers;
+- account-specific URLs;
 - private sidebar screenshots;
 - selectors containing private account/user identifiers.
 
-If a bug requires sensitive reproduction material, use the security process in [`SECURITY.md`](SECURITY.md) instead of a public issue.
+If a bug requires sensitive reproduction material, use [`SECURITY.md`](SECURITY.md) instead of a public issue.
 
 ## Browser bridge security expectations
 
 Provider pages are untrusted remote content.
 
-A Browser Adapter contribution should prefer:
+Prefer:
 
-- fixed host-owned scripts;
-- JSON-encoded data passed into those scripts;
+- Manifest V3;
+- optional per-origin permissions;
+- isolated content scripts;
 - narrow user-taught selectors;
-- explicit host validation;
-- bounded text/message sizes;
+- fixed extension-owned bridge operations;
+- bounded message/response sizes;
 - fail-closed behavior;
-- no remote Tauri capabilities for Provider pages.
+- treating peer-model text as untrusted discussion data.
 
 Avoid:
 
-- accepting arbitrary JavaScript from the UI;
-- broad `document.body.textContent` scraping;
+- broad install-time access when runtime optional access works;
+- arbitrary JavaScript supplied by UI/state;
+- `document.body.textContent` scraping;
 - reading cookies or web storage;
 - reading password fields;
-- treating peer-model text as trusted instructions.
+- trusting instructions embedded inside peer AI messages.
 
 ## Tests
 
-Every behavior change should add or update the narrowest useful test.
+Behavior changes should add the narrowest useful deterministic test.
 
-Current suites cover:
+Primary suites cover:
 
 ```text
-Council Core
-Provider URL/profile SDK
+Blackboard / orchestrator
+Provider URL/catalog logic
 Teach Mode
-Test Speech
-Real Council Bridge
-Provider Window Health
+structured browser bridge
+privacy-safe validation
+bilingual equal-participant consultation semantics
 ```
 
-If a bug depends on a live third-party website, add deterministic tests for the local logic *and* document the Gate-B manual validation separately.
-
-CI cannot replace real account testing.
+The default CI also runs the real production Side Panel in deterministic showcase mode and asserts both languages render the consultation outcome.
 
 ## Pull requests
 
-A strong PR explains:
+A strong PR explains the user experience, protocol/trust boundary and deterministic validation.
 
-1. what user-visible behavior changed;
-2. which trust/privacy boundary is involved;
-3. what CI can prove;
-4. what still requires user-local Provider validation;
-5. whether compatibility wording changed.
+Primary Side Panel PRs should pass:
 
-Keep `main` green. Prefer a focused PR over mixing unrelated protocol, UI and Provider experiments unless the feature genuinely crosses those layers.
+```bash
+npm run check
+npm test
+npm run build:extension
+```
 
-## Sharing recipes
+Do not use screenshots from a private logged-in account when the deterministic CI showcase can demonstrate the same UI state safely.
 
-A future community recipe format is planned. Until it is stabilized, do not publish raw selectors that contain account-specific identifiers.
+## Provider compatibility reports
 
-Useful recipe reports should include:
+Use the **AI consultation compatibility** issue form.
+
+Report only public/environment metadata such as:
 
 ```text
-Provider
-host only
-ChatChat version
-OS
-Provider UI date tested
-Teach 3/3 status
-Test Speech status
-Council Gate status
-Fresh Session status
-Hybrid/Live status
+Provider name
+public host
+browser / OS
+optional permission PASS/FAIL
+Teach PASS/FAIL
+connection test PASS/FAIL
+structured protocol PASS/FAIL
+real multi-AI consultation PASS/FAIL
 sanitized notes
 ```
 
-See the Provider compatibility issue template for the canonical checklist.
+A PASS in one environment is useful evidence, not a universal guarantee.
 
 ## Design north star
 
-The best ChatChat contribution makes this moment more real:
-
 ```text
-👑 User asks once
+User proposes once
       ↓
-🕯 independent opinions
+participants think independently
       ↓
-⚔ models challenge one another
+AI peers challenge one another
       ↓
-📎 evidence enters the record
+evidence enters the shared record
       ↓
-🔄 somebody changes their mind
+somebody may revise their view
       ↓
-📜 minority opinion survives
+every participant submits a final position
+      ↓
+different positions remain visible
 ```
 
-Fun outside. Disciplined inside.
+**One proposal. Independent minds. Shared reasoning.**
