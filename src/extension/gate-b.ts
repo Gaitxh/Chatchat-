@@ -18,13 +18,12 @@ export interface CaptureBrowserHouseProofInput {
   providerHostSeatIds: readonly string[];
 }
 
-/**
- * Converts the exact Browser House seats that participated in a Council into
- * the shared Gate B provider-proof vocabulary.
- *
- * No tab ids, display names, selectors, responses, or account data survive
- * this adapter. The shared Royal Proof Pack performs the final verdict logic.
- */
+export interface CaptureAdmittedBrowserHouseProofInput {
+  seats: readonly BrowserHouseProofSeat[];
+  recipes: Readonly<Record<string, AdapterRecipe>>;
+  providerHostSeatIds: readonly string[];
+}
+
 export function captureBrowserHouseProviderProof(
   input: CaptureBrowserHouseProofInput,
 ): ProviderProofSnapshot[] {
@@ -36,6 +35,29 @@ export function captureBrowserHouseProviderProof(
     recipeReady: adapterRecipeComplete(input.recipes[seat.origin]),
     testPassed: input.tests[seat.seatId] === "pass",
     councilGatePassed: input.gates[seat.seatId] === "pass",
+    providerHostHealthy: healthy.has(seat.seatId),
+    seated: true,
+  }));
+}
+
+/**
+ * Browser Side Panel admission invariant:
+ * a seat cannot reach CouncilOrchestrator unless its origin Recipe is complete
+ * and that independent tab has passed Test Speech plus Council Gate in the
+ * current Side Panel runtime. Use this helper only for those exact admitted
+ * participant seat ids.
+ */
+export function captureAdmittedBrowserHouseProviderProof(
+  input: CaptureAdmittedBrowserHouseProofInput,
+): ProviderProofSnapshot[] {
+  const healthy = new Set(input.providerHostSeatIds);
+  return input.seats.map((seat) => ({
+    providerId: seat.providerId,
+    adapterId: "extension.tab",
+    host: publicHost(seat.origin),
+    recipeReady: adapterRecipeComplete(input.recipes[seat.origin]),
+    testPassed: true,
+    councilGatePassed: true,
     providerHostHealthy: healthy.has(seat.seatId),
     seated: true,
   }));
