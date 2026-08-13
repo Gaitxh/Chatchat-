@@ -443,7 +443,7 @@ function ExtensionApp() {
       {stage !== "idle" ? (
         <section className="progress-card">
           <div className="phase-line">
-            <Phase name="密室" active={stage === "sealed"} done={stage !== "sealed" && stage !== "idle" && stage !== "error"} />
+            <Phase name="密室" active={stage === "sealed"} done={stage !== "sealed" && stage !== "error"} />
             <i />
             <Phase name="廷议" active={stage === "debate"} done={stage === "final" || stage === "complete"} />
             <i />
