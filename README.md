@@ -391,6 +391,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 **ChatChat — one proposal, many independent minds.**
 
+---
+
+## Assistance
+
+This project was completed with the assistance of chatGPT and codex from **openai**.
+
 MIT
 
 </div>
