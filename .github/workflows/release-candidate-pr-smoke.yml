@@ -56,7 +56,11 @@ jobs:
           npm test
 
       - name: Generate platform icons
-        run: npm run tauri -- icon assets/chatchat-app-icon.svg
+        run: npm run tauri -- icon --output src-tauri/icons assets/chatchat-app-icon.svg
+
+      - name: Verify generated bundle icons
+        run: >-
+          node --input-type=module -e "import fs from 'node:fs'; const paths=['src-tauri/icons/32x32.png','src-tauri/icons/128x128.png','src-tauri/icons/128x128@2x.png','src-tauri/icons/icon.png','src-tauri/icons/icon.icns','src-tauri/icons/icon.ico']; for (const p of paths) { if (!fs.existsSync(p)) throw new Error('Missing generated release icon: '+p); } console.log('Verified release icons:', paths.join(', '));"
 
       - name: Build unsigned candidate
         uses: tauri-apps/tauri-action@v0
