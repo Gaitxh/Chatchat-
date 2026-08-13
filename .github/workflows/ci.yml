@@ -150,10 +150,11 @@ jobs:
             --dump-dom \
             "$SUMMON_SHOWCASE" > artifacts/chatchat-extension-summon-house.html
 
+          grep -q 'id="chatchat-summon-house"' artifacts/chatchat-extension-summon-house.html
+          grep -q 'data-summon-candidates="7"' artifacts/chatchat-extension-summon-house.html
+          grep -q 'data-chatchat-summon-showcase="booted"' artifacts/chatchat-extension-summon-house.html
           grep -q 'SUMMON THE HOUSE' artifacts/chatchat-extension-summon-house.html
-          grep -q '召集 7 席' artifacts/chatchat-extension-summon-house.html
           grep -q '新席位仍需 Test + Gate' artifacts/chatchat-extension-summon-house.html
-          grep -q 'DETERMINISTIC SUMMON SHOWCASE' artifacts/chatchat-extension-summon-house.html
           ! grep -q 'COUNCIL GATE ✓' artifacts/chatchat-extension-summon-house.html
 
       - name: Upload Council Chamber screenshot
