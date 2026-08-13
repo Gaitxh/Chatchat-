@@ -64,7 +64,7 @@ export function useCouncilSession(realAgents: readonly CouncilAgent[] = []) {
     () => composeCouncil(realAgents),
     [realAgents],
   );
-  const participants = useMemo<readonly CouncilParticipant[]>(
+  const liveParticipants = useMemo<readonly CouncilParticipant[]>(
     () => councilComposition.agents.map((agent) => agent.participant),
     [councilComposition.agents],
   );
@@ -82,6 +82,11 @@ export function useCouncilSession(realAgents: readonly CouncilAgent[] = []) {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [resultSource, setResultSource] = useState<CouncilResultSource>(null);
   const [lastCompletedMode, setLastCompletedMode] = useState<CouncilRunMode | null>(null);
+
+  const participants = useMemo<readonly CouncilParticipant[]>(() => {
+    if (!report) return liveParticipants;
+    return report.positions.map((position) => position.participant);
+  }, [liveParticipants, report]);
 
   const refreshHistory = useCallback(async () => {
     try {
