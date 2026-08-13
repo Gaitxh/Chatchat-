@@ -1,1 +1,3 @@
-export { parseProviderCouncilResponse } from "./council-agent.js";
+export {
+  parseProviderConsultationResponse as parseProviderCouncilResponse,
+} from "./consultation-protocol.js";
