@@ -29,6 +29,17 @@ jobs:
       - name: Build Council Chamber
         run: npm run build:web
 
+      - name: Build Browser Extension
+        run: npm run build:extension
+
+      - name: Upload unpacked Browser Extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-browser-extension-unpacked
+          path: dist-extension/**
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Install screenshot fonts
         run: |
           sudo apt-get update
