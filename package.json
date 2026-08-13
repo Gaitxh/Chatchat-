@@ -16,7 +16,7 @@
     "check:web": "tsc -p tsconfig.app.json --noEmit",
     "check:product": "node scripts/check-product-language.mjs",
     "demo": "npm run build:core && node dist/src/demo.js",
-    "test": "npm run build:core && node dist/tests/core.test.js && node dist/tests/provider-sdk.test.js && node dist/tests/teach-mode.test.js && node dist/tests/test-speech.test.js && node dist/tests/council-bridge.test.js && node dist/tests/window-health.test.js && node dist/tests/gate-b-proof.test.js && node dist/tests/consultation-mode.test.js && node dist/tests/consultation-theater.test.js && node dist/tests/extension-gate-b.test.js && node dist/tests/recipe-candidate.test.js && node dist/tests/browser-chronicle.test.js",
+    "test": "npm run build:core && node dist/tests/core.test.js && node dist/tests/provider-sdk.test.js && node dist/tests/teach-mode.test.js && node dist/tests/test-speech.test.js && node dist/tests/council-bridge.test.js && node dist/tests/window-health.test.js && node dist/tests/gate-b-proof.test.js && node dist/tests/consultation-mode.test.js && node dist/tests/consultation-theater.test.js && node dist/tests/live-moments.test.js && node dist/tests/extension-gate-b.test.js && node dist/tests/recipe-candidate.test.js && node dist/tests/browser-chronicle.test.js",
     "preview": "vite preview --port 1420",
     "preview:extension": "vite preview --config vite.extension.config.ts"
   },
