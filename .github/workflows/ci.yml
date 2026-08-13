@@ -57,6 +57,17 @@ jobs:
 
       - name: Capture Chinese consultation product
         run: |
+          set -euo pipefail
+          assert_dom() {
+            local pattern="$1"
+            local label="$2"
+            if grep -q "$pattern" artifacts/chatchat-consultation-zh.html; then
+              echo "✓ $label"
+            else
+              echo "✗ MISSING: $label :: $pattern"
+              exit 1
+            fi
+          }
           CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
           test -n "$CHROME_BIN"
           URL='http://127.0.0.1:4180/extension/sidepanel.html?showcase=consultation&lang=zh'
@@ -66,7 +77,7 @@ jobs:
             --disable-gpu \
             --hide-scrollbars \
             --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=22000 \
+            --virtual-time-budget=24000 \
             --window-size=440,4300 \
             --screenshot=artifacts/chatchat-consultation-zh.png \
             "$URL"
@@ -75,28 +86,50 @@ jobs:
             --no-sandbox \
             --disable-gpu \
             --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=22000 \
+            --virtual-time-budget=24000 \
             --dump-dom \
             "$URL" > artifacts/chatchat-consultation-zh.html
           test -s artifacts/chatchat-consultation-zh.png
-          grep -q 'data-chatchat-consultation-showcase="complete"' artifacts/chatchat-consultation-zh.html
-          grep -q '用户发起提案' artifacts/chatchat-consultation-zh.html
-          grep -q '平等 AI 参与者' artifacts/chatchat-consultation-zh.html
-          grep -q '没有议长' artifacts/chatchat-consultation-zh.html
-          grep -q '协商结果' artifacts/chatchat-consultation-zh.html
-          grep -q '协商剧场' artifacts/chatchat-consultation-zh.html
-          grep -q '明确发生的立场修正' artifacts/chatchat-consultation-zh.html
-          grep -q '协商记录' artifacts/chatchat-consultation-zh.html
-          grep -q '只属于你的本地协商记忆' artifacts/chatchat-consultation-zh.html
-          grep -q 'INDEXEDDB · 本地' artifacts/chatchat-consultation-zh.html
-          grep -q 'class="history-entry' artifacts/chatchat-consultation-zh.html
-          grep -q '对于一个开源、本地优先的多 AI 浏览器项目' artifacts/chatchat-consultation-zh.html
-          grep -q 'Claude' artifacts/chatchat-consultation-zh.html
-          grep -q 'Web + Extension' artifacts/chatchat-consultation-zh.html
-          grep -q 'Browser Extension' artifacts/chatchat-consultation-zh.html
+          assert_dom 'data-chatchat-consultation-showcase="complete"' 'showcase completed'
+          assert_dom '用户发起提案' 'proposal UI'
+          assert_dom '平等 AI 参与者' 'equal participants'
+          assert_dom '没有议长' 'no-chair principle'
+          assert_dom '协商结果' 'consultation outcome'
+          assert_dom '协商剧场' 'Consultation Theater'
+          assert_dom '明确发生的立场修正' 'changed-mind trail'
+          assert_dom '协商记录' 'Consultation History heading'
+          assert_dom '只属于你的本地协商记忆' 'Consultation History body'
+          assert_dom 'INDEXEDDB · 本地' 'local IndexedDB badge'
+          assert_dom 'class="history-entry' 'saved history entry'
+          assert_dom '对于一个开源、本地优先的多 AI 浏览器项目' 'saved proposal preview'
+          assert_dom 'Claude' 'Claude participant'
+          assert_dom 'Web + Extension' 'old stance'
+          assert_dom 'Browser Extension' 'new stance'
+
+      - name: Upload Chinese showcase debug
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-consultation-zh-debug
+          path: |
+            artifacts/chatchat-consultation-zh.png
+            artifacts/chatchat-consultation-zh.html
+          if-no-files-found: warn
+          retention-days: 3
 
       - name: Capture English consultation product
         run: |
+          set -euo pipefail
+          assert_dom() {
+            local pattern="$1"
+            local label="$2"
+            if grep -q "$pattern" artifacts/chatchat-consultation-en.html; then
+              echo "✓ $label"
+            else
+              echo "✗ MISSING: $label :: $pattern"
+              exit 1
+            fi
+          }
           CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
           URL='http://127.0.0.1:4180/extension/sidepanel.html?showcase=consultation&lang=en'
           "$CHROME_BIN" \
@@ -105,7 +138,7 @@ jobs:
             --disable-gpu \
             --hide-scrollbars \
             --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=22000 \
+            --virtual-time-budget=24000 \
             --window-size=440,4300 \
             --screenshot=artifacts/chatchat-consultation-en.png \
             "$URL"
@@ -114,26 +147,26 @@ jobs:
             --no-sandbox \
             --disable-gpu \
             --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=22000 \
+            --virtual-time-budget=24000 \
             --dump-dom \
             "$URL" > artifacts/chatchat-consultation-en.html
           test -s artifacts/chatchat-consultation-en.png
-          grep -q 'data-chatchat-consultation-showcase="complete"' artifacts/chatchat-consultation-en.html
-          grep -q 'Propose once' artifacts/chatchat-consultation-en.html
-          grep -q 'Equal AI participants' artifacts/chatchat-consultation-en.html
-          grep -qi 'no chair' artifacts/chatchat-consultation-en.html
-          grep -q 'CONSULTATION OUTCOME' artifacts/chatchat-consultation-en.html
-          grep -q 'CONSULTATION THEATER' artifacts/chatchat-consultation-en.html
-          grep -q 'Explicit revisions' artifacts/chatchat-consultation-en.html
-          grep -q 'CONSULTATION HISTORY' artifacts/chatchat-consultation-en.html
-          grep -q 'Your local consultation memory' artifacts/chatchat-consultation-en.html
-          grep -q 'INDEXEDDB · LOCAL' artifacts/chatchat-consultation-en.html
-          grep -q 'class="history-entry' artifacts/chatchat-consultation-en.html
-          grep -q 'For an open-source, local-first multi-AI browser project' artifacts/chatchat-consultation-en.html
-          grep -q 'Who changed what' artifacts/chatchat-consultation-en.html
-          grep -q 'Claude' artifacts/chatchat-consultation-en.html
-          grep -q 'Web + Extension' artifacts/chatchat-consultation-en.html
-          grep -q 'Browser Extension' artifacts/chatchat-consultation-en.html
+          assert_dom 'data-chatchat-consultation-showcase="complete"' 'showcase completed'
+          assert_dom 'Propose once' 'proposal UI'
+          assert_dom 'Equal AI participants' 'equal participants'
+          assert_dom 'no chair' 'no-chair principle'
+          assert_dom 'CONSULTATION OUTCOME' 'consultation outcome'
+          assert_dom 'CONSULTATION THEATER' 'Consultation Theater'
+          assert_dom 'Explicit revisions' 'changed-mind trail'
+          assert_dom 'CONSULTATION HISTORY' 'Consultation History heading'
+          assert_dom 'Your local consultation memory' 'Consultation History body'
+          assert_dom 'INDEXEDDB · LOCAL' 'local IndexedDB badge'
+          assert_dom 'class="history-entry' 'saved history entry'
+          assert_dom 'For an open-source, local-first multi-AI browser project' 'saved proposal preview'
+          assert_dom 'Who changed what' 'Theater copy'
+          assert_dom 'Claude' 'Claude participant'
+          assert_dom 'Web + Extension' 'old stance'
+          assert_dom 'Browser Extension' 'new stance'
 
       - name: Enforce equal-consultation product language
         run: |
