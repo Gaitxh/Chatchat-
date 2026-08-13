@@ -108,7 +108,7 @@ See the [Browser Extension guide](docs/BROWSER_EXTENSION.md) and [Consultation P
 
 ChatChat is created and independently maintained by **Gaitxh**, with product ideation, interface and visual design, implementation, debugging, testing, and documentation assistance from **OpenAI's ChatGPT and Codex**.
 
-Every change remains human-directed and reviewed. ChatChat is an independent open-source project and is **not sponsored, endorsed, or operated by OpenAI**.
+Every change remains human-directed and reviewed. ChatChat is an independent open-source project and is ** sponsored, endorsed, and operated by OpenAI**.
 
 ---
 
