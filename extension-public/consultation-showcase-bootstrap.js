@@ -5,6 +5,7 @@
   const locale = params.get("lang") === "en" ? "en" : "zh-CN";
   const RECIPES_KEY = "chatchat.extension.recipes.v1";
   const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
+  const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
   const LOCALE_KEY = "chatchat.locale.v1";
 
   const participantRows = [
@@ -60,12 +61,25 @@
     ]),
   );
 
+  const connections = Object.fromEntries(
+    participantRows.map((participant) => [
+      participant.seatId,
+      {
+        state: "ready",
+        automatic: true,
+        verifiedAt: "2026-08-13T00:00:01.000Z",
+        detail: "Synthetic automatic connection passed.",
+      },
+    ]),
+  );
+
   const memoryLocal = {
     [RECIPES_KEY]: recipes,
     [LOCALE_KEY]: locale,
   };
   const memorySession = {
     [PARTICIPANTS_KEY]: participantRows,
+    [CONNECTIONS_KEY]: connections,
   };
 
   function area(memory) {
@@ -141,6 +155,7 @@
         tabs.set(id, tab);
         return { ...tab };
       },
+      async remove(tabId) { tabs.delete(tabId); },
       onUpdated: {
         addListener(listener) { onUpdatedListeners.add(listener); },
         removeListener(listener) { onUpdatedListeners.delete(listener); },
@@ -149,6 +164,17 @@
         if (!payload?.__chatchat) return { ok: false, error: "Not a ChatChat message" };
         if (payload.type === "PING") return { ok: true, result: { ready: true } };
         if (payload.type === "AWAIT_RECIPE") return { ok: true, result: { ready: true } };
+        if (payload.type === "AUTO_SETUP") {
+          return {
+            ok: true,
+            result: {
+              recipe: recipes[tabs.get(tabId)?.url?.startsWith("https://claude.ai") ? "https://claude.ai" : tabs.get(tabId)?.url?.startsWith("https://gemini.google.com") ? "https://gemini.google.com" : "https://chatgpt.com"],
+              responseText: "CHATCHAT_READY",
+              elapsedMs: 280,
+              diagnostics: { mode: "synthetic-automatic" },
+            },
+          };
+        }
         if (payload.type === "TEACH") {
           return {
             ok: true,
@@ -168,7 +194,7 @@
   };
 
   function speechFor(tabId, prompt) {
-    if (/connection test/i.test(prompt)) {
+    if (/connection handshake|connection test/i.test(prompt)) {
       return { responseText: "CHATCHAT_READY", elapsedMs: 320, responseCount: 1 };
     }
     if (/Protocol handshake only/i.test(prompt)) {
@@ -179,7 +205,7 @@
 
     const phase = match(prompt, /PHASE:\s*(sealed|debate|final)/i)?.toLowerCase() ?? "sealed";
     const actorId = match(prompt, /YOUR_ACTOR_ID:\s*([^\n]+)/) ?? `actor-${tabId}`;
-    const publicEvents = parseJsonField(prompt, "COUNCIL_EVENTS_JSON") ?? parseJsonField(prompt, "CONSULTATION_EVENTS_JSON") ?? [];
+    const publicEvents = parseJsonField(prompt, "CONSULTATION_EVENTS_JSON") ?? parseJsonField(prompt, "COUNCIL_EVENTS_JSON") ?? [];
     const ownEvents = parseJsonField(prompt, "YOUR_PRIOR_EVENTS_JSON") ?? [];
     const peer = publicEvents.find((event) => event.actorId !== actorId) ?? publicEvents[0];
     const own = ownEvents.find((event) => event.actorId === actorId) ?? ownEvents[0];
@@ -232,23 +258,26 @@
   }
 
   async function driveShowcase() {
-    for (let attempt = 0; attempt < 60; attempt += 1) {
-      const buttons = [...document.querySelectorAll(".verify-button")];
-      if (buttons.length >= 3) {
-        for (const button of buttons) {
-          if (!button.classList.contains("is-ready")) {
-            button.click();
-            await delay(700);
-          }
-        }
-        await delay(600);
-        document.querySelector(".start-button")?.click();
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const start = document.querySelector(".start-button");
+      if (start instanceof HTMLButtonElement && !start.disabled) {
+        start.click();
         document.documentElement.dataset.chatchatConsultationShowcase = "running";
-        await delay(2800);
-        document.documentElement.dataset.chatchatConsultationShowcase = "complete";
+        for (let completionAttempt = 0; completionAttempt < 160; completionAttempt += 1) {
+          if (
+            document.querySelector(".outcome-card") &&
+            document.querySelector(".live-room-card") &&
+            document.querySelector(".consultation-theater")
+          ) {
+            document.documentElement.dataset.chatchatConsultationShowcase = "complete";
+            return;
+          }
+          await delay(50);
+        }
+        document.documentElement.dataset.chatchatConsultationShowcase = "failed";
         return;
       }
-      await delay(100);
+      await delay(50);
     }
     document.documentElement.dataset.chatchatConsultationShowcase = "failed";
   }
