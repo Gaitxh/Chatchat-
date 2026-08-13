@@ -100,7 +100,7 @@ npm run dev:web
 
 **目前已有：** 浏览器优先的中英双语协商、结构化 Blackboard、最终报告、少数意见、事件溯源、协商剧场与本地回放。
 
-**正在推进：** 持久化的[协商记录](https://github.com/Gaitxh/Chatchat-/pull/52)，以及把“给了一个来源”和“这个主张真的被验证”明确分开的[证据层](https://github.com/Gaitxh/Chatchat-/issues/53)。
+**正在推进：** [协商记录](https://github.com/Gaitxh/Chatchat-/issues/57)、[证据层](https://github.com/Gaitxh/Chatchat-/issues/53)、[第一次协商引导](https://github.com/Gaitxh/Chatchat-/issues/58)，以及[真实双 Provider 浏览器验收](https://github.com/Gaitxh/Chatchat-/issues/12)。
 
 ## 人类主导，AI 协作
 
