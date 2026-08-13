@@ -157,9 +157,7 @@ export function buildEvidenceCourtLedger(
       for (const causeId of explicitCauses) {
         link(claims, eventById, unresolvedReferences, event.id, causeId, "revision", "revisionEventIds");
       }
-      // The previous position is also an explicit event reference, but it does
-      // not mean that previous event *caused* the revision. We therefore do not
-      // use previousEventId as evidence of persuasion.
+      // previousEventId identifies what was revised, not what caused it.
       continue;
     }
     if (event.kind === "concede") {
@@ -223,15 +221,15 @@ function deriveStatuses(
   evidence: readonly EvidenceRecord[],
 ): EvidenceLedgerStatus[] {
   const statuses = new Set<EvidenceLedgerStatus>();
-  const attached = evidence.filter((item) => claim.evidenceEventIds.includes(item.eventId));
+  const attachedIds = new Set(claim.evidenceEventIds);
+  if (claim.kind === "evidence") attachedIds.add(claim.eventId);
+  const attached = evidence.filter((item) => attachedIds.has(item.eventId));
 
   if (!claimHasExplicitEvidence(claim)) statuses.add("unsupported");
   if (attached.some((item) => item.source?.openable)) statuses.add("sourced");
-  if (
-    attached.some(
-      (item) => item.source?.openable && !item.sourceDate,
-    )
-  ) statuses.add("source-date-missing");
+  if (attached.some((item) => item.source?.openable && !item.sourceDate)) {
+    statuses.add("source-date-missing");
+  }
   if (claim.challengeEventIds.length) statuses.add("challenged");
   if (claim.supportEventIds.length) statuses.add("supported");
   if (claim.defenseEventIds.length) statuses.add("defended");
@@ -274,13 +272,19 @@ function link(
   >,
 ) {
   const targetEvent = eventById.get(targetEventId);
-  const targetClaim = claims.get(targetEventId);
-  if (!targetEvent || !targetClaim) {
+  if (!targetEvent) {
     unresolved.push({
       eventId: sourceEventId,
       referencedEventId: targetEventId,
       relation,
     });
+    return;
+  }
+  const targetClaim = claims.get(targetEventId);
+  if (!targetClaim) {
+    // A valid explicit reference may point at challenge/revision/etc. That is
+    // real provenance, but it is outside this v1 claim-ledger node set. Do not
+    // mislabel it as a broken reference and do not invent a claim node for it.
     return;
   }
   targetClaim[field].push(sourceEventId);
