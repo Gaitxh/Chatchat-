@@ -48,6 +48,19 @@ function ConsultationTheaterPortal() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (!completion) return;
+    const theaterRoot = document.getElementById("consultation-theater-root");
+    const setup = document.querySelector(".consultation-app .setup-card");
+    const app = setup?.parentElement ?? document.querySelector(".consultation-app");
+    if (!theaterRoot || !app) return;
+    if (setup) {
+      app.insertBefore(theaterRoot, setup);
+    } else {
+      app.append(theaterRoot);
+    }
+  }, [completion]);
+
   const selectedEvent = useMemo(
     () => completion?.events.find((event) => event.id === selectedEventId) ?? null,
     [completion, selectedEventId],
