@@ -106,8 +106,6 @@ npm run dev:web
 
 ChatChat 由 **Gaitxh** 发起并独立维护；项目开发过程中使用了 **OpenAI 的 ChatGPT 与 Codex** 协助产品构思、界面与视觉设计、代码实现、调试、测试和文档打磨。所有方向与最终变更仍由人类审阅和决定。
 
-本项目是独立开源项目，**不代表 OpenAI 官方，也未获得 OpenAI 的赞助、背书或运营支持**。
-
 ---
 
 <div align="center"><strong>一个提案，多种独立思想，共同协商。</strong><br /><sub>One proposal. Independent minds. Shared reasoning.</sub></div>
