@@ -164,11 +164,6 @@ jobs:
 
       - name: Assert Summon the House trust boundary
         run: |
-          echo '--- SUMMON SHOWCASE MARKERS ---'
-          grep -oE 'data-(chatchat-summon-showcase|summon-candidates|summon-providers|summon-trust|summon-action)="[^"]*"' artifacts/chatchat-extension-summon-house.html || true
-          grep -oE 'SUMMON THE HOUSE|新席位仍需 Test \+ Gate' artifacts/chatchat-extension-summon-house.html | head -10 || true
-          echo '--- END MARKERS ---'
-
           grep -q 'id="chatchat-summon-house"' artifacts/chatchat-extension-summon-house.html
           grep -q 'data-summon-candidates="7"' artifacts/chatchat-extension-summon-house.html
           grep -q 'data-summon-trust="unverified"' artifacts/chatchat-extension-summon-house.html
@@ -176,6 +171,56 @@ jobs:
           grep -q 'data-chatchat-summon-showcase="booted"' artifacts/chatchat-extension-summon-house.html
           grep -q 'SUMMON THE HOUSE' artifacts/chatchat-extension-summon-house.html
           grep -q '新席位仍需 Test + Gate' artifacts/chatchat-extension-summon-house.html
+
+      - name: Capture Community Recipe preview showcase
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          RECIPE_SHOWCASE='http://127.0.0.1:4180/extension/sidepanel.html?showcase=recipe'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=8000 \
+            --window-size=620,1250 \
+            --screenshot=artifacts/chatchat-extension-community-recipe.png \
+            "$RECIPE_SHOWCASE"
+          test -s artifacts/chatchat-extension-community-recipe.png
+
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=8000 \
+            --dump-dom \
+            "$RECIPE_SHOWCASE" > artifacts/chatchat-extension-community-recipe.html
+          test -s artifacts/chatchat-extension-community-recipe.html
+
+      - name: Upload Community Recipe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-extension-community-recipe
+          path: |
+            artifacts/chatchat-extension-community-recipe.png
+            artifacts/chatchat-extension-community-recipe.html
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Assert Community Recipe trust boundary
+        run: |
+          grep -q 'data-chatchat-recipe-showcase="booted"' artifacts/chatchat-extension-community-recipe.html
+          grep -q 'data-chatchat-recipe-preview="ready"' artifacts/chatchat-extension-community-recipe.html
+          grep -q 'id="chatchat-recipe-share"' artifacts/chatchat-extension-community-recipe.html
+          grep -q 'data-recipe-trust="map-only"' artifacts/chatchat-extension-community-recipe.html
+          grep -q 'data-recipe-import-effect="test-required"' artifacts/chatchat-extension-community-recipe.html
+          grep -q 'data-recipe-candidate-level="stable"' artifacts/chatchat-extension-community-recipe.html
+          grep -q 'data-recipe-candidate-trust="test-required"' artifacts/chatchat-extension-community-recipe.html
+          grep -q 'IMPORT · TEST REQUIRED' artifacts/chatchat-extension-community-recipe.html
+          grep -q 'capturedAt' artifacts/chatchat-extension-community-recipe.html
+          ! grep -q 'COUNCIL GATE ✓' artifacts/chatchat-extension-community-recipe.html
 
       - name: Upload Council Chamber screenshot
         uses: actions/upload-artifact@v4
