@@ -22,6 +22,8 @@
           host: location.hostname,
           title: document.title,
         };
+      case "CHATCHAT_CHECK_RECIPE":
+        return checkRecipe(message.recipe);
       case "CHATCHAT_TEACH":
         return teachSelector(message.role);
       case "CHATCHAT_TEST":
@@ -34,6 +36,24 @@
       default:
         throw new Error("Unknown ChatChat content command.");
     }
+  }
+
+  function checkRecipe(recipe) {
+    validateRecipe(recipe);
+    const composer = document.querySelector(recipe.composer);
+    const send = document.querySelector(recipe.send);
+    const responses = [...document.querySelectorAll(recipe.response)].filter(
+      (node) => node instanceof HTMLElement && visible(node),
+    );
+    return {
+      composer: composer instanceof HTMLElement,
+      send: send instanceof HTMLElement,
+      response: responses.length > 0,
+      ready:
+        composer instanceof HTMLElement &&
+        send instanceof HTMLElement &&
+        responses.length > 0,
+    };
   }
 
   function teachSelector(role) {
