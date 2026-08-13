@@ -190,7 +190,9 @@ function summarizeDelegation(
   const counts = countStances(positions.map((position) => position.stance));
   const top = topEntries(counts);
   const winner = top[0];
-  const tied = top.length > 1 && winner && top[1]![1] === winner[1];
+  const tied = Boolean(
+    top.length > 1 && winner && top[1]![1] === winner[1],
+  );
   const pluralityStance = tied ? null : winner?.[0] ?? null;
   const pluralitySeats = tied ? 0 : winner?.[1] ?? 0;
   const memberIds = positions.map((position) => position.participant.id);
@@ -267,14 +269,16 @@ function majorityFromStances(
   const counts = countStances(stances);
   const top = topEntries(counts);
   const winner = top[0];
-  const tied = top.length > 1 && winner && top[1]![1] === winner[1];
+  const tied = Boolean(
+    top.length > 1 && winner && top[1]![1] === winner[1],
+  );
   const total = totalOverride ?? stances.length;
   return {
     stance: tied ? null : winner?.[0] ?? null,
     support: tied ? 0 : winner?.[1] ?? 0,
     total,
     ratio: total && !tied && winner ? winner[1] / total : 0,
-    tied: Boolean(tied),
+    tied,
   };
 }
 
