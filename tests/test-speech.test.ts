@@ -1,7 +1,7 @@
 import {
   buildAdapterSpeechRequest,
   validateAdapterSpeechInput,
-} from "../src/provider-sdk/speech.js";
+} from "../src/provider-sdk/speech-request.js";
 import type { AdapterRecipe } from "../src/provider-sdk/recipe.js";
 import type { ProviderProfile } from "../src/provider-sdk/types.js";
 
@@ -37,27 +37,15 @@ assert(request.message === "hello", "Test Speech should trim the explicit test m
 assert(request.responseSelector === recipe.responseSelector, "The taught response selector must be preserved.");
 
 let rejectedIncomplete = false;
-try {
-  validateAdapterSpeechInput({ ...recipe, sendSelector: null }, "hello");
-} catch {
-  rejectedIncomplete = true;
-}
+try { validateAdapterSpeechInput({ ...recipe, sendSelector: null }, "hello"); } catch { rejectedIncomplete = true; }
 assert(rejectedIncomplete, "Incomplete recipes must not run Test Speech.");
 
 let rejectedBlank = false;
-try {
-  validateAdapterSpeechInput(recipe, "   ");
-} catch {
-  rejectedBlank = true;
-}
+try { validateAdapterSpeechInput(recipe, "   "); } catch { rejectedBlank = true; }
 assert(rejectedBlank, "Blank Test Speech messages must be rejected.");
 
 let rejectedLong = false;
-try {
-  validateAdapterSpeechInput(recipe, "x".repeat(4001));
-} catch {
-  rejectedLong = true;
-}
+try { validateAdapterSpeechInput(recipe, "x".repeat(4001)); } catch { rejectedLong = true; }
 assert(rejectedLong, "Overlong Test Speech messages must be rejected.");
 
-console.log("✓ ChatChat Test Speech tests passed");
+console.log("✓ ChatChat Test Speech request tests passed");
