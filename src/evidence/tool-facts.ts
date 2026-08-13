@@ -53,8 +53,8 @@ export function buildEvidenceToolFacts(
       ...(verification.truncated ? { truncated: true } : {}),
       note:
         verification.state === "reachable"
-          ? "The source URL answered ChatChat's bounded credential-free fetch. Reachability, metadata and excerpts do not prove the associated claim."
-          : "ChatChat's bounded source check could not obtain a successful public response. Unavailability does not prove the associated claim is false.",
+          ? "The source URL answered ChatChat's bounded credential-free fetch. This observation does not prove the associated claim."
+          : "ChatChat's bounded source check could not obtain a successful public response. This observation does not prove the associated claim is false.",
     });
   }
 
