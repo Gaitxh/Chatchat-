@@ -19,7 +19,7 @@ These levels are cumulative evidence, not synonyms.
 
 ## Built-in URL catalog
 
-The v0.9/v1-readiness catalog recognizes these hosts so ChatChat can provide a name, icon/monogram and clean start URL behavior:
+The v0.9/v1-readiness catalog recognizes these hosts so ChatChat can provide a stable identity, monogram and clean Council start URL:
 
 | Provider | Recognized host | Generic taught Browser Council Bridge | Runtime-validated environments | Official support status |
 |---|---|---|---|---|
@@ -27,6 +27,11 @@ The v0.9/v1-readiness catalog recognizes these hosts so ChatChat can provide a n
 | Claude | `claude.ai` | Available for local Teach/Test/Gate attempts | **No maintainer record committed yet** | Not claimed |
 | Gemini | `gemini.google.com` | Available for local Teach/Test/Gate attempts | **No maintainer record committed yet** | Not claimed |
 | DeepSeek | `chat.deepseek.com` | Available for local Teach/Test/Gate attempts | **No maintainer record committed yet** | Not claimed |
+| Yuanbao · 元宝 | `yuanbao.tencent.com` | Available for local Teach/Test/Gate attempts | **No maintainer record committed yet** | Not claimed |
+| Tongyi · 通义 | `tongyi.aliyun.com` | Available for local Teach/Test/Gate attempts | **No maintainer record committed yet** | Not claimed |
+| Grok | `grok.com` | Available for local Teach/Test/Gate attempts | **No maintainer record committed yet** | Not claimed |
+
+Recognition means ChatChat knows how to label the Provider and which catalog landing page to use when attempting a fresh Council session. It does **not** mean the current remote UI is proven compatible with the generic browser adapter.
 
 This table should change only when there is real evidence. Do not turn a successful URL detector unit test into a Provider support badge.
 
