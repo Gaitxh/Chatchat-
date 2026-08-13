@@ -95,6 +95,7 @@ jobs:
       - name: Capture fresh Browser Extension showcase
         run: |
           CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          EXTENSION_SHOWCASE='http://127.0.0.1:4180/extension/sidepanel.html?showcase=1'
           "$CHROME_BIN" \
             --headless=new \
             --no-sandbox \
@@ -104,8 +105,23 @@ jobs:
             --virtual-time-budget=14000 \
             --window-size=440,1500 \
             --screenshot=artifacts/chatchat-extension-sidepanel.png \
-            'http://127.0.0.1:4180/extension/sidepanel.html?showcase=1'
+            "$EXTENSION_SHOWCASE"
           test -s artifacts/chatchat-extension-sidepanel.png
+
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=14000 \
+            --dump-dom \
+            "$EXTENSION_SHOWCASE" > artifacts/chatchat-extension-sidepanel.html
+
+          grep -q 'HOUSE VERDICT' artifacts/chatchat-extension-sidepanel.html
+          grep -q '4/5' artifacts/chatchat-extension-sidepanel.html
+          grep -q '1/2' artifacts/chatchat-extension-sidepanel.html
+          grep -q 'DETERMINISTIC EXTENSION SHOWCASE' artifacts/chatchat-extension-sidepanel.html
+          ! grep -q "Cannot read properties of undefined" artifacts/chatchat-extension-sidepanel.html
 
       - name: Upload Council Chamber screenshot
         uses: actions/upload-artifact@v4
@@ -127,7 +143,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: chatchat-extension-sidepanel
-          path: artifacts/chatchat-extension-sidepanel.png
+          path: |
+            artifacts/chatchat-extension-sidepanel.png
+            artifacts/chatchat-extension-sidepanel.html
           if-no-files-found: error
           retention-days: 14
 
