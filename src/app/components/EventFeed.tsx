@@ -58,6 +58,7 @@ export function EventFeed({ events, participants, stage }: EventFeedProps) {
               <article
                 id={`council-event-${event.id}`}
                 data-event-id={event.id}
+                tabIndex={-1}
                 className={`event-card event-${event.kind}`}
                 key={event.id}
               >
