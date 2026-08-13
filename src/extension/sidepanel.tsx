@@ -3,13 +3,20 @@ import { createRoot } from "react-dom/client";
 import { CouncilOrchestrator } from "../core/orchestrator.js";
 import type {
   CouncilAgent,
+  CouncilContext,
   CouncilEvent,
   CouncilParticipant,
   CouncilReport,
 } from "../core/types.js";
-import { deriveHouseSummary } from "../house/delegations.js";
+import {
+  deriveHouseSummary,
+  MAX_DELEGATION_SEATS,
+  MAX_HOUSE_SEATS,
+} from "../house/delegations.js";
 import {
   BrowserCouncilAgent,
+  buildProviderCouncilPrompt,
+  parseProviderCouncilResponse,
 } from "../provider-sdk/council-agent.js";
 import {
   BUILT_IN_PROVIDER_MANIFESTS,
@@ -76,7 +83,6 @@ interface SpeechResult {
 }
 
 type CouncilStage = "idle" | "sealed" | "debate" | "final" | "complete" | "error";
-
 type TestState = "idle" | "running" | "pass" | "fail";
 
 function ExtensionApp() {
@@ -84,6 +90,7 @@ function ExtensionApp() {
   const [seats, setSeats] = useState<ExtensionSeat[]>([]);
   const [recipes, setRecipes] = useState<Record<string, AdapterRecipe>>({});
   const [tests, setTests] = useState<Record<string, TestState>>({});
+  const [gates, setGates] = useState<Record<string, TestState>>({});
   const [candidateTabs, setCandidateTabs] = useState<BrowserTab[]>([]);
   const [stage, setStage] = useState<CouncilStage>("idle");
   const [events, setEvents] = useState<CouncilEvent[]>([]);
@@ -164,11 +171,26 @@ function ExtensionApp() {
       return;
     }
     if (seats.some((seat) => seat.tabId === tab.id)) return;
+    if (seats.length >= MAX_HOUSE_SEATS) {
+      setError(`当前版本最多允许 ${MAX_HOUSE_SEATS} 个独立议员席位。`);
+      return;
+    }
 
     setBusy(`attach:${tab.id}`);
     setError(null);
     try {
       const detection = detectProviderUrl(tab.url);
+      const sameDelegation = seats.filter(
+        (seat) =>
+          seat.providerId === detection.providerId &&
+          seat.origin === detection.origin,
+      ).length;
+      if (sameDelegation >= MAX_DELEGATION_SEATS) {
+        throw new Error(
+          `${detection.displayName} 代表团当前最多允许 ${MAX_DELEGATION_SEATS} 席。`,
+        );
+      }
+
       await requestOriginPermission(detection.origin);
       await ensureBridge(tab.id);
       const next: ExtensionSeat = {
@@ -198,6 +220,16 @@ function ExtensionApp() {
   async function addSeat(delegationId: string) {
     const anchor = seats.find((seat) => seat.delegationId === delegationId);
     if (!anchor) return;
+    const delegationSeats = seats.filter((seat) => seat.delegationId === delegationId).length;
+    if (delegationSeats >= MAX_DELEGATION_SEATS) {
+      setError(`${anchor.providerName} 代表团已经达到 ${MAX_DELEGATION_SEATS} 席上限。`);
+      return;
+    }
+    if (seats.length >= MAX_HOUSE_SEATS) {
+      setError(`众议院已经达到 ${MAX_HOUSE_SEATS} 席上限。`);
+      return;
+    }
+
     setBusy(`new-seat:${delegationId}`);
     setError(null);
     try {
@@ -220,6 +252,8 @@ function ExtensionApp() {
   async function removeSeat(seatId: string) {
     const next = seats.filter((seat) => seat.seatId !== seatId);
     setSeats(next);
+    setTests((current) => withoutKey(current, seatId));
+    setGates((current) => withoutKey(current, seatId));
     await persistSeats(next);
   }
 
@@ -238,7 +272,12 @@ function ExtensionApp() {
       const next = { ...recipes, [seat.origin]: nextRecipe };
       setRecipes(next);
       await chrome.storage.local.set({ [RECIPES_KEY]: next });
-      setTests((currentTests) => ({ ...currentTests, [seat.origin]: "idle" }));
+
+      const affectedIds = new Set(
+        seats.filter((candidate) => candidate.origin === seat.origin).map((candidate) => candidate.seatId),
+      );
+      setTests((currentTests) => resetKeys(currentTests, affectedIds));
+      setGates((currentGates) => resetKeys(currentGates, affectedIds));
     } catch (caught) {
       setError(message(caught));
     } finally {
@@ -246,53 +285,64 @@ function ExtensionApp() {
     }
   }
 
-  async function testDelegation(delegationId: string) {
-    const seat = seatViews.find((item) => item.delegationId === delegationId);
-    if (!seat) return;
-    const recipe = recipes[seat.origin];
+  async function verifyDelegation(delegationId: string) {
+    const members = seatViews.filter((item) => item.delegationId === delegationId);
+    const first = members[0];
+    if (!first) return;
+    const recipe = recipes[first.origin];
     if (!adapterRecipeComplete(recipe)) {
       setError("先完成 Composer / Send / Response 三步 Teach Mode。");
       return;
     }
 
-    setTests((current) => ({ ...current, [seat.origin]: "running" }));
-    setBusy(`test:${delegationId}`);
+    setBusy(`verify:${delegationId}`);
     setError(null);
-    try {
-      await ensureBridge(seat.tabId);
-      const result = await sendBridge<SpeechResult>(seat.tabId, {
-        type: "RUN_SPEECH",
-        recipe,
-        prompt:
-          "ChatChat connection test. Reply with exactly CHATCHAT_READY and nothing else.",
-        timeoutMs: 90_000,
-      });
-      const pass = result.responseText.toLocaleUpperCase().includes("CHATCHAT_READY");
-      setTests((current) => ({
-        ...current,
-        [seat.origin]: pass ? "pass" : "fail",
-      }));
-      if (!pass) {
-        setError("页面能返回内容，但没有通过 CHATCHAT_READY 试奏。可以重新 Teach 后再试。");
+    const failures: string[] = [];
+
+    for (const seat of members) {
+      setTests((current) => ({ ...current, [seat.seatId]: "running" }));
+      setGates((current) => ({ ...current, [seat.seatId]: "idle" }));
+      try {
+        await ensureBridge(seat.tabId);
+        const speech = await sendBridge<SpeechResult>(seat.tabId, {
+          type: "RUN_SPEECH",
+          recipe,
+          prompt:
+            "ChatChat connection test. Reply with exactly CHATCHAT_READY and nothing else.",
+          timeoutMs: 90_000,
+        });
+        if (!speech.responseText.toLocaleUpperCase().includes("CHATCHAT_READY")) {
+          throw new Error("Test Speech did not return CHATCHAT_READY.");
+        }
+        setTests((current) => ({ ...current, [seat.seatId]: "pass" }));
+
+        setGates((current) => ({ ...current, [seat.seatId]: "running" }));
+        await verifySeatCouncilGate(seat, recipe);
+        setGates((current) => ({ ...current, [seat.seatId]: "pass" }));
+      } catch (caught) {
+        const reason = message(caught);
+        failures.push(`${seat.displayName}: ${reason}`);
+        setTests((current) => ({
+          ...current,
+          [seat.seatId]: current[seat.seatId] === "pass" ? "pass" : "fail",
+        }));
+        setGates((current) => ({ ...current, [seat.seatId]: "fail" }));
       }
-    } catch (caught) {
-      setTests((current) => ({ ...current, [seat.origin]: "fail" }));
-      setError(message(caught));
-    } finally {
-      setBusy(null);
     }
+
+    if (failures.length) {
+      setError(`有 ${failures.length}/${members.length} 个席位未通过独立验证。${failures[0]}`);
+    }
+    setBusy(null);
   }
 
   async function convene(event: FormEvent) {
     event.preventDefault();
     if (!question.trim() || stage === "sealed" || stage === "debate" || stage === "final") return;
 
-    const ready = seatViews.filter((seat) => {
-      const recipe = recipes[seat.origin];
-      return adapterRecipeComplete(recipe) && tests[seat.origin] === "pass";
-    });
+    const ready = seatViews.filter((seat) => isSeatReady(seat, recipes, tests, gates));
     if (ready.length < 2) {
-      setError("至少需要 2 个已经 Teach 3/3 且 Test Speech PASS 的独立标签页席位。不同席位必须是不同 tab。 ");
+      setError("至少需要 2 个独立标签页席位分别通过 Recipe 3/3、Test Speech 和 Council Gate。不同席位必须是不同 tab。");
       return;
     }
 
@@ -366,13 +416,15 @@ function ExtensionApp() {
               const first = delegation.seats[0]!;
               const recipe = recipes[first.origin];
               const progress = recipeProgress(recipe);
-              const testState = tests[first.origin] ?? "idle";
+              const readyCount = delegation.seats.filter((seat) =>
+                isSeatReady(seat, recipes, tests, gates),
+              ).length;
               return (
                 <div className="delegation-row" key={delegation.id}>
                   <div className="delegate-avatar">{monogram(first.providerName)}</div>
                   <div className="delegate-main">
                     <strong>{first.providerName}</strong>
-                    <span>{progress}/3 taught · {testLabel(testState)}</span>
+                    <span>{progress}/3 taught · {readyCount}/{delegation.seats.length} ready</span>
                   </div>
                   <div className="seat-stepper" aria-label={`${first.providerName} seat count`}>
                     <button
@@ -384,7 +436,11 @@ function ExtensionApp() {
                     <button
                       type="button"
                       onClick={() => void addSeat(delegation.id)}
-                      disabled={Boolean(busy) || delegation.seats.length >= 16}
+                      disabled={
+                        Boolean(busy) ||
+                        delegation.seats.length >= MAX_DELEGATION_SEATS ||
+                        seatViews.length >= MAX_HOUSE_SEATS
+                      }
                     >＋</button>
                   </div>
                 </div>
@@ -503,7 +559,7 @@ function ExtensionApp() {
 
       <details className="advanced-card">
         <summary>
-          <span>高级 · Teach / 标签页 / 议政板</span>
+          <span>高级 · Teach / 席位验证 / 标签页 / 议政板</span>
           <b>⌄</b>
         </summary>
 
@@ -511,12 +567,14 @@ function ExtensionApp() {
           {delegations.map((delegation) => {
             const first = delegation.seats[0]!;
             const recipe = recipes[first.origin];
-            const testState = tests[first.origin] ?? "idle";
+            const readyCount = delegation.seats.filter((seat) =>
+              isSeatReady(seat, recipes, tests, gates),
+            ).length;
             return (
               <div className="teach-group" key={delegation.id}>
                 <div className="teach-head">
                   <strong>{first.providerName}</strong>
-                  <span>{recipeProgress(recipe)}/3 · {testLabel(testState)}</span>
+                  <span>{recipeProgress(recipe)}/3 · {readyCount}/{delegation.seats.length} seats ready</span>
                 </div>
                 <div className="teach-actions">
                   {(["composer", "send", "response"] as const).map((role) => (
@@ -532,16 +590,18 @@ function ExtensionApp() {
                   ))}
                   <button
                     type="button"
-                    className={testState === "pass" ? "is-ready" : ""}
-                    onClick={() => void testDelegation(delegation.id)}
+                    className={readyCount === delegation.seats.length ? "is-ready" : ""}
+                    onClick={() => void verifyDelegation(delegation.id)}
                     disabled={Boolean(busy) || !adapterRecipeComplete(recipe)}
-                  >试奏</button>
+                  >验证席位</button>
                 </div>
                 <div className="tab-list">
                   {delegation.seats.map((seat) => (
                     <div key={seat.seatId}>
                       <span>{seat.displayName}</span>
-                      <small>tab {seat.tabId}</small>
+                      <small>
+                        T:{stateGlyph(tests[seat.seatId])} G:{stateGlyph(gates[seat.seatId])} · tab {seat.tabId}
+                      </small>
                       <button type="button" onClick={() => void chrome.tabs.update(seat.tabId, { active: true })}>打开</button>
                       <button type="button" onClick={() => void removeSeat(seat.seatId)}>移除</button>
                     </div>
@@ -581,7 +641,7 @@ function ExtensionApp() {
 
       <footer className="side-footer">
         <span>ChatChat {__CHATCHAT_VERSION__}</span>
-        <span>无中转服务器 · 数据留在浏览器/Provider</span>
+        <span>无中转服务器 · 每个 tab 独立验席</span>
       </footer>
     </div>
   );
@@ -643,20 +703,7 @@ function numberSeats(seats: readonly ExtensionSeat[]): SeatView[] {
 }
 
 function createTabCouncilAgent(seat: SeatView, recipe: AdapterRecipe): CouncilAgent {
-  const now = new Date().toISOString();
-  const profile: ProviderProfile = {
-    profileId: seat.seatId,
-    providerId: seat.providerId,
-    adapterId: "extension.tab",
-    displayName: seat.displayName,
-    url: seat.url,
-    origin: seat.origin,
-    profileKey: `tab:${seat.tabId}`,
-    authState: "ready",
-    seatState: "seated",
-    createdAt: now,
-    updatedAt: now,
-  };
+  const profile = profileForSeat(seat);
   const seatRecipe: AdapterRecipe = { ...recipe, profileId: seat.seatId };
   const inner = new BrowserCouncilAgent(
     profile,
@@ -682,18 +729,87 @@ function createTabCouncilAgent(seat: SeatView, recipe: AdapterRecipe): CouncilAg
       });
     },
   );
-  const participant: CouncilParticipant = {
-    ...inner.participant,
+  const participant: CouncilParticipant = participantForSeat(seat);
+  return {
+    participant,
+    respond: (context) => inner.respond(context),
+  };
+}
+
+async function verifySeatCouncilGate(
+  seat: SeatView,
+  recipe: AdapterRecipe,
+): Promise<void> {
+  await ensureBridge(seat.tabId);
+  const context: CouncilContext = {
+    sessionId: `extension-council-gate:${seat.seatId}`,
+    question:
+      "Protocol handshake only. If you can follow the requested structured Council format, return one argument whose stance is exactly READY. Otherwise use stance NOT_READY and explain why.",
+    phase: "sealed",
+    round: 1,
+    participant: participantForSeat(seat),
+    publicEvents: [],
+    ownEvents: [],
+  };
+  const prompt = buildProviderCouncilPrompt(context);
+  const result = await sendBridge<SpeechResult>(seat.tabId, {
+    type: "RUN_SPEECH",
+    recipe,
+    prompt,
+    timeoutMs: 90_000,
+  });
+  const contributions = parseProviderCouncilResponse(result.responseText, context);
+  const ready = contributions.some(
+    (item) =>
+      item.kind === "argument" &&
+      item.stance.trim().toLocaleLowerCase() === "ready",
+  );
+  if (!ready) {
+    throw new Error("Council Gate returned valid structured data but did not declare stance READY.");
+  }
+}
+
+function profileForSeat(seat: SeatView): ProviderProfile {
+  const now = new Date().toISOString();
+  return {
+    profileId: seat.seatId,
+    providerId: seat.providerId,
+    adapterId: "extension.tab",
+    displayName: seat.displayName,
+    url: seat.url,
+    origin: seat.origin,
+    profileKey: `tab:${seat.tabId}`,
+    authState: "ready",
+    seatState: "seated",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function participantForSeat(seat: SeatView): CouncilParticipant {
+  return {
+    id: seat.seatId,
     name: seat.displayName,
+    provider: seat.providerId,
+    role: "Browser Tab Delegate",
     delegationId: seat.delegationId,
     delegationName: seat.delegationName,
     seatIndex: seat.seatIndex,
     seatCount: seat.seatCount,
   };
-  return {
-    participant,
-    respond: (context) => inner.respond(context),
-  };
+}
+
+function isSeatReady(
+  seat: SeatView,
+  recipes: Readonly<Record<string, AdapterRecipe>>,
+  tests: Readonly<Record<string, TestState>>,
+  gates: Readonly<Record<string, TestState>>,
+): boolean {
+  return Boolean(
+    adapterRecipeComplete(recipes[seat.origin]) &&
+    tests[seat.seatId] === "pass" &&
+    gates[seat.seatId] === "pass",
+  );
 }
 
 async function ensureBridge(tabId: number) {
@@ -759,11 +875,11 @@ function teachLabel(role: TeachRole): string {
   return "回答";
 }
 
-function testLabel(state: TestState): string {
-  if (state === "pass") return "Test ✓";
-  if (state === "running") return "Testing…";
-  if (state === "fail") return "Test failed";
-  return "not tested";
+function stateGlyph(state: TestState | undefined): string {
+  if (state === "pass") return "✓";
+  if (state === "running") return "…";
+  if (state === "fail") return "×";
+  return "·";
 }
 
 function stageLabel(stage: CouncilStage): string {
@@ -786,6 +902,21 @@ function monogram(name: string): string {
   if (/qwen/i.test(name)) return "Q";
   if (/gpt/i.test(name)) return "G";
   return name.slice(0, 2).toUpperCase();
+}
+
+function withoutKey<T>(record: Readonly<Record<string, T>>, key: string): Record<string, T> {
+  const next = { ...record };
+  delete next[key];
+  return next;
+}
+
+function resetKeys<T>(
+  record: Readonly<Record<string, T>>,
+  keys: ReadonlySet<string>,
+): Record<string, T> {
+  const next = { ...record };
+  for (const key of keys) delete next[key];
+  return next;
 }
 
 function message(caught: unknown): string {
