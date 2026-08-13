@@ -3,6 +3,7 @@ import avatarUrl from "../../assets/chatchat-avatar-pixel.png";
 import { captureProviderProofSnapshot, type ProviderProofSnapshot } from "../validation/proof-pack.js";
 import { AdvisorDock } from "./components/AdvisorDock.js";
 import { CouncilReportPanel } from "./components/CouncilReportPanel.js";
+import { CouncilTheater } from "./components/CouncilTheater.js";
 import { DemoTheater } from "./components/DemoTheater.js";
 import { EventFeed } from "./components/EventFeed.js";
 import { GateBProofPanel } from "./components/GateBProofPanel.js";
@@ -67,7 +68,7 @@ export default function App() {
         </div>
         <div className="topbar-center">
           <span className="motto">YOU ASK · THEY DEBATE</span>
-          <span className="build-badge">v1 READINESS · GATE B PROOF</span>
+          <span className="build-badge">v1 READINESS · COUNCIL THEATER</span>
           <span className={`build-badge council-mode-badge council-mode-badge--${council.mode}`}>{modeLabel}</span>
         </div>
         <div className="privacy-badge" title="ChatChat itself has no relay server"><i />LOCAL-FIRST</div>
@@ -88,6 +89,14 @@ export default function App() {
           />
 
           {council.report ? <CouncilReportPanel report={council.report} /> : null}
+
+          {council.report ? (
+            <CouncilTheater
+              events={council.events}
+              participants={council.participants}
+              report={council.report}
+            />
+          ) : null}
 
           <GateBProofPanel
             providerSnapshot={proofSnapshot}
@@ -194,7 +203,7 @@ export default function App() {
       <footer className="app-footer">
         <span>NO CHATCHAT SERVER</span><span>•</span>
         <span>ROUND 1 SEALED</span><span>•</span>
-        <span>WINDOW HEALTH ENFORCED</span><span>•</span>
+        <span>INFLUENCE EDGES ARE TRACEABLE</span><span>•</span>
         <span>PROOF PACK EXCLUDES CONTENT</span><span>•</span>
         <span>{modeLabel}</span>
       </footer>
@@ -204,10 +213,10 @@ export default function App() {
 
 function commandCopy(mode: ReturnType<typeof useCouncilSession>["mode"], liveSeatCount: number): string {
   if (mode === "live") {
-    return `${liveSeatCount} 位健康真实网页智囊已经入席。你只下令一次；之后 sealed → debate → final 全自动执行。Council 结束后会生成不含正文的 Royal Proof Pack。`;
+    return `${liveSeatCount} 位健康真实网页智囊已经入席。你只下令一次；之后 sealed → debate → final 全自动执行。Council Theater 会从事件图追踪谁改变了谁。`;
   }
   if (mode === "hybrid") {
     return "1 位健康真实网页智囊已入席：当前是 HYBRID REHEARSAL；再入席 1 位健康真实 AI 即解锁纯 LIVE COUNCIL。";
   }
-  return "当前没有健康真实席位，所以自动退回 deterministic Mock Demo。Demo 可以展示协议，但 Proof Pack 会明确标记为不可用于 Gate B。";
+  return "当前没有健康真实席位，所以自动退回 deterministic Mock Demo。Mock Council 也会生成可追溯 Influence Graph，方便验证整个体验。";
 }
