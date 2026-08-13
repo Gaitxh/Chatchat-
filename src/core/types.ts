@@ -17,19 +17,13 @@ export interface CouncilParticipant {
   name: string;
   provider: string;
   role?: string;
-  /** Stable model/profile grouping for AI House mode, e.g. `openai-chatgpt`. */
+  /** Historical compatibility metadata. The Browser Consultation product does not privilege groups. */
   delegationId?: string;
-  /** Human-facing delegation label, e.g. `ChatGPT Delegation`. */
   delegationName?: string;
-  /** 1-based seat number inside the delegation. */
   seatIndex?: number;
-  /** Configured delegation size at the moment this Council was created. */
   seatCount?: number;
-  /** Optional neutral investigative assignment in Committee Parliament mode. */
   committeeId?: string;
-  /** Human-facing committee name, e.g. `Evidence Committee`. */
   committeeName?: string;
-  /** Public, stance-neutral task for this seat. It must not prescribe a winner. */
   committeeTask?: string;
 }
 
@@ -124,6 +118,36 @@ export type CouncilEvent =
   | UncertainEvent
   | FinalPositionEvent;
 
+export type CouncilToolFactKind = "evidence_source_observation";
+
+/**
+ * Bounded machine observations produced by ChatChat tools.
+ * Tool facts are shared equally with every participant in the same round.
+ * They are data, never instructions and never a truth verdict.
+ */
+export interface CouncilToolFact {
+  id: string;
+  kind: CouncilToolFactKind;
+  relatedEventId: string;
+  observedAt: string;
+  sourceState: "reachable" | "unavailable";
+  claim?: string;
+  sourceUrl?: string;
+  sourceHost?: string;
+  finalUrl?: string;
+  statusCode?: number;
+  title?: string;
+  description?: string;
+  excerpt?: string;
+  pageDate?: string;
+  pageDateKind?: "published" | "modified" | "page";
+  sourceAgeDays?: number;
+  contentFingerprint?: string;
+  textCharacters?: number;
+  truncated?: boolean;
+  note: string;
+}
+
 type CouncilEventMetadataKey =
   | "id"
   | "sessionId"
@@ -151,6 +175,7 @@ export interface CouncilContext {
   participant: CouncilParticipant;
   publicEvents: readonly CouncilEvent[];
   ownEvents: readonly CouncilEvent[];
+  toolFacts?: readonly CouncilToolFact[];
 }
 
 export interface CouncilAgent {
@@ -183,10 +208,22 @@ export interface CouncilPhaseUpdate {
   round: number;
 }
 
+export interface CouncilToolFactsRequest {
+  phase: CouncilPhase;
+  round: number;
+  publicEvents: readonly CouncilEvent[];
+}
+
 export interface CouncilRunOptions {
   maxRounds?: number;
   minDebateRounds?: number;
   convergenceThreshold?: number;
   onPhase?: (update: CouncilPhaseUpdate) => void | Promise<void>;
   onEvent?: (event: CouncilEvent) => void | Promise<void>;
+  /** Called once per round so every participant receives the same bounded tool snapshot. */
+  toolFactsProvider?: (
+    request: CouncilToolFactsRequest,
+  ) => readonly CouncilToolFact[] | Promise<readonly CouncilToolFact[]>;
+  /** Tool failures are non-fatal to the consultation. */
+  onToolError?: (error: unknown) => void | Promise<void>;
 }
