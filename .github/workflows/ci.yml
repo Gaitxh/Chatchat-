@@ -82,6 +82,7 @@ jobs:
           grep -q 'data-chatchat-consultation-showcase="complete"' artifacts/chatchat-consultation-zh.html
           grep -q '用户发起提案' artifacts/chatchat-consultation-zh.html
           grep -q '平等 AI 参与者' artifacts/chatchat-consultation-zh.html
+          grep -q '没有议长' artifacts/chatchat-consultation-zh.html
           grep -q '协商结果' artifacts/chatchat-consultation-zh.html
           grep -q 'Browser Extension' artifacts/chatchat-consultation-zh.html
 
@@ -111,6 +112,7 @@ jobs:
           grep -q 'data-chatchat-consultation-showcase="complete"' artifacts/chatchat-consultation-en.html
           grep -q 'Propose once' artifacts/chatchat-consultation-en.html
           grep -q 'Equal AI participants' artifacts/chatchat-consultation-en.html
+          grep -qi 'no chair' artifacts/chatchat-consultation-en.html
           grep -q 'CONSULTATION OUTCOME' artifacts/chatchat-consultation-en.html
           grep -q 'Browser Extension' artifacts/chatchat-consultation-en.html
 
@@ -122,7 +124,6 @@ jobs:
             ! grep -q 'HOUSE VERDICT' "$page"
             ! grep -qi 'Delegation' "$page"
             ! grep -q '众议院' "$page"
-            ! grep -q '议长' "$page"
           done
 
       - name: Validate extension manifest product identity
