@@ -1,3 +1,6 @@
+const MAX_EVIDENCE_BYTES = 256 * 1024;
+const EVIDENCE_TIMEOUT_MS = 8_000;
+
 const enablePanelOnAction = async () => {
   try {
     await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -13,5 +16,162 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onStartup.addListener(() => {
   void enablePanelOnAction();
 });
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type !== "VERIFY_EVIDENCE_SOURCE") return undefined;
+  verifyEvidenceSource(String(message.url ?? ""))
+    .then((result) => sendResponse({ ok: true, result }))
+    .catch((error) => sendResponse({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+  return true;
+});
+
+async function verifyEvidenceSource(rawUrl) {
+  const url = publicEvidenceUrl(rawUrl);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), EVIDENCE_TIMEOUT_MS);
+  const observedAt = new Date().toISOString();
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      credentials: "omit",
+      redirect: "follow",
+      cache: "no-store",
+      referrerPolicy: "no-referrer",
+      signal: controller.signal,
+      headers: {
+        Accept: "text/html,text/plain,application/json;q=0.9,*/*;q=0.4",
+      },
+    });
+
+    const finalUrl = publicEvidenceUrl(response.url || url.toString());
+    const contentType = (response.headers.get("content-type") ?? "").slice(0, 160);
+    const declaredLength = Number(response.headers.get("content-length") ?? "0");
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_EVIDENCE_BYTES * 4) {
+      return {
+        state: response.ok ? "reachable" : "unavailable",
+        observedAt,
+        requestedUrl: url.toString(),
+        finalUrl: finalUrl.toString(),
+        statusCode: response.status,
+        contentType,
+        bytesRead: 0,
+        truncated: true,
+        error: "Source response is too large for ChatChat's bounded verifier.",
+      };
+    }
+
+    const body = await readBoundedText(response, MAX_EVIDENCE_BYTES);
+    const title = extractTitle(body.text, contentType);
+    return {
+      state: response.ok ? "reachable" : "unavailable",
+      observedAt,
+      requestedUrl: url.toString(),
+      finalUrl: finalUrl.toString(),
+      statusCode: response.status,
+      contentType,
+      ...(title ? { title } : {}),
+      bytesRead: body.bytesRead,
+      truncated: body.truncated,
+      ...(!response.ok ? { error: `HTTP ${response.status}` } : {}),
+    };
+  } catch (error) {
+    return {
+      state: "unavailable",
+      observedAt,
+      requestedUrl: url.toString(),
+      error: error?.name === "AbortError"
+        ? "Source check timed out."
+        : "Source could not be reached by the bounded verifier.",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function readBoundedText(response, maxBytes) {
+  if (!response.body) return { text: "", bytesRead: 0, truncated: false };
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let bytesRead = 0;
+  let truncated = false;
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      const remaining = maxBytes - bytesRead;
+      if (remaining <= 0) {
+        truncated = true;
+        break;
+      }
+      const chunk = value.byteLength > remaining ? value.slice(0, remaining) : value;
+      bytesRead += chunk.byteLength;
+      text += decoder.decode(chunk, { stream: true });
+      if (chunk.byteLength < value.byteLength || bytesRead >= maxBytes) {
+        truncated = true;
+        break;
+      }
+    }
+    text += decoder.decode();
+  } finally {
+    if (truncated) await reader.cancel().catch(() => undefined);
+    else reader.releaseLock();
+  }
+
+  return { text, bytesRead, truncated };
+}
+
+function publicEvidenceUrl(rawUrl) {
+  const url = new URL(rawUrl);
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error("Evidence source must use http or https.");
+  }
+  url.username = "";
+  url.password = "";
+  if (isPrivateHost(url.hostname)) {
+    throw new Error("ChatChat does not verify localhost or private-network evidence URLs.");
+  }
+  return url;
+}
+
+function isPrivateHost(hostname) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host === "::1") return true;
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!ipv4) return false;
+  const parts = ipv4.slice(1).map(Number);
+  if (parts.some((part) => part < 0 || part > 255)) return true;
+  const [a, b] = parts;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    a >= 224
+  );
+}
+
+function extractTitle(text, contentType) {
+  if (!/html/i.test(contentType) && !/<title[\s>]/i.test(text)) return "";
+  const title = text.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "";
+  return decodeBasicEntities(title.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()).slice(0, 240);
+}
+
+function decodeBasicEntities(value) {
+  return value
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'");
+}
 
 void enablePanelOnAction();
