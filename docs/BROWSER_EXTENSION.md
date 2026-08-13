@@ -1,30 +1,50 @@
-# ChatChat Browser Extension · Side Panel Council
+# ChatChat Browser Extension · Side Panel Council 👑🌐
 
-The desktop app remains ChatChat's most controlled runtime.
+The **Browser Side Panel is ChatChat's primary product surface**.
 
-The browser extension is the **lowest-friction door into the Council**:
+The web demo remains a lightweight playground. The older Tauri desktop runtime is kept as an experimental/power-user path, but desktop packaging is no longer a default release or pull-request gate.
+
+Why this direction is so natural:
+
+```text
+Chrome / Edge / Chromium
+  ├── ChatGPT tab        already logged in
+  ├── Claude tab         already logged in
+  ├── Gemini tab         already logged in
+  ├── DeepSeek tab       already logged in
+  ├── Yuanbao / Qwen / Grok / ...
+  └── ChatChat Side Panel 👑
+```
+
+The browser is already the user's universal AI account container. ChatChat should reuse that reality instead of asking the user to maintain a second set of WebViews and login sessions.
+
+The lowest-friction path into the Council is therefore:
 
 ```text
 install extension
       ↓
-open ChatGPT / Claude / Gemini / ... normally
+open AI products normally
       ↓
 login normally in the browser
       ↓
 open ChatChat Side Panel
       ↓
-attach the current AI tab
+SUMMON THE HOUSE / attach current AI tab
       ↓
-Teach once → Test Speech → add seats → convene
+Teach once → Test Speech → Council Gate
+      ↓
+👑 King's Command
+      ↓
+sealed → debate → final
 ```
 
 ChatChat does not receive the user's password and does not create a second Provider account system.
 
 ## Why Side Panel
 
-The Council should live beside the user's normal browsing context instead of replacing it.
+The Council lives beside the user's normal browsing context instead of replacing it.
 
-The Side Panel is deliberately small and calm:
+The default surface is deliberately small and calm:
 
 ```text
 ChatChat
@@ -36,6 +56,9 @@ GPT     ×3   − +
 Claude  ×2   − +
 Qwen    ×4   − +
 
+Parliament Mode
+[ Free ] [ Committee ]
+
 [ King's Command................ ]
 [ Convene the House             ]
 
@@ -43,21 +66,19 @@ sealed  →  debate  →  final
 
 House Verdict
 Tauri
-Seat Majority       11/16
-Delegation Consensus 3/4
+Seat Majority        11/16
+Delegation Consensus  3/4
 
 ▸ Advanced · Teach / tabs / Blackboard
 ```
 
-The default view should never look like an operations dashboard.
+The first minute should feel like a decision tool. The entire parliament remains available underneath it.
 
 ## Permission model
 
-The manifest does **not** request install-time `host_permissions`.
+The manifest does **not** request blanket install-time Provider access.
 
-It declares Provider access as `optional_host_permissions`.
-
-When a user explicitly attaches a Provider tab, ChatChat requests permission for that origin only.
+Provider access is declared through `optional_host_permissions` and requested when the user explicitly attaches or summons a Provider origin.
 
 Example:
 
@@ -65,17 +86,44 @@ Example:
 https://chatgpt.com/*
 ```
 
-This keeps installation understandable and makes the relationship explicit:
+This keeps installation understandable:
 
 > ChatChat may interact with the AI sites the user chose to invite.
 
-The extension currently requests these core browser capabilities:
+The extension uses browser capabilities for:
 
 - Side Panel;
 - extension-local storage;
-- scripting injection;
-- tab management;
+- scripting/content-bridge injection;
+- tab discovery/management;
 - optional Provider-origin access.
+
+## SUMMON THE HOUSE · 召集诸卿
+
+If the user's browser already has AI tabs open, ChatChat can scan those tab URLs and propose catalog-recognized Providers in one shot.
+
+Current catalog/discovery work includes entry points such as:
+
+- ChatGPT;
+- Claude;
+- Gemini;
+- DeepSeek;
+- Grok;
+- Tencent Yuanbao;
+- Qwen / Tongyi.
+
+Bulk summon is **attach-only**. It does not convert a recognized tab into a trusted seat.
+
+Every new seat still needs:
+
+```text
+Recipe 3/3
+→ Test Speech
+→ Council Gate
+→ admitted seat
+```
+
+An unknown/custom HTTP(S) AI page remains an explicit single-tab attach rather than an automatic bulk-summon candidate.
 
 ## One tab = one seat
 
@@ -89,7 +137,7 @@ GPT-03 → tab 131
 
 Authentication cookies may be shared by the browser, but active conversation state is separated by tab/session.
 
-ChatChat refuses the conceptual shortcut of drawing five seat cards on top of one live conversation and calling that `GPT ×5`.
+ChatChat refuses the shortcut of drawing five seat cards on top of one live conversation and calling that `GPT ×5`.
 
 ## Adding seats
 
@@ -99,9 +147,48 @@ After the first Provider tab joins, the delegation row exposes:
 −  GPT ×1  +
 ```
 
-`+` opens another Provider start tab and attaches it as a new delegate channel.
+`+` opens another Provider start tab and attaches it as a fresh delegate channel.
 
-The current implementation treats this as an **experimental fresh-tab channel**. Real compatibility still depends on the Provider's routing/UI behavior and must be tested.
+Repeated seats are independent sessions/samples, **not independent model sources**. ChatChat therefore keeps both:
+
+```text
+Seat Majority
+Delegation Consensus
+```
+
+so GPT ×10 cannot silently masquerade as ten independent model families.
+
+See [`AI_HOUSE.md`](AI_HOUSE.md).
+
+## Free Parliament vs Committee Parliament
+
+Free Parliament remains the default:
+
+```text
+🗣️ Free Parliament
+all admitted seats discuss the same question directly
+```
+
+Large Houses can optionally use:
+
+```text
+🏛️ Committee Parliament
+cross-Provider seats investigate different neutral dimensions
+```
+
+Built-in investigative lenses include:
+
+- 📎 Evidence;
+- 🛡️ Security & Privacy;
+- 💰 Cost & Economics;
+- 🧱 Engineering;
+- 👥 User Experience;
+- 😈 Counterexample;
+- 📜 Requirements.
+
+A committee is not a faction and does not prescribe a winner. The King's original question remains a separate `KING_QUESTION_JSON` field; committee metadata is explicit adjacent system context.
+
+See [`HOUSE_COMMITTEES.md`](HOUSE_COMMITTEES.md).
 
 ## Teach Mode in a normal Provider page
 
@@ -115,17 +202,37 @@ For each Provider origin, the user teaches three elements:
 2. Send button;
 3. AI response element.
 
-The injected page helper highlights the hovered target. The user clicks the desired element and ChatChat builds a selector.
+The injected helper highlights the hovered target. The user clicks the desired element and ChatChat stores a local selector recipe.
 
 Password fields are explicitly rejected.
 
-Recipes are stored in extension-local storage and can be reused by other seats on the same Provider origin.
+Recipes are stored in extension-local storage and may be reused as DOM-location knowledge by seats on the same Provider origin.
 
-## Test Speech
+## Community Recipes
 
-Before a delegation can join a live extension Council, its origin must pass a small Test Speech.
+A selector map can be copied/imported as a **Recipe Candidate**.
 
-The current test asks for:
+The rule is:
+
+> **Share the map, not the passport.**
+
+A portable recipe may contain public Provider origin and selectors. It may **not** carry login/session state, Test Speech evidence, Council Gate evidence, READY state, account data, cookies or tokens.
+
+Import always means:
+
+```text
+selector hint imported
+→ Test required again
+→ Council Gate required again
+```
+
+## Test Speech and Council Gate
+
+Before a browser tab can join a real Council it must pass two runtime checks.
+
+### Test Speech
+
+The current transport test asks for:
 
 ```text
 CHATCHAT_READY
@@ -133,20 +240,27 @@ CHATCHAT_READY
 
 A completed Recipe is not the same as a working Provider transport.
 
+### Council Gate
+
+The Provider must also return a valid structured ChatChat Council envelope.
+
+A passing tab does **not** grant readiness to another tab from the same Provider. Runtime admission is per seat.
+
 ## Council transport
 
-The side panel creates the normal ChatChat `CouncilOrchestrator` and wraps each attached Provider tab as a `CouncilAgent`.
+The Side Panel uses the normal shared `CouncilOrchestrator` and wraps each admitted Provider tab as a `CouncilAgent`.
 
-Each Council session:
+Each real Council session:
 
-1. navigates a seat to its configured Provider start URL;
+1. starts from the seat's configured Provider start URL;
 2. waits for the taught recipe to become available;
 3. sends the sealed Council prompt;
 4. waits for the taught response element to change and stabilize;
-5. parses the normal structured ChatChat Council envelope;
-6. proceeds automatically into debate and final position.
+5. parses the structured ChatChat Council envelope;
+6. runs later debate rounds automatically;
+7. asks each seat for a final position.
 
-The same typed Blackboard protocol is therefore used by desktop and extension modes.
+The King does not press Send again for Round 2.
 
 ## Failure behavior
 
@@ -154,52 +268,55 @@ A Provider tab may fail because:
 
 - the site UI changed;
 - a selector drifted;
-- the Provider requires login again;
-- the response never stabilized;
+- login expired;
+- generation never stabilized;
 - the model did not produce valid Council JSON;
-- the Provider rate-limited many simultaneous seats.
+- many parallel seats hit Provider rate limits.
 
-The Council bridge must expose failure as `uncertain` / zero-confidence fallback rather than fabricating a position.
+The Council bridge exposes failure as `uncertain` / zero-confidence fallback rather than fabricating a position.
 
-## AI House in the extension
+A graceful fallback is useful runtime behavior, but it does **not** count as Provider compatibility success in the Royal Proof Pack.
 
-The extension is a natural host for multi-seat delegations:
+## Browser Royal Proof Pack
 
-```text
-GPT ×5 = five GPT tabs
-Qwen ×5 = five Qwen tabs
-```
+Completed Browser-only Councils can produce privacy-safe Gate B evidence using the same strict shared Proof Pack semantics.
 
-The final UI can show both:
+The evidence may include:
 
-```text
-Seat Majority
-11 / 16 Tauri
+- Provider id + public host;
+- Recipe/Test/Gate/Host booleans;
+- real participant count;
+- rounds and event-kind counts;
+- zero-confidence/uncertain counts;
+- consensus metadata.
 
-Delegation Consensus
-3 / 4 Tauri
-```
+It deliberately excludes:
 
-See [`AI_HOUSE.md`](AI_HOUSE.md).
+- King's question;
+- model replies / Blackboard body text;
+- selectors;
+- tab ids/titles;
+- account identifiers;
+- cookies/tokens/passwords.
 
 ## Privacy boundary
 
 There is no ChatChat relay server.
 
-However, a Provider seat is still a remote AI webpage. The King's prompt and Council context sent to that seat are transmitted to that Provider through its normal webpage.
+A Provider seat is still a remote AI webpage, so the King's prompt and relevant Council context sent to that seat are transmitted to that Provider through its normal webpage.
 
-ChatChat extension-local state includes things such as:
+ChatChat extension-local state may include:
 
 - taught selectors;
 - attached tab ids for the current browser session;
-- Council UI state.
+- Council/House UI state.
 
 It should never persist:
 
 - passwords;
 - cookies;
 - auth tokens;
-- full unrelated page/sidebar contents.
+- unrelated sidebar/page contents.
 
 ## Development install
 
@@ -224,7 +341,7 @@ dist-extension/
 Then in a Chromium browser:
 
 ```text
-Extensions
+chrome://extensions
 → Developer mode
 → Load unpacked
 → choose dist-extension/
@@ -232,10 +349,16 @@ Extensions
 
 Click the ChatChat toolbar action to open the Side Panel.
 
-CI also uploads `chatchat-browser-extension-unpacked` so contributors can test the exact packaged PR artifact.
+CI uploads `chatchat-browser-extension-unpacked` so contributors can test the exact packaged PR artifact.
 
-## First-release scope
+## Release scope
 
-The first extension target is Chromium Manifest V3 (Chrome/Edge and compatible browsers).
+**Primary first-release target:** Chromium Manifest V3 (Chrome/Edge and compatible Chromium browsers).
 
-Firefox/WebExtension support should use the same core Council/House logic, but browser-specific sidebar and permission behavior should be validated separately rather than claimed in advance.
+Default PR CI must validate the Browser product and must not wait for desktop bundle compilation.
+
+The Tauri source remains in the repository as an experimental/power-user path. Desktop bundle workflows are manual and may evolve independently.
+
+Firefox/WebExtension support should reuse the same Council/House core, but browser-specific sidebar and permission behavior must be validated before support is claimed.
+
+> **One browser. Many logged-in AIs. One King.**
