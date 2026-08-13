@@ -1,0 +1,103 @@
+name: Browser Gate B Showcase
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gate-b-proof-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm install
+
+      - name: Build Browser Extension
+        run: npm run build:extension
+
+      - name: Install screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Start extension preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4180 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-gate-b-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4180/manifest.json >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4180/manifest.json >/dev/null
+
+      - name: Capture Browser Gate B Royal Proof showcase
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME_BIN" ]; then
+            echo "No Chromium-compatible browser found on the runner."
+            exit 1
+          fi
+          GATE_B_SHOWCASE='http://127.0.0.1:4180/extension/sidepanel.html?showcase=gate-b'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=7000 \
+            --window-size=520,1450 \
+            --screenshot=artifacts/chatchat-extension-gate-b-proof.png \
+            "$GATE_B_SHOWCASE"
+          test -s artifacts/chatchat-extension-gate-b-proof.png
+
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=7000 \
+            --dump-dom \
+            "$GATE_B_SHOWCASE" > artifacts/chatchat-extension-gate-b-proof.html
+          test -s artifacts/chatchat-extension-gate-b-proof.html
+
+      - name: Upload Browser Gate B proof evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-extension-gate-b-proof
+          path: |
+            artifacts/chatchat-extension-gate-b-proof.png
+            artifacts/chatchat-extension-gate-b-proof.html
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Assert Browser Gate B proof privacy boundary
+        run: |
+          grep -q 'data-chatchat-gate-b-showcase="booted"' artifacts/chatchat-extension-gate-b-proof.html
+          grep -q 'id="chatchat-browser-proof"' artifacts/chatchat-extension-gate-b-proof.html
+          grep -q 'data-proof-privacy="metadata-only"' artifacts/chatchat-extension-gate-b-proof.html
+          grep -q 'data-proof-source="browser-house"' artifacts/chatchat-extension-gate-b-proof.html
+          grep -q 'data-gate-b-verdict="gate-b-candidate"' artifacts/chatchat-extension-gate-b-proof.html
+          grep -q 'data-gate-b-providers="2"' artifacts/chatchat-extension-gate-b-proof.html
+          grep -q 'data-gate-b-rounds="3"' artifacts/chatchat-extension-gate-b-proof.html
+          grep -q 'data-gate-b-uncertain="0"' artifacts/chatchat-extension-gate-b-proof.html
+          grep -q 'GATE B CANDIDATE' artifacts/chatchat-extension-gate-b-proof.html
+          grep -q 'COPY ISSUE MARKDOWN' artifacts/chatchat-extension-gate-b-proof.html
+          grep -q 'COPY JSON' artifacts/chatchat-extension-gate-b-proof.html
+          grep -q 'openai-chatgpt' artifacts/chatchat-extension-gate-b-proof.html
+          grep -q 'deepseek-chat' artifacts/chatchat-extension-gate-b-proof.html
+          grep -q 'METADATA ONLY' artifacts/chatchat-extension-gate-b-proof.html
