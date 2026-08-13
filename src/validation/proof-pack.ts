@@ -127,6 +127,7 @@ export function buildGateBProofPack(
     council &&
       council.mode === "live" &&
       council.realParticipantCount >= 2 &&
+      input.providers.length === council.realParticipantCount &&
       council.finalPositionCount === council.realParticipantCount &&
       council.zeroConfidenceFinalCount === 0 &&
       council.eventKinds.uncertain === 0 &&
