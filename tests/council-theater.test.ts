@@ -82,6 +82,7 @@ assert(
 const tinyParticipants: CouncilParticipant[] = [
   { id: "a", name: "A", provider: "test" },
   { id: "b", name: "B", provider: "test" },
+  { id: "c", name: "C", provider: "test" },
 ];
 const brokenEvents: CouncilEvent[] = [
   {
@@ -129,6 +130,140 @@ assert(
     (edge) => edge.sourceActorId !== edge.targetActorId,
   ),
   "Self interactions should not pollute the inter-advisor persuasion graph.",
+);
+
+const traceEvents: CouncilEvent[] = [
+  {
+    id: "a-argument",
+    sessionId: "session-trace",
+    round: 1,
+    actorId: "a",
+    kind: "argument",
+    stance: "Alpha",
+    content: "Alpha",
+    confidence: 0.6,
+    createdAt: "2026-08-13T00:01:00.000Z",
+  },
+  {
+    id: "b-argument",
+    sessionId: "session-trace",
+    round: 1,
+    actorId: "b",
+    kind: "argument",
+    stance: "Beta",
+    content: "Beta",
+    confidence: 0.6,
+    createdAt: "2026-08-13T00:01:01.000Z",
+  },
+  {
+    id: "c-evidence",
+    sessionId: "session-trace",
+    round: 2,
+    actorId: "c",
+    kind: "evidence",
+    targetEventId: "a-argument",
+    claim: "Evidence against Alpha",
+    content: "Evidence is an interaction until somebody explicitly revises or concedes.",
+    confidence: 0.8,
+    createdAt: "2026-08-13T00:01:02.000Z",
+  },
+  {
+    id: "b-challenge",
+    sessionId: "session-trace",
+    round: 2,
+    actorId: "b",
+    kind: "challenge",
+    targetEventId: "a-argument",
+    content: "Challenge Alpha",
+    createdAt: "2026-08-13T00:01:03.000Z",
+  },
+  {
+    id: "b-concede",
+    sessionId: "session-trace",
+    round: 2,
+    actorId: "b",
+    kind: "concede",
+    targetEventId: "a-argument",
+    content: "I concede this point to A.",
+    createdAt: "2026-08-13T00:01:04.000Z",
+  },
+];
+const traceGraph = buildCouncilInfluenceGraph(tinyParticipants, traceEvents);
+const evidenceEdge = traceGraph.edges.find((edge) => edge.sourceEventId === "c-evidence");
+assert(evidenceEdge, "Targeted evidence should create a traceable interaction edge.");
+assert(evidenceEdge.kind === "evidence" && evidenceEdge.strength === "interaction", "Evidence alone must remain attempted influence, not successful persuasion.");
+assert(evidenceEdge.sourceActorId === "c" && evidenceEdge.targetActorId === "a", "Evidence direction should run from submitter to the actor whose event was targeted.");
+assert(evidenceEdge.targetEventId === "a-argument", "Evidence edges must retain the exact targeted Blackboard event.");
+
+const concedeEdge = traceGraph.edges.find((edge) => edge.sourceEventId === "b-concede");
+assert(concedeEdge, "An explicit concede event should create a strong influence edge.");
+assert(concedeEdge.kind === "concede" && concedeEdge.strength === "strong", "Concede is explicit successful influence.");
+assert(concedeEdge.sourceActorId === "a" && concedeEdge.targetActorId === "b", "Concede direction should run from the conceded-to actor to the conceding actor.");
+assert(concedeEdge.causedByEventId === "a-argument", "Concede provenance must preserve the exact accepted event id.");
+
+const aggregatedEvidence = traceGraph.aggregatedEdges.find(
+  (edge) => edge.sourceActorId === "c" && edge.targetActorId === "a" && edge.strength === "interaction",
+);
+assert(aggregatedEvidence?.kinds.evidence === 1, "Aggregated graph edges must preserve per-kind counts.");
+assert(aggregatedEvidence.eventIds.includes("c-evidence"), "Aggregated graph edges must retain source event provenance.");
+
+const tieEvents: CouncilEvent[] = [
+  {
+    id: "tie-a-argument",
+    sessionId: "session-tie",
+    round: 1,
+    actorId: "a",
+    kind: "argument",
+    stance: "A",
+    content: "A",
+    confidence: 0.5,
+    createdAt: "2026-08-13T00:02:00.000Z",
+  },
+  {
+    id: "tie-b-argument",
+    sessionId: "session-tie",
+    round: 1,
+    actorId: "b",
+    kind: "argument",
+    stance: "B",
+    content: "B",
+    confidence: 0.5,
+    createdAt: "2026-08-13T00:02:01.000Z",
+  },
+  {
+    id: "tie-a-evidence",
+    sessionId: "session-tie",
+    round: 2,
+    actorId: "a",
+    kind: "evidence",
+    targetEventId: "tie-b-argument",
+    claim: "A evidence",
+    content: "A evidence",
+    confidence: 0.6,
+    createdAt: "2026-08-13T00:02:02.000Z",
+  },
+  {
+    id: "tie-b-evidence",
+    sessionId: "session-tie",
+    round: 2,
+    actorId: "b",
+    kind: "evidence",
+    targetEventId: "tie-a-argument",
+    claim: "B evidence",
+    content: "B evidence",
+    confidence: 0.6,
+    createdAt: "2026-08-13T00:02:03.000Z",
+  },
+];
+const tieGraph = buildCouncilInfluenceGraph(tinyParticipants.slice(0, 2), tieEvents);
+const tieAwards = deriveCouncilAwards(tieGraph, tieEvents, null);
+assert(
+  !tieAwards.some((award) => award.kind === "evidence_keeper"),
+  "A tied evidence count must not invent a single Evidence Keeper winner.",
+);
+assert(
+  !tieAwards.some((award) => award.kind === "most_influential"),
+  "Interaction-only evidence must not create a Most Influential winner.",
 );
 
 console.log("✓ ChatChat Council Theater influence tests passed");
