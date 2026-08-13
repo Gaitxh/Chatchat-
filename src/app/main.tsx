@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.js";
 import { startShowcaseFromUrl } from "./showcase.js";
 import "./styles.css";
+import "./fresh-ui.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("ChatChat root element is missing.");
