@@ -153,7 +153,7 @@ export default function App() {
 
         {council.report ? <FreshVerdict report={council.report} /> : null}
 
-        <details className="fresh-disclosure" defaultOpen={theaterShowcase}>
+        <details className="fresh-disclosure" open={theaterShowcase || undefined}>
           <summary>
             <div>
               <b>查看议会过程</b>
