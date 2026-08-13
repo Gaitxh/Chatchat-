@@ -12,16 +12,27 @@
     active: true,
   };
   const origin = "https://chatgpt.com";
+  const recipe = {
+    profileId: origin,
+    composerSelector: "textarea[data-testid='prompt-textarea']",
+    sendSelector: "button[aria-label='Send message']",
+    responseSelector: "[data-message-author-role='assistant']",
+    createdAt: "2026-08-13T00:00:00.000Z",
+    updatedAt: "2026-08-13T00:00:00.000Z",
+  };
+  const candidate = {
+    schemaVersion: 1,
+    providerId: "openai-chatgpt",
+    origin,
+    composerSelector: recipe.composerSelector,
+    sendSelector: recipe.sendSelector,
+    responseSelector: recipe.responseSelector,
+    capturedAt: "2026-08-13",
+    notes: "Deterministic selector-map showcase only. No runtime trust.",
+  };
   const localState = {
     [recipesKey]: {
-      [origin]: {
-        profileId: origin,
-        composerSelector: "textarea[data-testid='prompt-textarea']",
-        sendSelector: "button[aria-label='Send message']",
-        responseSelector: "[data-message-author-role='assistant']",
-        createdAt: "2026-08-13T00:00:00.000Z",
-        updatedAt: "2026-08-13T00:00:00.000Z",
-      },
+      [origin]: recipe,
     },
   };
   const sessionState = {
@@ -55,7 +66,7 @@
       executeScript: async () => [],
     },
     tabs: {
-      query: async (query) => query?.active ? [tab] : [tab],
+      query: async (_query) => [tab],
       get: async (id) => id === tab.id ? tab : undefined,
       create: async ({ url, active }) => ({ ...tab, id: 202, url, active: Boolean(active) }),
       update: async (_id, patch) => ({ ...tab, ...patch }),
@@ -90,7 +101,36 @@
     badge.style.cssText =
       "position:fixed;z-index:999999;right:8px;bottom:8px;padding:6px 8px;border-radius:999px;background:#6a5225;color:#fff;font:700 8px system-ui;letter-spacing:.05em;opacity:.9;pointer-events:none";
     document.body.appendChild(badge);
+    void drivePreview();
   });
+
+  async function drivePreview() {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const open = document.querySelector("#chatchat-recipe-share [data-action='open']");
+      if (open) {
+        open.click();
+        break;
+      }
+      await sleep(100);
+    }
+    await sleep(180);
+    const textarea = document.querySelector("#chatchat-recipe-share [data-field='json']");
+    const preview = document.querySelector("#chatchat-recipe-share [data-action='preview']");
+    if (!(textarea instanceof HTMLTextAreaElement) || !(preview instanceof HTMLButtonElement)) {
+      document.documentElement.dataset.chatchatRecipePreview = "missing-ui";
+      return;
+    }
+    textarea.value = JSON.stringify(candidate, null, 2);
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    preview.click();
+    await sleep(80);
+    const card = document.querySelector("#chatchat-recipe-share [data-recipe-candidate-level]");
+    document.documentElement.dataset.chatchatRecipePreview = card ? "ready" : "failed";
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 
   function store(target) {
     return {
