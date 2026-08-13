@@ -36,7 +36,7 @@ void bootSummonControl();
 
 async function bootSummonControl() {
   if (typeof chrome === "undefined" || !chrome.tabs || !chrome.storage) return;
-  if (new URLSearchParams(location.search).has("showcase")) return;
+  if (new URLSearchParams(location.search).get("showcase") === "1") return;
 
   await whenDomReady();
   const host = document.createElement("div");
