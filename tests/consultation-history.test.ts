@@ -1,6 +1,9 @@
-import assert from "node:assert/strict";
 import { createConsultationArchive, summarizeConsultationArchive } from "../src/history/consultation-history.js";
 import type { CouncilEvent, CouncilReport } from "../src/core/types.js";
+
+function assert(condition: unknown, message: string): asserts condition {
+  if (!condition) throw new Error(`Assertion failed: ${message}`);
+}
 
 const report: CouncilReport = {
   sessionId: "session-history",
@@ -24,14 +27,14 @@ const events: CouncilEvent[] = [
 const archive = createConsultationArchive(report, events);
 const summary = summarizeConsultationArchive(archive);
 
-assert.equal(archive.sessionId, report.sessionId);
-assert.equal(archive.events.length, 4);
-assert.equal(summary.eventCount, 4);
-assert.equal(summary.revisionCount, 1);
-assert.equal(summary.evidenceCount, 1);
-assert.equal(summary.minoritySurvives, true);
-assert.equal(summary.consensusStance, "Full Room");
-assert.equal("events" in summary, false, "history list summaries must not duplicate full event bodies");
-assert.equal("report" in summary, false, "history list summaries must not duplicate the full report");
+assert(archive.sessionId === report.sessionId, "archive keeps the session id");
+assert(archive.events.length === 4, "archive keeps the full event stream");
+assert(summary.eventCount === 4, "summary counts events");
+assert(summary.revisionCount === 1, "summary counts revisions");
+assert(summary.evidenceCount === 1, "summary counts evidence");
+assert(summary.minoritySurvives === true, "summary preserves minority visibility");
+assert(summary.consensusStance === "Full Room", "summary keeps the consensus label");
+assert(!("events" in summary), "history list summaries must not duplicate full event bodies");
+assert(!("report" in summary), "history list summaries must not duplicate the full report");
 
 console.log("✓ ChatChat Consultation History summary tests passed");
