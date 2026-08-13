@@ -4,6 +4,7 @@
 
   const DEFAULT_TIMEOUT_MS = 120_000;
   const STABLE_MS = 1_400;
+  const AUTO_STABLE_MS = 850;
   let teachCleanup = null;
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -15,6 +16,13 @@
           return pageInfo();
         case "PROBE":
           return probePage();
+        case "AUTO_SETUP":
+          return autoSetup(
+            String(message.profileId ?? location.origin),
+            String(message.prompt ?? ""),
+            String(message.expectedText ?? "CHATCHAT_READY"),
+            message.timeoutMs ?? 90_000,
+          );
         case "TEACH":
           return teach(message.role);
         case "AWAIT_RECIPE":
@@ -57,9 +65,272 @@
       inputs: document.querySelectorAll("input,textarea,[contenteditable='true']").length,
       buttons: document.querySelectorAll("button,[role='button']").length,
       assistantCandidates: document.querySelectorAll(
-        "[data-message-author-role='assistant'],[data-testid*='assistant'],[class*='assistant']",
+        "[data-message-author-role='assistant'],[data-testid*='assistant'],[data-role*='assistant'],[class*='assistant']",
       ).length,
     };
+  }
+
+  async function autoSetup(profileId, prompt, expectedText, timeoutMs) {
+    if (!prompt.trim()) throw new Error("Automatic setup requires a connection prompt.");
+    const composerMatch = bestComposer();
+    if (!composerMatch || composerMatch.score < 35) {
+      throw new Error("ChatChat could not confidently identify the AI message box automatically.");
+    }
+
+    const composer = composerMatch.element;
+    const composerSelector = selectorFor(composer);
+    const initialSend = bestSendButton(composer);
+    if (!initialSend || initialSend.score < 42) {
+      throw new Error("ChatChat found the message box but could not confidently identify the send button.");
+    }
+
+    const startedAt = new Date().toISOString();
+    const baselineExpectedCount = countTextOccurrences(document.body?.innerText ?? "", expectedText);
+    fillComposer(composer, prompt);
+    await sleep(140);
+
+    const sendMatch = bestSendButton(composer) ?? initialSend;
+    const send = sendMatch.element;
+    if (!isClickable(send)) {
+      await sleep(320);
+    }
+    if (!isClickable(send)) {
+      throw new Error("The detected send button did not become clickable after ChatChat filled the message box.");
+    }
+    const sendSelector = selectorFor(send);
+    send.click();
+
+    const response = await waitForExpectedResponse(
+      expectedText,
+      composer,
+      baselineExpectedCount,
+      timeoutMs,
+    );
+    const responseSelector = inferResponseSelector(response.element, composer);
+    const now = new Date().toISOString();
+
+    return {
+      recipe: {
+        profileId,
+        composerSelector,
+        sendSelector,
+        responseSelector,
+        createdAt: startedAt,
+        updatedAt: now,
+      },
+      responseText: response.text,
+      elapsedMs: response.elapsedMs,
+      diagnostics: {
+        mode: "automatic",
+        composerScore: composerMatch.score,
+        sendScore: sendMatch.score,
+        responseStrategy: responseSelector,
+      },
+    };
+  }
+
+  function bestComposer() {
+    const candidates = [
+      ...document.querySelectorAll(
+        "textarea,[contenteditable='true'],input:not([type='password']):not([type='hidden']):not([type='file'])",
+      ),
+    ];
+    let best = null;
+    for (const element of candidates) {
+      if (!(element instanceof HTMLElement) || !isVisible(element)) continue;
+      if (element instanceof HTMLInputElement && ["search", "email", "tel", "url"].includes(element.type)) {
+        continue;
+      }
+      const label = searchableLabel(element);
+      if (/search|filter|email|phone|login|sign in|搜索|筛选|邮箱|登录/i.test(label)) continue;
+      const rect = element.getBoundingClientRect();
+      let score = 0;
+      if (element instanceof HTMLTextAreaElement) score += 30;
+      if (element.isContentEditable) score += 26;
+      if (element instanceof HTMLInputElement) score += 12;
+      if (/prompt|message|chat|ask|question|composer|send|输入|消息|提问|聊天|问/i.test(label)) score += 48;
+      if (element.closest("main,[role='main']")) score += 10;
+      if (rect.width >= 240) score += 14;
+      if (rect.height >= 32) score += 8;
+      if (rect.top > window.innerHeight * 0.45) score += 10;
+      if (element.getAttribute("aria-multiline") === "true") score += 12;
+      if (!best || score > best.score) best = { element, score };
+    }
+    return best;
+  }
+
+  function bestSendButton(composer) {
+    const form = composer.closest("form");
+    const candidates = [
+      ...(form ? form.querySelectorAll("button,[role='button']") : []),
+      ...document.querySelectorAll("button,[role='button']"),
+    ];
+    const unique = [...new Set(candidates)];
+    const composerRect = composer.getBoundingClientRect();
+    let best = null;
+
+    for (const element of unique) {
+      if (!(element instanceof HTMLElement) || !isVisible(element)) continue;
+      const label = searchableLabel(element);
+      if (/attach|upload|image|photo|voice|microphone|record|stop|cancel|menu|more|附件|上传|图片|语音|麦克风|停止|取消|菜单/i.test(label)) {
+        continue;
+      }
+      const rect = element.getBoundingClientRect();
+      const dx = Math.abs(rect.left + rect.width / 2 - (composerRect.right - 24));
+      const dy = Math.abs(rect.top + rect.height / 2 - (composerRect.top + composerRect.height / 2));
+      let score = 0;
+      if (form && form.contains(element)) score += 34;
+      if (/send|submit|arrow.?up|paper.?plane|发送|提交/i.test(label)) score += 70;
+      if (element instanceof HTMLButtonElement && element.type === "submit") score += 42;
+      if (dx < 180 && dy < 100) score += 24;
+      if (dx < 80 && dy < 70) score += 15;
+      if (!element.hasAttribute("disabled") && element.getAttribute("aria-disabled") !== "true") score += 8;
+      if (!best || score > best.score) best = { element, score };
+    }
+    return best;
+  }
+
+  function searchableLabel(element) {
+    return [
+      element.getAttribute("aria-label"),
+      element.getAttribute("title"),
+      element.getAttribute("placeholder"),
+      element.getAttribute("data-testid"),
+      element.getAttribute("data-qa"),
+      element.getAttribute("name"),
+      element.textContent,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .slice(0, 800);
+  }
+
+  function isClickable(element) {
+    return (
+      isVisible(element) &&
+      !element.hasAttribute("disabled") &&
+      element.getAttribute("aria-disabled") !== "true"
+    );
+  }
+
+  async function waitForExpectedResponse(expectedText, composer, baselineCount, timeoutMs) {
+    const started = Date.now();
+    let candidate = null;
+    let candidateText = "";
+    let stableSince = 0;
+
+    while (Date.now() - started < timeoutMs) {
+      const bodyText = document.body?.innerText ?? "";
+      if (countTextOccurrences(bodyText, expectedText) > baselineCount) {
+        const element = findSmallestExpectedElement(expectedText, composer);
+        if (element) {
+          const text = visibleText(element);
+          if (element !== candidate || text !== candidateText) {
+            candidate = element;
+            candidateText = text;
+            stableSince = Date.now();
+          } else if (Date.now() - stableSince >= AUTO_STABLE_MS) {
+            return {
+              element,
+              text: expectedText,
+              elapsedMs: Date.now() - started,
+            };
+          }
+        }
+      }
+      await sleep(300);
+    }
+    throw new Error("The AI page did not return the automatic ChatChat connection reply in time.");
+  }
+
+  function findSmallestExpectedElement(expectedText, composer) {
+    const all = [...document.querySelectorAll("main *,[role='main'] *,article,[role='article'],body *")];
+    let best = null;
+    let bestLength = Number.POSITIVE_INFINITY;
+    for (const element of all) {
+      if (!(element instanceof HTMLElement) || !isVisible(element)) continue;
+      if (element === composer || element.contains(composer) || composer.contains(element)) continue;
+      const text = visibleText(element);
+      if (!text.includes(expectedText)) continue;
+      if (text.length < bestLength) {
+        best = element;
+        bestLength = text.length;
+      }
+    }
+    return best;
+  }
+
+  function inferResponseSelector(element, composer) {
+    let current = element;
+    for (let depth = 0; current && depth < 8; depth += 1) {
+      const author = current.getAttribute("data-message-author-role");
+      if (author?.toLowerCase() === "assistant") {
+        return `[data-message-author-role=${JSON.stringify(author)}]`;
+      }
+      const role = current.getAttribute("data-role");
+      if (role && /assistant|model|response/i.test(role)) {
+        return `[data-role=${JSON.stringify(role)}]`;
+      }
+      const testId = current.getAttribute("data-testid");
+      if (testId && /assistant|response|message-content|model/i.test(testId) && testId.length < 180) {
+        return `[data-testid=${JSON.stringify(testId)}]`;
+      }
+      const semanticClasses = [...current.classList].filter((name) =>
+        /assistant|model-response|response-content|message-content|markdown/i.test(name),
+      );
+      for (const name of semanticClasses) {
+        const selector = `${current.tagName.toLowerCase()}.${CSS.escape(name)}`;
+        if (safeQueryAll(selector).length) return selector;
+      }
+      current = current.parentElement;
+    }
+
+    const main = element.closest("main,[role='main']");
+    if (main instanceof HTMLElement) {
+      if (main.matches("main") && document.querySelectorAll("main").length === 1) return "main";
+      if (main.getAttribute("role") === "main") return '[role="main"]';
+    }
+
+    current = element;
+    let fallback = element;
+    for (let depth = 0; current?.parentElement && depth < 7; depth += 1) {
+      const parent = current.parentElement;
+      if (parent === document.body || parent.contains(composer)) break;
+      fallback = parent;
+      current = parent;
+    }
+    try {
+      return selectorFor(fallback);
+    } catch {
+      return selectorFor(element);
+    }
+  }
+
+  function countTextOccurrences(text, needle) {
+    if (!needle) return 0;
+    let count = 0;
+    let index = 0;
+    while ((index = text.indexOf(needle, index)) >= 0) {
+      count += 1;
+      index += needle.length;
+    }
+    return count;
+  }
+
+  function visibleText(element) {
+    return (element.innerText || element.textContent || "").trim();
+  }
+
+  function isVisible(element) {
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return (
+      rect.width > 2 &&
+      rect.height > 2 &&
+      style.display !== "none" &&
+      style.visibility !== "hidden" &&
+      Number(style.opacity || "1") > 0.01
+    );
   }
 
   async function teach(role) {
@@ -169,20 +440,14 @@
   }
 
   function selectionFor(role, element) {
-    const inputType =
-      element instanceof HTMLInputElement ? element.type || null : null;
+    const inputType = element instanceof HTMLInputElement ? element.type || null : null;
     if (inputType?.toLowerCase() === "password") {
       throw new Error("ChatChat refuses to teach against password fields.");
     }
 
     const tag = element.tagName.toLowerCase();
     const contentEditable = element.getAttribute("contenteditable") === "true";
-    if (
-      role === "composer" &&
-      !contentEditable &&
-      tag !== "textarea" &&
-      tag !== "input"
-    ) {
+    if (role === "composer" && !contentEditable && tag !== "textarea" && tag !== "input") {
       throw new Error("Composer must be an input, textarea, or contenteditable element.");
     }
 
@@ -201,6 +466,7 @@
   }
 
   function selectorFor(element) {
+    if (element === document.body) return "body";
     if (element.id) {
       const candidate = `#${CSS.escape(element.id)}`;
       if (isUnique(candidate)) return candidate;
@@ -232,12 +498,8 @@
       if (classes.length) part += classes.map((name) => `.${CSS.escape(name)}`).join("");
       const parent = current.parentElement;
       if (parent) {
-        const sameTag = [...parent.children].filter(
-          (child) => child.tagName === current.tagName,
-        );
-        if (sameTag.length > 1) {
-          part += `:nth-of-type(${sameTag.indexOf(current) + 1})`;
-        }
+        const sameTag = [...parent.children].filter((child) => child.tagName === current.tagName);
+        if (sameTag.length > 1) part += `:nth-of-type(${sameTag.indexOf(current) + 1})`;
       }
       path.unshift(part);
       const candidate = path.join(" > ");
@@ -266,18 +528,24 @@
       }
       await sleep(350);
     }
-    throw new Error("Provider tab did not become ready for the taught recipe in time.");
+    throw new Error("Provider tab did not become ready for the configured recipe in time.");
   }
 
   async function runSpeech(recipe, prompt, timeoutMs) {
-    if (!prompt.trim()) throw new Error("ChatChat cannot send an empty Council prompt.");
+    if (!prompt.trim()) throw new Error("ChatChat cannot send an empty consultation prompt.");
     const composer = requiredQuery(recipe?.composerSelector, "composer");
-    const send = requiredQuery(recipe?.sendSelector, "send");
     const responseSelector = requiredSelector(recipe?.responseSelector, "response");
 
     const baseline = responseSnapshot(responseSelector);
+    const baselineSignal = responseSignal(baseline.lastText, prompt, "");
     fillComposer(composer, prompt);
-    await sleep(60);
+    await sleep(100);
+
+    const refreshedSend = bestSendButton(composer)?.element;
+    const send = refreshedSend && isClickable(refreshedSend)
+      ? refreshedSend
+      : requiredQuery(recipe?.sendSelector, "send");
+    if (!isClickable(send)) throw new Error("Configured send button is currently unavailable.");
     send.click();
 
     const started = Date.now();
@@ -287,14 +555,14 @@
 
     while (Date.now() - started < timeoutMs) {
       const snapshot = responseSnapshot(responseSelector);
+      const signal = responseSignal(snapshot.lastText, prompt, baseline.lastText);
       const changed =
         snapshot.count > baseline.count ||
         (snapshot.lastText && snapshot.lastText !== baseline.lastText);
 
-      if (changed && snapshot.lastText.trim()) {
-        const next = snapshot.lastText.trim();
-        if (next !== candidate) {
-          candidate = next;
+      if (changed && signal && signal !== baselineSignal) {
+        if (signal !== candidate) {
+          candidate = signal;
           stableSince = Date.now();
         } else if (Date.now() - stableSince >= STABLE_MS) {
           return {
@@ -320,22 +588,36 @@
         truncatedByTimeout: true,
       };
     }
-    throw new Error("Timed out waiting for a changed AI response from the taught response selector.");
+    throw new Error("Timed out waiting for a changed AI response from the configured response area.");
+  }
+
+  function responseSignal(text, prompt, baselineText) {
+    const source = String(text ?? "");
+    const open = "<CHATCHAT_COUNCIL_JSON>";
+    const close = "</CHATCHAT_COUNCIL_JSON>";
+    const start = source.lastIndexOf(open);
+    if (start >= 0) {
+      const end = source.indexOf(close, start + open.length);
+      if (end > start) return source.slice(start, end + close.length).trim();
+    }
+
+    const exact = prompt.match(/reply\s+with\s+exactly\s*:?\s*([A-Z0-9_-]{4,80})/i)?.[1];
+    if (exact) {
+      const before = countTextOccurrences(String(baselineText ?? ""), exact);
+      const after = countTextOccurrences(source, exact);
+      if (after > before) return exact;
+      return "";
+    }
+    return source.trim();
   }
 
   function fillComposer(element, text) {
     element.focus();
     if (element instanceof HTMLTextAreaElement) {
-      const setter = Object.getOwnPropertyDescriptor(
-        HTMLTextAreaElement.prototype,
-        "value",
-      )?.set;
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
       setter?.call(element, text);
     } else if (element instanceof HTMLInputElement) {
-      const setter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        "value",
-      )?.set;
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
       setter?.call(element, text);
     } else if (element instanceof HTMLElement && element.isContentEditable) {
       const selection = window.getSelection();
@@ -346,7 +628,7 @@
       const inserted = document.execCommand?.("insertText", false, text);
       if (!inserted) element.textContent = text;
     } else {
-      throw new Error("Taught composer is no longer an editable element.");
+      throw new Error("Configured composer is no longer an editable element.");
     }
 
     element.dispatchEvent(
@@ -371,13 +653,13 @@
   function requiredQuery(selector, label) {
     const value = requiredSelector(selector, label);
     const element = safeQuery(value);
-    if (!element) throw new Error(`Taught ${label} selector no longer matches the Provider page.`);
+    if (!element) throw new Error(`Configured ${label} selector no longer matches the Provider page.`);
     return element;
   }
 
   function requiredSelector(selector, label) {
     if (typeof selector !== "string" || !selector.trim()) {
-      throw new Error(`Missing taught ${label} selector.`);
+      throw new Error(`Missing configured ${label} selector.`);
     }
     return selector.trim();
   }
