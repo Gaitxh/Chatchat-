@@ -24,10 +24,12 @@ Community Recipes therefore use a deliberately weaker object: **Recipe Candidate
   "composerSelector": "textarea[data-testid='prompt-textarea']",
   "sendSelector": "button[aria-label='Send message']",
   "responseSelector": "[data-message-author-role='assistant']",
-  "testedAt": "2026-08-13",
+  "capturedAt": "2026-08-13",
   "notes": "Optional sanitized public note"
 }
 ```
+
+`capturedAt` means only **when this selector map was captured/exported**. It is deliberately *not* called `testedAt`: the candidate may be copied before Test Speech, and its timestamp must never masquerade as runtime evidence.
 
 Schema:
 
@@ -154,7 +156,7 @@ recipes/
 └── qwen/
 ```
 
-Each file should carry a date and sanitized environment note because third-party Provider DOMs are time-sensitive.
+Each file should carry a capture date and sanitized environment note because third-party Provider DOMs are time-sensitive. Any runtime validation date belongs in the Compatibility / Gate B evidence layer, not inside the selector map.
 
 The directory must remain boring evidence, not a marketing support matrix.
 
