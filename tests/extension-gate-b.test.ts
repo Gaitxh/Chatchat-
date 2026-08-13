@@ -185,8 +185,8 @@ for (const secret of [
   "PRIVATE KING QUESTION",
   "PRIVATE CHATGPT ANSWER",
   "PRIVATE DEEPSEEK ANSWER",
-  "PRIVATE CHATGPT_COMPOSER",
-  "PRIVATE DEEPSEEK_COMPOSER",
+  "PRIVATE_CHATGPT_COMPOSER",
+  "PRIVATE_DEEPSEEK_COMPOSER",
   "PRIVATE CHATGPT TAB NAME",
 ]) {
   assert(!exported.includes(secret), `Browser proof export must not leak ${secret}.`);
@@ -208,5 +208,18 @@ const offHostPack = buildGateBProofPack({
   environment: "Chromium",
 });
 assert(offHostPack.verdict === "incomplete", "One off-host Browser tab must fail closed rather than qualify as Gate B candidate evidence.");
+
+const missingProviderRowPack = buildGateBProofPack({
+  providers: providerProof.slice(0, 1),
+  report,
+  events,
+  mode: "live",
+  chatChatVersion: "0.9.0",
+  environment: "Chromium",
+});
+assert(
+  missingProviderRowPack.verdict === "incomplete",
+  "A Gate B candidate must freeze one Provider proof row for every real Council participant.",
+);
 
 console.log("✓ ChatChat Browser House Gate B proof tests passed");
