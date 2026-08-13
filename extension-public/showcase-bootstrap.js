@@ -9,16 +9,26 @@
     seat(101, "openai-chatgpt", "ChatGPT", "https://chatgpt.com", "gpt", "GPT Delegation"),
     seat(102, "openai-chatgpt", "ChatGPT", "https://chatgpt.com", "gpt", "GPT Delegation"),
     seat(103, "openai-chatgpt", "ChatGPT", "https://chatgpt.com", "gpt", "GPT Delegation"),
-    seat(201, "qwen", "Qwen", "https://chat.qwen.ai", "qwen", "Qwen Delegation"),
-    seat(202, "qwen", "Qwen", "https://chat.qwen.ai", "qwen", "Qwen Delegation"),
+    seat(104, "openai-chatgpt", "ChatGPT", "https://chatgpt.com", "gpt", "GPT Delegation"),
+    seat(105, "openai-chatgpt", "ChatGPT", "https://chatgpt.com", "gpt", "GPT Delegation"),
+    seat(201, "qwen-chat", "Qwen", "https://chat.qwen.ai", "qwen", "Qwen Delegation"),
+    seat(202, "qwen-chat", "Qwen", "https://chat.qwen.ai", "qwen", "Qwen Delegation"),
+    seat(203, "qwen-chat", "Qwen", "https://chat.qwen.ai", "qwen", "Qwen Delegation"),
+    seat(204, "qwen-chat", "Qwen", "https://chat.qwen.ai", "qwen", "Qwen Delegation"),
+    seat(205, "qwen-chat", "Qwen", "https://chat.qwen.ai", "qwen", "Qwen Delegation"),
   ];
-  const tabs = new Map(seats.map((item) => [item.tabId, {
-    id: item.tabId,
-    url: item.url,
-    title: `${item.providerName} · showcase`,
-    status: "complete",
-    active: item.tabId === 101,
-  }]));
+  const tabs = new Map(
+    seats.map((item) => [
+      item.tabId,
+      {
+        id: item.tabId,
+        url: item.url,
+        title: `${item.providerName} · showcase`,
+        status: "complete",
+        active: item.tabId === 101,
+      },
+    ]),
+  );
   const storage = {
     [recipesKey]: {
       "https://chatgpt.com": recipe("https://chatgpt.com"),
@@ -27,7 +37,7 @@
   };
   const session = { [seatsKey]: seats };
 
-  globalThis.chrome = {
+  const showcaseChrome = {
     storage: {
       local: store(storage),
       session: store(session),
@@ -44,7 +54,13 @@
       get: async (id) => tabs.get(id),
       create: async ({ url, active }) => {
         const id = 900 + tabs.size;
-        const tab = { id, url, title: "Showcase seat", status: "complete", active: Boolean(active) };
+        const tab = {
+          id,
+          url,
+          title: "Showcase seat",
+          status: "complete",
+          active: Boolean(active),
+        };
         tabs.set(id, tab);
         return tab;
       },
@@ -62,16 +78,30 @@
     },
   };
 
+  // A normal Chrome page may expose a partial browser-owned `window.chrome`
+  // object without extension APIs. Feature-detect tabs.query above, then fill
+  // only the missing showcase APIs instead of assuming the global is writable.
+  if (globalThis.chrome) Object.assign(globalThis.chrome, showcaseChrome);
+  else globalThis.chrome = showcaseChrome;
+
   document.documentElement.dataset.chatchatExtensionShowcase = "booted";
   window.addEventListener("load", () => {
     const badge = document.createElement("div");
-    badge.textContent = "DETERMINISTIC EXTENSION SHOWCASE · NO REAL PROVIDER";
-    badge.style.cssText = "position:fixed;z-index:999999;right:8px;bottom:8px;padding:6px 8px;border-radius:999px;background:#173b32;color:#fff;font:700 8px system-ui;letter-spacing:.05em;opacity:.88;pointer-events:none";
+    badge.textContent = "DETERMINISTIC 10-SEAT HOUSE SHOWCASE · NO REAL PROVIDER";
+    badge.style.cssText =
+      "position:fixed;z-index:999999;right:8px;bottom:8px;padding:6px 8px;border-radius:999px;background:#173b32;color:#fff;font:700 8px system-ui;letter-spacing:.05em;opacity:.88;pointer-events:none";
     document.body.appendChild(badge);
     void autoRun();
   });
 
-  function seat(tabId, providerId, providerName, origin, delegationId, delegationName) {
+  function seat(
+    tabId,
+    providerId,
+    providerName,
+    origin,
+    delegationId,
+    delegationName,
+  ) {
     return {
       seatId: `extension:${providerId}:${tabId}`,
       tabId,
@@ -110,20 +140,32 @@
     if (!message?.__chatchat) return undefined;
     if (message.type === "PING") {
       const tab = tabs.get(tabId);
-      return { ok: true, result: { url: tab?.url, origin: tab ? new URL(tab.url).origin : "", title: tab?.title, readyState: "complete" } };
+      return {
+        ok: true,
+        result: {
+          url: tab?.url,
+          origin: tab ? new URL(tab.url).origin : "",
+          title: tab?.title,
+          readyState: "complete",
+        },
+      };
     }
     if (message.type === "AWAIT_RECIPE") {
       return { ok: true, result: { ready: true, elapsedMs: 12 } };
     }
     if (message.type === "RUN_SPEECH") {
       if (String(message.prompt).includes("CHATCHAT_READY")) {
-        return { ok: true, result: { responseText: "CHATCHAT_READY", elapsedMs: 120 } };
+        return {
+          ok: true,
+          result: { responseText: "CHATCHAT_READY", elapsedMs: 120 },
+        };
       }
       if (String(message.prompt).includes("stance is exactly READY")) {
         return {
           ok: true,
           result: {
-            responseText: '<CHATCHAT_COUNCIL_JSON>{"contributions":[{"kind":"argument","stance":"READY","content":"Structured Council protocol ready.","confidence":1}]}</CHATCHAT_COUNCIL_JSON>',
+            responseText:
+              '<CHATCHAT_COUNCIL_JSON>{"contributions":[{"kind":"argument","stance":"READY","content":"Structured Council protocol ready.","confidence":1}]}</CHATCHAT_COUNCIL_JSON>',
             elapsedMs: 150,
           },
         };
@@ -136,8 +178,16 @@
         },
       };
     }
-    if (message.type === "PROBE") return { ok: true, result: { inputs: 1, buttons: 3, assistantCandidates: 1 } };
-    return { ok: false, error: `Unsupported showcase message ${message.type}` };
+    if (message.type === "PROBE") {
+      return {
+        ok: true,
+        result: { inputs: 1, buttons: 3, assistantCandidates: 1 },
+      };
+    }
+    return {
+      ok: false,
+      error: `Unsupported showcase message ${message.type}`,
+    };
   }
 
   function councilResponse(prompt, tabId) {
@@ -150,60 +200,127 @@
     let contributions;
 
     if (phase === "sealed") {
-      contributions = [{
-        kind: "argument",
-        stance: initial,
-        content: `${actorId} independently opens for ${initial}.`,
-        confidence: initial === "Tauri" ? 0.76 : 0.66,
-      }];
+      contributions = [
+        {
+          kind: "argument",
+          stance: initial,
+          content: `${actorId} independently opens for ${initial}.`,
+          confidence:
+            initial === "Tauri" ? 0.76 : initial === "Electron" ? 0.66 : 0.46,
+        },
+      ];
     } else if (phase === "debate" && tabId === 102) {
       const previous = ownEvents.find((event) => event.kind === "argument");
-      const cause = publicEvents.find((event) => event.actorId.includes("qwen:201") && event.kind === "argument")
-        ?? publicEvents.find((event) => event.actorId !== actorId && event.kind === "argument" && event.stance === "Tauri");
-      contributions = [{
-        kind: "revision",
-        previousEventId: previous?.id,
-        stance: "Tauri",
-        content: "I cross the aisle after another delegation made the local-first constraint more persuasive.",
-        confidence: 0.78,
-        causedBy: cause ? [cause.id] : [],
-      }];
+      const cause =
+        publicEvents.find(
+          (event) =>
+            event.actorId.includes("qwen") &&
+            event.kind === "argument" &&
+            event.stance === "Tauri",
+        ) ??
+        publicEvents.find(
+          (event) =>
+            event.actorId !== actorId &&
+            event.kind === "argument" &&
+            event.stance === "Tauri",
+        );
+      contributions = [
+        {
+          kind: "revision",
+          previousEventId: previous?.id,
+          stance: "Tauri",
+          content:
+            "I cross the aisle after another delegation made the local-first constraint more persuasive.",
+          confidence: 0.78,
+          causedBy: cause ? [cause.id] : [],
+        },
+      ];
     } else if (phase === "debate") {
-      const target = publicEvents.find((event) => event.actorId !== actorId && event.kind === "argument" && event.stance !== initial)
-        ?? publicEvents.find((event) => event.actorId !== actorId && event.kind === "argument");
-      contributions = target ? [{
-        kind: "challenge",
-        targetEventId: target.id,
-        content: `I challenge the opposing ${target.stance} argument while keeping an independent seat.`,
-      }] : [{ kind: "uncertain", content: "No opposing event is available yet.", confidence: 0.4 }];
+      const target =
+        publicEvents.find(
+          (event) =>
+            event.actorId !== actorId &&
+            event.kind === "argument" &&
+            event.stance !== initial,
+        ) ??
+        publicEvents.find(
+          (event) => event.actorId !== actorId && event.kind === "argument",
+        );
+      contributions = target
+        ? [
+            {
+              kind: "challenge",
+              targetEventId: target.id,
+              content: `I challenge the opposing ${target.stance} argument while keeping an independent seat.`,
+            },
+          ]
+        : [
+            {
+              kind: "uncertain",
+              content: "No opposing event is available yet.",
+              confidence: 0.4,
+            },
+          ];
     } else {
-      contributions = [{
-        kind: "final_position",
-        stance: final,
-        content: `Final showcase vote: ${final}.`,
-        confidence: final === "Tauri" ? 0.8 : 0.68,
-        caveats: final === "Tauri" ? ["Keep Provider compatibility as a release gate."] : ["Revisit after more runtime evidence."],
-      }];
+      contributions = [
+        {
+          kind: "final_position",
+          stance: final,
+          content: `Final showcase vote: ${final}.`,
+          confidence:
+            final === "Tauri" ? 0.8 : final === "Electron" ? 0.68 : 0.45,
+          caveats:
+            final === "Tauri"
+              ? ["Keep Provider compatibility as a release gate."]
+              : final === "Electron"
+                ? ["Revisit after more runtime evidence."]
+                : ["Evidence remains insufficient for a decisive final vote."],
+        },
+      ];
     }
 
     return `<CHATCHAT_COUNCIL_JSON>${JSON.stringify({ contributions })}</CHATCHAT_COUNCIL_JSON>`;
   }
 
   function initialStance(tabId) {
-    return tabId === 102 || tabId === 202 ? "Electron" : "Tauri";
+    if (tabId === 102 || tabId === 104 || tabId === 202 || tabId === 204) {
+      return "Electron";
+    }
+    if (tabId === 205) return "Uncertain";
+    return "Tauri";
   }
+
   function finalStance(tabId) {
-    return tabId === 202 ? "Electron" : "Tauri";
+    // GPT-02 explicitly crosses the aisle during debate.
+    if (tabId === 104 || tabId === 202 || tabId === 204) return "Electron";
+    if (tabId === 205) return "Uncertain";
+    return "Tauri";
   }
+
   function line(prompt, prefix) {
-    return prompt.split("\n").find((value) => value.startsWith(prefix))?.slice(prefix.length).trim() ?? "";
+    return (
+      prompt
+        .split("\n")
+        .find((value) => value.startsWith(prefix))
+        ?.slice(prefix.length)
+        .trim() ?? ""
+    );
   }
+
   function jsonLine(prompt, prefix) {
     const value = line(prompt, prefix);
-    try { return JSON.parse(value); } catch { return null; }
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
   }
-  function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
-  async function waitEnabled(selector, index = 0, timeout = 8000) {
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function waitEnabled(selector, index = 0, timeout = 12_000) {
     const started = Date.now();
     while (Date.now() - started < timeout) {
       const elements = [...document.querySelectorAll(selector)];
@@ -213,14 +330,17 @@
     }
     throw new Error(`Showcase could not find enabled ${selector} at ${index}`);
   }
+
   async function autoRun() {
     try {
-      const firstTest = await waitEnabled(".teach-actions button:last-child", 0);
-      firstTest.click();
-      await sleep(650);
-      const secondTest = await waitEnabled(".teach-actions button:last-child", 1);
-      secondTest.click();
-      await sleep(850);
+      // Each button now verifies every tab in that delegation independently:
+      // Test Speech + structured Council Gate per seat.
+      const firstVerify = await waitEnabled(".teach-actions button:last-child", 0);
+      firstVerify.click();
+      await sleep(1200);
+      const secondVerify = await waitEnabled(".teach-actions button:last-child", 1);
+      secondVerify.click();
+      await sleep(1500);
       const convene = await waitEnabled(".convene-button", 0);
       convene.click();
     } catch (error) {
