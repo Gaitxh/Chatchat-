@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useState } from "react";
+import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { CouncilOrchestrator } from "../core/orchestrator.js";
 import type {
@@ -6,12 +6,19 @@ import type {
   CouncilReport,
   CouncilRunOptions,
 } from "../core/types.js";
+import {
+  createConsultationHistoryStore,
+  type ConsultationArchive,
+  type ConsultationHistorySummary,
+} from "../consultation/history.js";
 import { normalizeLocale, type Locale } from "../i18n/index.js";
+import { ConsultationHistory } from "./components/ConsultationHistory.js";
 import { ConsultationTheater } from "./components/ConsultationTheater.js";
 import "./consultation-theater-portal.css";
 
 const COMPLETE_EVENT = "chatchat:consultation-complete";
 const PATCH_MARKER = "__chatchatConsultationTheaterObserverV1" as const;
+const historyStore = createConsultationHistoryStore();
 
 interface ConsultationCompletionDetail {
   report: CouncilReport;
@@ -22,23 +29,54 @@ type ObservablePrototype = typeof CouncilOrchestrator.prototype & {
   [PATCH_MARKER]?: true;
 };
 
+type ViewingSource = "current" | "history";
+
 installReadOnlyObserver();
 
 function ConsultationTheaterPortal() {
-  const [completion, setCompletion] = useState<ConsultationCompletionDetail | null>(null);
+  const [current, setCurrent] = useState<ConsultationCompletionDetail | null>(null);
+  const [viewing, setViewing] = useState<ConsultationCompletionDetail | null>(null);
+  const [viewingSource, setViewingSource] = useState<ViewingSource>("current");
+  const [history, setHistory] = useState<ConsultationHistorySummary[]>([]);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [locale, setLocale] = useState<Locale>(() => normalizeLocale(document.documentElement.lang));
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+
+  const refreshHistory = useCallback(async () => {
+    try {
+      setHistory(await historyStore.list(12));
+      setHistoryError(null);
+    } catch (caught) {
+      setHistoryError(errorMessage(caught));
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshHistory();
+  }, [refreshHistory]);
 
   useEffect(() => {
     const onComplete = (event: Event) => {
       const detail = (event as CustomEvent<ConsultationCompletionDetail>).detail;
       if (!detail?.report || !Array.isArray(detail.events)) return;
-      setCompletion({ report: detail.report, events: [...detail.events] });
+      const frozen = { report: detail.report, events: [...detail.events] };
+      setCurrent(frozen);
+      setViewing(frozen);
+      setViewingSource("current");
       setSelectedEventId(null);
+      void (async () => {
+        try {
+          await historyStore.save(frozen.report, frozen.events);
+          await refreshHistory();
+        } catch (caught) {
+          setHistoryError(errorMessage(caught));
+        }
+      })();
     };
     window.addEventListener(COMPLETE_EVENT, onComplete);
     return () => window.removeEventListener(COMPLETE_EVENT, onComplete);
-  }, []);
+  }, [refreshHistory]);
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -49,43 +87,137 @@ function ConsultationTheaterPortal() {
   }, []);
 
   useEffect(() => {
-    if (!completion) return;
-    const theaterRoot = document.getElementById("consultation-theater-root");
-    const setup = document.querySelector(".consultation-app .setup-card");
-    const app = setup?.parentElement ?? document.querySelector(".consultation-app");
-    if (!theaterRoot || !app) return;
-    if (setup) {
-      app.insertBefore(theaterRoot, setup);
-    } else {
-      app.append(theaterRoot);
-    }
-  }, [completion]);
+    let stopped = false;
+    const place = () => {
+      if (stopped) return true;
+      const portalRoot = document.getElementById("consultation-theater-root");
+      const setup = document.querySelector(".consultation-app .setup-card");
+      const app = setup?.parentElement ?? document.querySelector(".consultation-app");
+      if (!portalRoot || !app) return false;
+      if (setup) app.insertBefore(portalRoot, setup);
+      else app.append(portalRoot);
+      return true;
+    };
+    if (place()) return () => { stopped = true; };
+    const observer = new MutationObserver(() => {
+      if (place()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      stopped = true;
+      observer.disconnect();
+    };
+  }, []);
 
   const selectedEvent = useMemo(
-    () => completion?.events.find((event) => event.id === selectedEventId) ?? null,
-    [completion, selectedEventId],
+    () => viewing?.events.find((event) => event.id === selectedEventId) ?? null,
+    [viewing, selectedEventId],
   );
 
-  if (!completion) return null;
+  const openHistory = useCallback(async (sessionId: string) => {
+    setHistoryBusy(true);
+    setHistoryError(null);
+    try {
+      const archive = await historyStore.load(sessionId);
+      if (!archive) throw new Error("Saved consultation could not be loaded.");
+      setViewing(archiveToCompletion(archive));
+      setViewingSource("history");
+      setSelectedEventId(null);
+    } catch (caught) {
+      setHistoryError(errorMessage(caught));
+    } finally {
+      setHistoryBusy(false);
+    }
+  }, []);
 
-  const participants = completion.report.positions.map((position) => position.participant);
+  const removeHistory = useCallback(async (sessionId: string) => {
+    setHistoryBusy(true);
+    setHistoryError(null);
+    try {
+      await historyStore.remove(sessionId);
+      if (viewingSource === "history" && viewing?.report.sessionId === sessionId) {
+        setViewing(current);
+        setViewingSource("current");
+        setSelectedEventId(null);
+      }
+      await refreshHistory();
+    } catch (caught) {
+      setHistoryError(errorMessage(caught));
+    } finally {
+      setHistoryBusy(false);
+    }
+  }, [current, refreshHistory, viewing, viewingSource]);
+
+  const clearHistory = useCallback(async () => {
+    setHistoryBusy(true);
+    setHistoryError(null);
+    try {
+      await historyStore.clear();
+      if (viewingSource === "history") {
+        setViewing(current);
+        setViewingSource("current");
+        setSelectedEventId(null);
+      }
+      await refreshHistory();
+    } catch (caught) {
+      setHistoryError(errorMessage(caught));
+    } finally {
+      setHistoryBusy(false);
+    }
+  }, [current, refreshHistory, viewingSource]);
+
+  const returnCurrent = useCallback(() => {
+    setViewing(current);
+    setViewingSource("current");
+    setSelectedEventId(null);
+  }, [current]);
+
+  const participants = viewing?.report.positions.map((position) => position.participant) ?? [];
+
   return (
     <div className="consultation-theater-portal">
-      <ConsultationTheater
-        participants={participants}
-        events={completion.events}
-        report={completion.report}
+      {viewing ? (
+        <ConsultationTheater
+          participants={participants}
+          events={viewing.events}
+          report={viewing.report}
+          locale={locale}
+          onFocusEvent={setSelectedEventId}
+        />
+      ) : null}
+
+      <ConsultationHistory
+        entries={history}
         locale={locale}
-        onFocusEvent={setSelectedEventId}
+        activeSessionId={viewing?.report.sessionId ?? null}
+        viewingHistorical={viewingSource === "history"}
+        hasCurrentConsultation={Boolean(current)}
+        busy={historyBusy}
+        onOpen={(sessionId) => void openHistory(sessionId)}
+        onRemove={(sessionId) => void removeHistory(sessionId)}
+        onClear={() => void clearHistory()}
+        onReturnCurrent={returnCurrent}
       />
-      {selectedEvent ? (
+
+      {historyError ? <HistoryError message={historyError} locale={locale} /> : null}
+
+      {selectedEvent && viewing ? (
         <EventProvenanceDetail
           event={selectedEvent}
-          report={completion.report}
+          report={viewing.report}
           locale={locale}
           onClose={() => setSelectedEventId(null)}
         />
       ) : null}
+    </div>
+  );
+}
+
+function HistoryError({ message, locale }: { message: string; locale: Locale }) {
+  return (
+    <div className="history-error" role="alert">
+      <strong>{locale === "zh-CN" ? "本地协商记录暂时不可用" : "Local consultation history is unavailable"}</strong>
+      <span>{message}</span>
     </div>
   );
 }
@@ -173,6 +305,13 @@ function installReadOnlyObserver() {
   }) as typeof originalRun;
 }
 
+function archiveToCompletion(archive: ConsultationArchive): ConsultationCompletionDetail {
+  return {
+    report: archive.report,
+    events: [...archive.events],
+  };
+}
+
 function eventReferences(event: CouncilEvent): string[] {
   if (event.kind === "challenge" || event.kind === "support" || event.kind === "defense" || event.kind === "concede") {
     return [event.targetEventId];
@@ -180,6 +319,10 @@ function eventReferences(event: CouncilEvent): string[] {
   if (event.kind === "evidence") return event.targetEventId ? [event.targetEventId] : [];
   if (event.kind === "revision") return [event.previousEventId, ...(event.causedBy ?? [])];
   return [];
+}
+
+function errorMessage(value: unknown): string {
+  return value instanceof Error ? value.message : String(value);
 }
 
 const root = document.getElementById("consultation-theater-root");
