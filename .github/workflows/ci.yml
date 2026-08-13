@@ -125,9 +125,69 @@ jobs:
           grep -q 'Web + Extension' artifacts/chatchat-consultation-en.html
           grep -q 'Browser Extension' artifacts/chatchat-consultation-en.html
 
+      - name: Capture Chinese Full Room product
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          URL='http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=zh'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=22000 \
+            --window-size=1440,2800 \
+            --screenshot=artifacts/chatchat-room-zh.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=22000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-room-zh.html
+          test -s artifacts/chatchat-room-zh.png
+          grep -q 'data-chatchat-room-showcase="complete"' artifacts/chatchat-room-zh.html
+          grep -q '协商记录' artifacts/chatchat-room-zh.html
+          grep -q 'history-entry' artifacts/chatchat-room-zh.html
+          grep -q 'INDEXEDDB · LOCAL' artifacts/chatchat-room-zh.html
+          grep -q '协商剧场' artifacts/chatchat-room-zh.html
+          grep -q 'AI 关系战场' artifacts/chatchat-room-zh.html
+
+      - name: Capture English Full Room product
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          URL='http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=en'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=22000 \
+            --window-size=1440,2800 \
+            --screenshot=artifacts/chatchat-room-en.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=22000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-room-en.html
+          test -s artifacts/chatchat-room-en.png
+          grep -q 'data-chatchat-room-showcase="complete"' artifacts/chatchat-room-en.html
+          grep -q 'CONSULTATION HISTORY' artifacts/chatchat-room-en.html
+          grep -q 'history-entry' artifacts/chatchat-room-en.html
+          grep -q 'INDEXEDDB · LOCAL' artifacts/chatchat-room-en.html
+          grep -q 'CONSULTATION THEATER' artifacts/chatchat-room-en.html
+          grep -q 'RELATIONSHIP MAP' artifacts/chatchat-room-en.html
+
       - name: Enforce equal-consultation product language
         run: |
-          for page in artifacts/chatchat-consultation-zh.html artifacts/chatchat-consultation-en.html; do
+          for page in artifacts/chatchat-consultation-zh.html artifacts/chatchat-consultation-en.html artifacts/chatchat-room-zh.html artifacts/chatchat-room-en.html; do
             ! grep -q "KING'S COMMAND" "$page"
             ! grep -q 'AI HOUSE' "$page"
             ! grep -q 'HOUSE VERDICT' "$page"
@@ -141,6 +201,7 @@ jobs:
         run: |
           grep -q 'ChatChat — AI Consultation' dist-extension/manifest.json
           grep -q 'optional_host_permissions' dist-extension/manifest.json
+          test -s dist-extension/app/app.html
           ! grep -q 'AI Council' dist-extension/manifest.json
           ! grep -q 'Parliament' dist-extension/manifest.json
 
@@ -153,5 +214,9 @@ jobs:
             artifacts/chatchat-consultation-en.png
             artifacts/chatchat-consultation-zh.html
             artifacts/chatchat-consultation-en.html
+            artifacts/chatchat-room-zh.png
+            artifacts/chatchat-room-en.png
+            artifacts/chatchat-room-zh.html
+            artifacts/chatchat-room-en.html
           if-no-files-found: error
           retention-days: 14
