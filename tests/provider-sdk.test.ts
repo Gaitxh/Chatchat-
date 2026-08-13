@@ -25,6 +25,11 @@ assert(gemini.adapterId === "web.gemini", "Gemini app URLs should remain recogni
 const deepseek = detectProviderUrl("https://chat.deepseek.com/");
 assert(deepseek.providerId === "deepseek-chat", "DeepSeek chat should remain recognized.");
 
+const qwen = detectProviderUrl("https://chat.qwen.ai/");
+assert(qwen.kind === "known", "Qwen Studio should be a first-class provider.");
+assert(qwen.adapterId === "web.qwen", "Qwen should select the Qwen adapter id.");
+assert(qwen.providerId === "qwen-chat", "Qwen provider id should remain stable.");
+
 // These deliberately use synthetic path/query identifiers. Do not commit a user's
 // real conversation/session id just to prove host-level provider recognition.
 const yuanbao = detectProviderUrl(
@@ -47,8 +52,8 @@ assert(grok.adapterId === "web.grok", "Grok should select the Grok adapter id.")
 assert(grok.providerId === "xai-grok", "Grok provider id should be stable.");
 
 assert(
-  BUILT_IN_PROVIDER_MANIFESTS.length >= 7,
-  "The built-in catalog should expose the expanded advisor roster.",
+  BUILT_IN_PROVIDER_MANIFESTS.length >= 8,
+  "The built-in catalog should expose the expanded advisor roster including Qwen.",
 );
 assert(
   BUILT_IN_PROVIDER_MANIFESTS.every((manifest) => manifest.capabilities.councilTurns),
@@ -62,6 +67,12 @@ assert(custom.adapterId === "custom.browser", "Unknown hosts should use the gene
 const knownProfile = createProviderProfile({ url: "https://gemini.google.com/app" });
 assert(knownProfile.authState === "login_required", "Known web providers should wait for local login and Council Gate.");
 assert(knownProfile.seatState === "bench", "New advisors should wait on the bench before seating.");
+
+const qwenProfile = createProviderProfile({ url: "https://chat.qwen.ai/c/example" });
+assert(
+  providerCouncilStartUrl(qwenProfile) === "https://chat.qwen.ai/",
+  "Built-in Qwen Councils should start from the official Studio landing page instead of reopening an old conversation path.",
+);
 
 const yuanbaoProfile = createProviderProfile({
   url: "https://yuanbao.tencent.com/chat/example-room/example-session",

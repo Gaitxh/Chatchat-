@@ -1,442 +1,585 @@
 <div align="center">
-  <img src="assets/chatchat-avatar-pixel.png" width="180" alt="ChatChat pixel-art council avatar" />
+  <img src="assets/chatchat-avatar-pixel.png" width="150" alt="ChatChat pixel-art council avatar" />
 
 # ChatChat 👑🏛️
 
 ### **You ask. They debate.**
 
-一个本地优先、开源的 **AI 圆桌会议 / AI Council**。
+一个本地优先、开源的 **AI Council / AI Parliament**。
 
-**把你自己的 AI 账号召进同一间议政厅。你只下令一次，接下来让它们自己争。**
+**把你已经登录的 AI 召进同一个议会。你只提问一次，接下来让它们自己讨论、质询、举证、改口和表态。**
 
 </div>
 
 <p align="center">
-  <img src="assets/chatchat-council-chamber.webp" width="100%" alt="ChatChat v0.9 Council Chamber real production build screenshot" />
+  <img src="assets/chatchat-browser-house.webp" width="440" alt="ChatChat Browser Side Panel showing a deterministic ten-seat AI House" />
 </p>
 
-<p align="center"><sub>真实 production build 截图 · 当前画面是明确标注的 DEMO Council。LIVE 模式必须在用户本机完成 Provider 登录与 Council Gate 后解锁。</sub></p>
+<p align="center"><sub>真实 production build / Chromium CI 截图 · GPT ×5 + Qwen ×5 deterministic showcase · 不包含真实 Provider 账号或对话。</sub></p>
 
-ChatChat 不是“多开几个聊天窗口然后把答案拼起来”。它把不同 AI 变成一个有规则的智囊团：
+---
+
+## 一句话理解 ChatChat
+
+普通 AI 客户端：
 
 ```text
-👑 KING'S COMMAND
-      │
-      ▼
-🕯️ Round 1 · SEALED
-每位智囊独立奏议，彼此不可见
-      │
-      ▼
-🔔 OPEN COUNCIL
-共享结构化 Blackboard
-      │
-      ├── ⚔️ Challenge
-      ├── 📎 Evidence
-      ├── 🛡️ Defense
-      ├── 🤝 Support
-      ├── 🔄 Revision
-      └── 🏳️ Concede
-      │
-      ▼
-📜 Final Positions
-      │
-      ▼
-⚖️ Council Report
-共识 + 置信度 + Minority Report
-      │
-      ▼
-📚 Local Chronicle
-完整事件流保存在本机
+You → one AI → one answer
+```
+
+ChatChat：
+
+```text
+                     👑 YOU
+                       │
+                 King's Command
+                       │
+                       ▼
+              ┌─────────────────┐
+              │    AI HOUSE     │
+              └─────────────────┘
+              GPT  Claude  Qwen ...
+                 │    │    │
+                 └────┼────┘
+                      ▼
+              🕯️ SEALED OPINIONS
+                      ▼
+              ⚔️ OPEN COUNCIL
+          challenge · evidence · support
+          defense · revision · concede
+                      ▼
+              📜 FINAL POSITIONS
+                      ▼
+        ⚖️ CONSENSUS + MINORITY REPORT
 ```
 
 > **共识不是目的，接近事实才是目的。**
 
 ---
 
-# v0.9 — Real Council Bridge 🔥
+# 🌿 推荐入口：Browser Side Panel
 
-v0.9 第一次把真实网页 AI 从“试奏成功”接进正式 Council Protocol。
+ChatChat 的浏览器插件是最轻量的使用方式。
 
-真实智囊的入席路径：
+你本来就在 Chrome / Chromium 浏览器里登录了各种 AI；ChatChat 不需要再造一套账号系统，而是直接把这些普通 AI 标签页变成议会席位。
 
 ```text
-Model URL
-   ↓
-➕ INVITE AI
-   ↓
-🔐 isolated local WebView
-用户自己登录自己的账号
-   ↓
-🎙 御前试音
-metadata-only DOM probe
-   ↓
-🧩 Teach Mode
-点 3 次：Composer / Send / Response
-   ↓
-🎻 Test Speech
-真实网页往返
-   ↓
-⚖️ COUNCIL GATE
-必须返回合法 CouncilContribution[]
-   ↓
-✅ COUNCIL READY
-   ↓
-🪑 TAKE A SEAT
-   ↓
-🔥 LIVE COUNCIL
+安装 ChatChat
+      ↓
+点击工具栏图标
+      ↓
+ChatChat Side Panel
+      ↓
+打开 / 附加已经登录的 AI 标签页
+      ↓
+Teach Composer / Send / Response
+      ↓
+Test Speech
+      ↓
+把席位加进 AI House
+      ↓
+👑 Ask once
+      ↓
+sealed → debate → final
 ```
 
-### 三种议会模式
+### 开发版安装
 
-| 真实入席智囊 | 模式 | 行为 |
-|---:|---|---|
-| 0 | 🎭 **DEMO** | 4 个 deterministic mocks 演示完整协议 |
-| 1 | ⚗️ **HYBRID REHEARSAL** | 1 个真实网页 AI + 3 个明确标注的 mock 陪练 |
-| 2–4 | 🔥 **LIVE COUNCIL** | **只使用真实网页 AI** 自动完成 sealed → debate → final |
+```text
+npm install
+npm run build:extension
 
-所以你接通第一个账号以后立刻就能玩；第二个真实智囊一入席，就解锁纯真实 AI 圆桌。
+chrome://extensions
+→ Developer mode
+→ Load unpacked
+→ 选择 dist-extension/
+```
+
+CI 也会直接上传一个可 `Load unpacked` 的 Browser Extension artifact。
+
+详细说明：[`docs/BROWSER_EXTENSION.md`](docs/BROWSER_EXTENSION.md)
 
 ---
 
-## 任意 AI URL，而不只是四个品牌
+# 🏛️ AI House：一个模型不只一个席位
 
-ChatChat 会识别常见入口：
+圆桌可以继续长大。
 
-- ChatGPT
-- Claude
-- Gemini
-- DeepSeek
-
-但识别品牌不是准入条件。
-
-v0.9 的通用 Browser Council Bridge 允许任意 `http/https` AI 页面走同一条本地路径：
+例如：
 
 ```text
-Custom URL
-  → isolated WebView
-  → Teach 3 selectors
-  → Test Speech
-  → Council Gate
-  → Take a Seat
+GPT Delegation × 5
+├─ GPT-01
+├─ GPT-02
+├─ GPT-03
+├─ GPT-04
+└─ GPT-05
+
+Qwen Delegation × 5
+├─ Qwen-01
+├─ Qwen-02
+├─ Qwen-03
+├─ Qwen-04
+└─ Qwen-05
 ```
 
-对于 Custom Provider，建议用户添加它的**新聊天落地页** URL。ChatChat 不需要预先知道它的 DOM；你通过 Teach Mode 告诉 ChatChat 三个表面在哪里。
+每个席位都是一个**独立会话 / 独立采样**。
+
+Round 1 中：
+
+```text
+GPT-01 看不到 GPT-02
+GPT-02 看不到 GPT-03
+Qwen-01 看不到 Qwen-02
+...
+```
+
+Round 2 开始后，同一轮所有席位拿到同一个不可变 Blackboard snapshot，再分别回应。
+
+一个 GPT 席位可以：
+
+- 支持 Qwen；
+- 反驳另一个 GPT；
+- 被 Gemini 的证据说服；
+- 修改自己的立场；
+- 坚持少数意见。
+
+ChatChat **不会**告诉同一个 Provider 的席位“你们是自己人，请站队”。
+
+> **多个 GPT 席位 = 多个独立会话 / 样本，不等于多个独立模型来源。**
+
+当前 AI House Core 的安全上限：
+
+```text
+16 seats / delegation
+64 total seats
+```
 
 ---
 
-# 真实操作界面：Demo Theater 🎬
+# 🗳️ 两种共识，不把 10 个 GPT 当 10 个模型
 
-v0.9 内置 **Demo Theater / 真实演示台**。
+AI House 会同时报告：
 
-它不是预制营销动画，而是读取当前运行状态：
+### Seat Majority
 
-```text
-Invite URL       ○ / ✓
-Open WebView     ○ / ✓
-Teach 3/3        ○ / ✓
-Test Speech      ○ / ✓
-Council Gate     ○ / ✓
-Take a Seat      ○ / ✓
-LIVE COUNCIL     ○ / 🔥
-```
-
-每一个绿灯都来自真实 Provider Profile / Recipe / Test / Gate / Seat 状态。
-
-Demo Theater 还内置 3 个可以直接装填进 King's Command 的议题：
-
-### ⚙️ Architecture War
-
-> 我们要做一个 local-first、开源、跨平台的桌面 AI 工具。请比较 Tauri、Electron 和原生开发，给出推荐方案；如果你不同意其他智囊，请明确指出它们忽略了什么。
-
-### 🚀 Startup Council
-
-> 一个两人团队只有 6 个月 runway，要做面向开发者的 AI 产品。应该优先做开源增长、付费 SaaS，还是本地优先桌面产品？请从增长、现金流、护城河、执行风险四个角度互相质询。
-
-### 🔎 Evidence Trial
-
-> Rust 是否真的比 Go 更适合构建高可靠的本地 AI 基础设施？不要只讲偏好：请区分可验证事实、工程经验和主观判断，并主动挑战没有证据的论点。
-
-完整录屏剧本见 [`docs/DEMO.md`](docs/DEMO.md)。
-
----
-
-# Council Gate：TEST PASSED 仍然不够
-
-v0.8 的 `TEST PASSED` 只证明网页能完成一次真实往返。
-
-v0.9 新增第二道门：
+每个席位一票。
 
 ```text
-TEST PASSED
-     ↓
-ChatChat sends sealed-phase handshake
-     ↓
-Provider must return:
-<CHATCHAT_COUNCIL_JSON>
-{"contributions":[...]}
-</CHATCHAT_COUNCIL_JSON>
-     ↓
-strict parser
-     ↓
-stance == READY
-     ↓
-COUNCIL READY
+Tauri 6 / 10 = 60%
 ```
 
-只有通过结构化协议握手的网页 AI 才能点击 **TAKE A SEAT**。
+### Delegation Consensus
 
-`READY` 因此第一次真正表示：
-
-> **这个 Provider 当前登录态 + 当前网页 + 当前 Recipe 不只会聊天，而且能作为 ChatChat CouncilAgent 返回合法议会事件。**
-
----
-
-# 真实 AI 在议会里收到什么？
-
-真实网页智囊收到 phase-aware Council Prompt：
-
-```text
-PHASE: sealed | debate | final
-ROUND: n
-KING_QUESTION_JSON: ...
-COUNCIL_EVENTS_JSON: ...
-YOUR_PRIOR_EVENTS_JSON: ...
-```
-
-并被要求只返回结构化贡献：
-
-```json
-{
-  "contributions": [
-    {
-      "kind": "challenge",
-      "targetEventId": "event_xxx",
-      "content": "这个结论缺少对部署成本的证据。"
-    }
-  ]
-}
-```
-
-ChatChat 不直接相信模型输出：
-
-- event id 必须真实存在；
-- 模型不能伪造一个不存在的 challenge target；
-- `revision.previousEventId` 只能修改**自己的**旧立场；
-- sealed 阶段不能偷偷输出 debate-only 事件；
-- final 阶段必须恰好提交一个 `final_position`；
-- confidence 必须在 `[0, 1]`；
-- malformed output 会获得一次结构化 repair 重试；
-- 第二次仍失败，ChatChat 会降级成 `uncertain` / 0 confidence，而不是编造答案或炸掉整场 Council。
-
-另外，其他智囊的文本被明确包装为**不可信讨论数据**，不是系统指令。这是对跨模型 prompt injection 的一层防御，但不是“绝对免疫”的宣称。
-
-详见 [`docs/REAL_COUNCIL.md`](docs/REAL_COUNCIL.md)。
-
----
-
-# 每场真实 Council 尽量从干净页面开始
-
-如果把上一场讨论的网页上下文直接带进下一场，Round 1 就不再真正独立。
-
-因此 v0.9 在每个新 Council Session 的第一轮之前，会让每个真实 Provider 回到 Council 起始页，并等待用户教过的 composer 重新出现。
-
-对于内置 Provider，ChatChat 使用 catalog 的默认根入口；对于 Custom Provider，使用用户添加的 URL。
+先看每个模型代表团内部形成什么立场，再按代表团计票。
 
 如果：
 
-- 被重定向回登录页；
-- taught composer 消失；
-- selector 漂移；
-- 页面在限定时间内没有准备好；
+```text
+GPT ×5
+4 Tauri / 1 Electron
+→ GPT delegation votes Tauri
 
-该智囊会明确进入 uncertainty，而不是悄悄复用旧对话。
+Qwen ×5
+2 Tauri / 2 Electron / 1 Uncertain
+→ Qwen delegation is SPLIT
+```
+
+那么：
+
+```text
+Seat Majority        Tauri 6 / 10 = 60%
+Delegation Consensus Tauri 1 / 2  = 50%
+```
+
+这比简单多数投票更诚实：相关模型的重复采样不会被伪装成独立来源。
+
+AI House 还会确定性生成：
+
+- delegation discipline；
+- split delegation；
+- rebels；
+- cross-provider **caucuses**（按最终 stance 形成的联盟）。
+
+**Delegation 是来源，Caucus 是立场。**
 
 ---
 
-# Local First 🔒
+# 🕯️ The King speaks once
 
-ChatChat 没有中央 relay server：
+用户只发送一次问题。
+
+之后 ChatChat 自动运行：
 
 ```text
-┌──────────────────── User Computer ────────────────────┐
-│ ChatChat                                               │
-│  ├── Council Engine                                    │
-│  ├── Structured Blackboard                            │
-│  ├── Council Chamber UI                               │
-│  ├── SQLite Chronicle                                 │
-│  ├── Provider Profiles                                │
-│  ├── Isolated Provider WebViews                       │
-│  ├── Teach Recipes                                    │
-│  ├── Test Speech                                      │
-│  ├── Council Gate                                     │
-│  └── Browser Council Bridge                           │
-└────────────┬────────────────┬────────────────┬─────────┘
-             │                │                │
-             ▼                ▼                ▼
-          ChatGPT          Claude           Custom AI
+👑 KING'S COMMAND
+      │
+      ▼
+🕯️ ROUND 1 · SEALED
+所有席位独立奏议
+      │
+      ▼
+🔔 OPEN COUNCIL
+共享结构化 Blackboard
+      │
+      ├── ⚔ Challenge
+      ├── 📎 Evidence
+      ├── 🤝 Support
+      ├── 🛡 Defense
+      ├── 🔄 Revision
+      ├── 🏳 Concede
+      └── ❓ Question
+      │
+      ▼
+📜 FINAL POSITIONS
+      │
+      ▼
+⚖️ COUNCIL REPORT
+```
+
+用户不需要再手动触发 Round 2。
+
+---
+
+# 🔄 改口是功能，不是失败
+
+AI 的目标不是“赢”。
+
+ChatChat 鼓励：
+
+```text
+KEEP
+REVISE
+CONCEDE
+UNCERTAIN
+CHALLENGE
+PROVIDE EVIDENCE
+```
+
+例如：
+
+```text
+Qwen-02 提出证据
+        ↓
+GPT-02 重新评估
+        ↓
+🔄 GPT-02 changed mind
+Electron → Tauri
+```
+
+少数派仍然可以留下：
+
+```text
+Minority Report
+GPT-04  → Electron
+Qwen-02 → Electron
+Qwen-04 → Electron
+Qwen-05 → Uncertain
+```
+
+**不同意多数不是 bug。**
+
+---
+
+# 🎭 Council Theater：谁真正影响了谁？
+
+ChatChat 的 Blackboard 不是普通聊天记录。
+
+它保存结构化事件：
+
+```text
+argument
+challenge
+evidence
+support
+defense
+revision
+concede
+question
+uncertain
+final_position
+```
+
+因此 ChatChat 可以确定性画出 influence graph，而不是让另一个 LLM 猜“谁更有说服力”。
+
+强影响关系只来自显式协议：
+
+```text
+revision.causedBy[]
+concede.targetEventId
+```
+
+challenge / evidence / support 只代表互动，不自动冒充“成功说服”。
+
+```text
+GPT ───────────────▶ Claude
+                      │
+Gemini ── evidence ──▶│
+                      ▼
+              🔄 Electron → Tauri
+```
+
+点击图上的关系可以回到准确的 Blackboard event。
+
+本地 Chronicle 还支持 **Council Replay**。
+
+详见：[`docs/COUNCIL_THEATER.md`](docs/COUNCIL_THEATER.md)
+
+---
+
+# 🤖 Provider roster
+
+内置 URL catalog 当前识别：
+
+- ChatGPT — `chatgpt.com`
+- Claude — `claude.ai`
+- Gemini — `gemini.google.com`
+- DeepSeek — `chat.deepseek.com`
+- Tencent Yuanbao / 腾讯元宝 — `yuanbao.tencent.com`
+- Qwen / Tongyi / 通义 — `tongyi.aliyun.com`
+- Grok — `grok.com`
+
+也可以尝试任意 `http/https` AI 页面走 Custom Browser Adapter / Teach Mode。
+
+但：
+
+> **Recognized ≠ Runtime-validated ≠ Officially supported.**
+
+远程网页会变化，所以兼容性状态被严格区分为：
+
+```text
+recognized
+→ teachable
+→ test-passed
+→ council-ready
+→ runtime-validated
+→ officially supported
+```
+
+详见：[`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md)
+
+---
+
+# 🧩 Teach Mode
+
+ChatChat 不假装知道所有 AI 网站的 DOM。
+
+你只需要告诉它三个表面：
+
+```text
+Composer
+Send
+Response
+```
+
+浏览器 bridge：
+
+- 拒绝 password field；
+- 只保存 taught selectors；
+- 只往 taught composer 写入；
+- 只点击 taught send；
+- 只读取 taught response surface；
+- 不要求你复制 Cookie / token；
+- 不把整个网页正文当作回答抓走。
+
+桌面版还有更完整的 Test Speech / Council Gate / Provider Window Health。
+
+---
+
+# 🔒 Local-first
+
+ChatChat 自己没有中央 relay server。
+
+浏览器版：
+
+```text
+Your Browser
+├─ ChatChat Side Panel
+├─ local extension storage
+├─ GPT tabs
+├─ Qwen tabs
+├─ Gemini tabs
+└─ ...
+```
+
+桌面版：
+
+```text
+Your Computer
+├─ ChatChat Desktop
+├─ SQLite Chronicle
+├─ Council Engine
+├─ Provider Profiles
+└─ managed Provider WebViews
 ```
 
 不存在：
 
 ```text
-User → ChatChat Server → Provider
+User → ChatChat Server → AI Provider
 ```
 
-但是隐私边界必须说清楚：如果你把一个在线 AI 加入 Council，发给它的 King's Command、相关议会事件和阶段 prompt 会从你的电脑直接发送给那个 Provider。**Local-first 不等于在线 Provider 看不到你主动发给它的内容。**
+不过边界必须说清楚：当你让一个在线 AI 参加 Council 时，你主动发给它的 King's Command 和相关 Council context 仍会直接发送给那个 Provider。
 
-登录密码和账户会话由各 Provider 的本地隔离 WebView 处理；ChatChat 不要求用户粘贴密码或 Cookie。
+**Local-first 不等于远程 AI 离线。**
 
 ---
 
-# 运行
+# 🖥️ Desktop · Power User mode
 
-需要 Node.js 20+。
+Browser Side Panel 负责“装完就玩”。
 
-## 网页 Demo
+Tauri Desktop 继续承担更重的能力：
+
+- managed isolated Provider WebViews；
+- SQLite Court Chronicle；
+- Provider Window Health；
+- Royal Proof Pack；
+- compatibility workflow；
+- deep diagnostics；
+- Council Theater / Replay；
+- macOS / Windows / Linux candidate bundles。
+
+<p align="center">
+  <img src="assets/chatchat-council-chamber.webp" width="100%" alt="ChatChat desktop Council Chamber production build screenshot" />
+</p>
+
+运行：
 
 ```bash
 npm install
 npm run check
 npm test
-npm run dev
-```
-
-Web 模式可以试玩：
-
-- Council Chamber
-- Mock Council
-- Demo Theater
-- Historian
-- Provider Roster UI
-
-真实 Provider WebView 需要桌面版。
-
-## 桌面版
-
-准备 Rust 与 Tauri 2 开发依赖，然后：
-
-```bash
-npm install
 npm run tauri:dev
 ```
 
-然后按 UI：
+纯 Web / Mock demo：
 
-```text
-+ INVITE AI
-→ LOGIN
-→ 御前试音
-→ 教我 Composer
-→ 教我 Send
-→ 教我 Response
-→ 试奏
-→ OPEN COUNCIL GATE
-→ TAKE A SEAT
+```bash
+npm run dev
 ```
-
-至少两位真实智囊入席后，顶部会切换成：
-
-> 🔥 **LIVE COUNCIL**
-
-此后按一次 **LIVE 开廷**。
-
-用户不再需要参与 Round 2。
 
 ---
 
-# 两道质量门槛
+# 📚 Court Chronicle
 
-GitHub CI 无法替你登录第三方账号，因此我们明确分成：
+桌面版会把完整结构化事件流写进本地 SQLite。
 
 ```text
-Gate A — automated CI
-TypeScript
-Council/Provider tests
-Vite production build
-real UI screenshot artifact
-Rust/Tauri compile
+Session
+├─ King's Question
+├─ Council Report
+└─ Blackboard Events
+   ├─ argument
+   ├─ challenge
+   ├─ evidence
+   ├─ revision
+   └─ final_position
+```
 
-Gate B — user-local runtime
-real provider login
-DOM probe
+这使得 ChatChat 可以做：
+
+- Council Replay；
+- influence graph；
+- changed-mind trail；
+- minority history；
+- 哪个模型经常纠正其他模型；
+- 哪些任务额外 debate 真有增益。
+
+---
+
+# ✅ Quality gates
+
+### Gate A · automated
+
+```text
+TypeScript
+Council Core tests
+Provider SDK tests
+AI House tests
+Browser Extension build + MV3 validation
+real Chromium UI screenshots
+Council Theater showcase
+Tauri / Rust compile
+macOS / Windows / Linux RC smoke
+```
+
+### Gate B · user-local
+
+```text
+real Provider login
 Teach Recipe 3/3
 Test Speech
 Council Gate
-Take a Seat
-real sealed/debate/final
+fresh session
+real sealed → debate → final
 ```
 
-CI 现在还会从**实际 production build** 启动页面并用无头 Chromium 生成 Council Chamber 截图 artifact，避免项目首页展示和真实代码逐渐脱节。
+CI 不应该登录你的私人 AI 账号，所以真实 Provider 的 Runtime Validation 必须发生在用户自己的机器上。
 
-真实 Provider 手工验收见 [`docs/MANUAL_PROVIDER_TEST.md`](docs/MANUAL_PROVIDER_TEST.md)。
+桌面版可以生成一个不包含问题正文、模型回复、selector、Cookie 或 token 的 **Royal Proof Pack**：
+
+[`docs/GATE_B_PROOF.md`](docs/GATE_B_PROOF.md)
 
 ---
 
-# 当前结构
+# Project map
 
 ```text
-src/
-├── core/                 # Council Protocol / Blackboard / Orchestrator
-├── provider-sdk/         # URL / profile / recipe / browser council bridge
-├── providers/            # deterministic mock council
-├── history/              # local archive
-└── app/                  # Council Chamber / Demo Theater / Provider UI
-
-src-tauri/
-├── src/
-│   ├── lib.rs
-│   ├── provider_session.rs
-│   ├── provider_probe.js
-│   ├── provider_teach.js
-│   └── provider_speech_*.js
-├── migrations/
-└── capabilities/
-
-tests/
-├── core.test.ts
-├── provider-sdk.test.ts
-├── teach-mode.test.ts
-├── test-speech.test.ts
-└── council-bridge.test.ts
+extension-public/        # MV3 manifest / service worker / content bridge
+extension/               # browser Side Panel HTML
+src/extension/           # React Side Panel
+src/core/                # Council Protocol / Blackboard / Orchestrator
+src/house/               # Delegations / seats / caucuses / House metrics
+src/provider-sdk/        # Provider catalog / Teach / Browser Council Bridge
+src/theater/             # Influence Graph / Replay
+src/history/             # local Chronicle
+src/app/                 # Desktop Council Chamber
+src-tauri/               # Tauri host / SQLite / managed WebViews
+tests/                   # deterministic protocol / provider / House tests
 ```
 
 ---
 
 # Roadmap
 
-- ✅ **v0.1 — Council Protocol**
-- ✅ **v0.2 — Council Chamber**
-- ✅ **v0.3 — The Historian**
-- ✅ **v0.4 — Invite Advisors**
-- ✅ **v0.5 — Isolated Login Gate**
-- ✅ **v0.6 — Adapter Lab / 御前试音**
-- ✅ **v0.7 — Teach Mode**
-- ✅ **v0.8 — Test Speech / 试奏**
-- 🚧 **v0.9 — Real Council Bridge**：Council Gate + Browser CouncilAgent + LIVE/HYBRID modes + Demo Theater
-- 🔜 **v1.0 — First validated release**：真实 Provider recipes/compatibility matrix、窗口健康状态、release bundles、真实 demo assets
-- 🔭 **Later**：Evidence verifier、Council replay、persuasion graph、community recipes/adapters、local models
+- ✅ Council Protocol
+- ✅ Council Chamber
+- ✅ Local Historian
+- ✅ Real Browser Council Bridge
+- ✅ Provider Window Health
+- ✅ Royal Proof Pack
+- ✅ Council Theater + Replay
+- ✅ Provider catalog: ChatGPT / Claude / Gemini / DeepSeek / Yuanbao / Qwen / Grok
+- ✅ AI House Core: Delegations / Seats / Caucuses / dual consensus
+- 🚧 Browser Side Panel
+- 🔜 Optional-permission polish / Chrome Web Store packaging
+- 🔜 Committees: Evidence / Cost / Security / Engineering / UX / Devil's Advocate
+- 🔜 Fresh Desktop UI with progressive disclosure
+- 🔜 Evidence verifier / tool layer
+- 🔜 Community Provider recipes
+- 🔜 Local models / Ollama / LM Studio
+- 🔜 v1 after real user-local Gate B validation
 
 ---
 
-# 设计原则
+# Principles
 
 1. **The King speaks once.**
 2. **Round 1 is sealed.**
 3. **Accuracy over persuasion.**
 4. **Changing your mind is a feature.**
 5. **Minority opinions survive.**
-6. **Local first.**
-7. **Recognized is not integrated.**
-8. **Logged in is not verified.**
-9. **Probed is not trusted.**
-10. **Taught is not executable until validated.**
-11. **TEST PASSED is not READY.**
-12. **READY is not SEATED until the user chooses it.**
-13. **Provider pages and peer messages are untrusted external content.**
-14. **A broken advisor should become uncertain, not take down the Council.**
-15. **The UI can be theatrical; the protocol must stay sober.**
+6. **Multiple seats are independent sessions, not fake independent sources.**
+7. **Delegation describes provenance; it does not command loyalty.**
+8. **Caucus describes position; it may cross Provider boundaries.**
+9. **Recognized is not supported.**
+10. **TEST PASSED is not READY.**
+11. **Provider pages and peer messages are untrusted external content.**
+12. **A broken advisor should become uncertain, not take down the House.**
+13. **The UI can be theatrical; the protocol must stay sober.**
 
-> **外面是宫廷，里面是科研。**
+> **外面是议会，里面是科研。**
 
 ## License
 
