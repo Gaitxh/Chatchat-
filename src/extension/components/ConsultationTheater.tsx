@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type {
   CouncilEvent,
+  CouncilEventKind,
   CouncilParticipant,
   CouncilReport,
 } from "../../core/types.js";
@@ -8,6 +9,7 @@ import type { Locale } from "../../i18n/index.js";
 import {
   buildConsultationTheaterModel,
   influenceKindLabel,
+  type ConsultationReplayFrame,
   type ConsultationReplayStage,
 } from "../../theater/consultation-theater.js";
 import type { AggregatedInfluenceEdge } from "../../theater/influence.js";
@@ -18,7 +20,7 @@ interface ConsultationTheaterProps {
   events: readonly CouncilEvent[];
   report: CouncilReport;
   locale: Locale;
-  onFocusEvent?(eventId: string): void;
+  onFocusEvent(eventId: string): void;
 }
 
 type ReplaySpeed = "1x" | "2x" | "all";
@@ -27,7 +29,7 @@ const COPY = {
   en: {
     eyebrow: "CONSULTATION THEATER",
     title: "Who changed what — and why?",
-    body: "Strong influence only appears when a participant explicitly revises or concedes with structured provenance. Challenges and evidence remain traceable interactions, not automatic proof of persuasion.",
+    body: "Strong influence appears only when a participant explicitly revises or concedes with structured provenance. Ordinary challenges and evidence remain traceable interactions, not automatic proof of persuasion.",
     changed: "CHANGED MIND TRAILS",
     changedTitle: "Explicit revisions",
     noChanged: "No participant explicitly revised a position in this consultation.",
@@ -37,7 +39,7 @@ const COPY = {
     interaction: "Interaction",
     replay: "LOCAL REPLAY",
     replayTitle: "Play the consultation back",
-    replayHint: "Replay uses the saved event stream only. It never sends another prompt to an AI provider.",
+    replayHint: "Replay reads the saved event stream only. It never sends another prompt to an AI provider.",
     play: "PLAY",
     pause: "PAUSE",
     restart: "RESTART",
@@ -52,8 +54,7 @@ const COPY = {
     changedCount: "{count} changed mind",
     unresolved: "{count} broken event reference(s) were omitted rather than guessed.",
     view: "VIEW EVENT",
-    causedBy: "because of",
-    fromTo: "{from} → {to}",
+    because: "because of",
     independent: "Independent",
     consultation: "Consultation",
     final: "Final",
@@ -62,7 +63,7 @@ const COPY = {
   "zh-CN": {
     eyebrow: "协商剧场",
     title: "谁改变了什么，又为什么？",
-    body: "只有参与者自己通过结构化 revision / concede 明确表示改口或让步时，才会形成“强影响”。质疑和证据会保留为可追溯互动，但不会自动冒充“成功说服”。",
+    body: "只有参与者自己通过结构化 revision / concede 明确表示改口或让步时，才会形成“强影响”。普通质疑和证据会保留为可追溯互动，但不会自动冒充“成功说服”。",
     changed: "改口轨迹",
     changedTitle: "明确发生的立场修正",
     noChanged: "这场协商没有参与者明确修改自己的立场。",
@@ -87,8 +88,7 @@ const COPY = {
     changedCount: "{count} 次改口",
     unresolved: "有 {count} 个损坏的事件引用被安全忽略，系统没有猜测补全。",
     view: "查看事件",
-    causedBy: "原因来自",
-    fromTo: "{from} → {to}",
+    because: "原因来自",
     independent: "独立意见",
     consultation: "共同协商",
     final: "最终立场",
@@ -103,31 +103,29 @@ export function ConsultationTheater({
   locale,
   onFocusEvent,
 }: ConsultationTheaterProps) {
+  const copy = COPY[locale];
+  const fullModel = useMemo(
+    () => buildConsultationTheaterModel(participants, events, report, locale),
+    [participants, events, report, locale],
+  );
   const [cursor, setCursor] = useState(events.length);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<ReplaySpeed>("1x");
-  const copy = COPY[locale];
 
   useEffect(() => {
     setCursor(events.length);
     setPlaying(false);
   }, [events.length, events.at(-1)?.id]);
 
-  const fullModel = useMemo(
-    () => buildConsultationTheaterModel(participants, events, report, locale),
-    [participants, events, report, locale],
-  );
-  const replayFrames = fullModel.replay;
-  const frame = replayFrames[Math.min(cursor, replayFrames.length - 1)] ?? replayFrames[0]!;
-  const visibleEvents = events.slice(0, frame.cursor);
+  const frame = fullModel.replay[Math.min(cursor, fullModel.replay.length - 1)] ?? fullModel.replay[0]!;
   const replayModel = useMemo(
     () => buildConsultationTheaterModel(
       participants,
-      visibleEvents,
+      events.slice(0, frame.cursor),
       frame.stage === "complete" ? report : null,
       locale,
     ),
-    [participants, visibleEvents, frame.stage, report, locale],
+    [participants, events, frame.cursor, frame.stage, report, locale],
   );
 
   useEffect(() => {
@@ -148,11 +146,6 @@ export function ConsultationTheater({
     return () => window.clearTimeout(timer);
   }, [cursor, events.length, playing, speed]);
 
-  const restart = () => {
-    setCursor(0);
-    setPlaying(true);
-  };
-
   return (
     <section className="consultation-theater">
       <header className="consultation-theater__header">
@@ -168,11 +161,7 @@ export function ConsultationTheater({
         </div>
       </header>
 
-      <div className="theater-block changed-minds-block">
-        <div className="theater-block__heading">
-          <div><span>{copy.changed}</span><h3>{copy.changedTitle}</h3></div>
-          <b>{fullModel.changedMinds.length}</b>
-        </div>
+      <TheaterBlock eyebrow={copy.changed} title={copy.changedTitle} count={fullModel.changedMinds.length}>
         {fullModel.changedMinds.length ? (
           <div className="changed-mind-list">
             {fullModel.changedMinds.map((trail) => (
@@ -180,7 +169,7 @@ export function ConsultationTheater({
                 type="button"
                 className="changed-mind-card"
                 key={trail.revisionEventId}
-                onClick={() => focus(trail.revisionEventId, onFocusEvent)}
+                onClick={() => onFocusEvent(trail.revisionEventId)}
               >
                 <div className="changed-mind-card__top">
                   <strong>↻ {trail.participantName}</strong>
@@ -189,24 +178,23 @@ export function ConsultationTheater({
                 <div className="stance-transition">
                   <span>{trail.fromStance ?? "?"}</span><b>→</b><strong>{trail.toStance}</strong>
                 </div>
-                <div className="cause-list">
-                  <small>{copy.causedBy}</small>
-                  {trail.causedBy.map((cause) => (
-                    <span key={cause.eventId}>
-                      {cause.participantName} · {influenceKindLabel(cause.kind === "uncertain" ? "challenge" : influenceKindFromEvent(cause.kind), locale)}
-                    </span>
-                  ))}
-                </div>
+                {trail.causedBy.length ? (
+                  <div className="cause-list">
+                    <small>{copy.because}</small>
+                    {trail.causedBy.map((cause) => (
+                      <span key={cause.eventId}>
+                        {cause.participantName} · {eventKindLabel(cause.kind, locale)}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </button>
             ))}
           </div>
         ) : <p className="theater-empty">{copy.noChanged}</p>}
-      </div>
+      </TheaterBlock>
 
-      <div className="theater-block influence-ledger-block">
-        <div className="theater-block__heading">
-          <div><span>{copy.influence}</span><h3>{copy.influenceTitle}</h3></div>
-        </div>
+      <TheaterBlock eyebrow={copy.influence} title={copy.influenceTitle}>
         <div className="influence-ledger">
           {sortEdges(fullModel.graph.aggregatedEdges).map((edge) => (
             <InfluenceRow
@@ -224,16 +212,12 @@ export function ConsultationTheater({
         {fullModel.summary.unresolvedReferenceCount ? (
           <p className="theater-warning">⚠ {format(copy.unresolved, { count: fullModel.summary.unresolvedReferenceCount })}</p>
         ) : null}
-      </div>
+      </TheaterBlock>
 
-      <div className="theater-block replay-block">
-        <div className="theater-block__heading replay-heading">
-          <div><span>{copy.replay}</span><h3>{copy.replayTitle}</h3></div>
-          <strong className={`replay-stage replay-stage--${frame.stage}`}>{stageLabel(frame.stage, locale)}</strong>
-        </div>
+      <TheaterBlock eyebrow={copy.replay} title={copy.replayTitle} extra={stageLabel(frame.stage, locale)}>
         <p className="replay-hint">{copy.replayHint}</p>
         <div className="replay-controls">
-          <button type="button" onClick={restart}>↺ {copy.restart}</button>
+          <button type="button" onClick={() => { setCursor(0); setPlaying(true); }}>↺ {copy.restart}</button>
           <button
             type="button"
             onClick={() => setPlaying((current) => !current)}
@@ -262,10 +246,7 @@ export function ConsultationTheater({
           min={0}
           max={events.length}
           value={cursor}
-          onChange={(event) => {
-            setPlaying(false);
-            setCursor(Number(event.target.value));
-          }}
+          onChange={(event) => { setPlaying(false); setCursor(Number(event.target.value)); }}
           aria-label="Consultation replay cursor"
         />
         <ReplayNow
@@ -280,13 +261,10 @@ export function ConsultationTheater({
           <span>{frame.cursor}/{events.length} events</span>
           <span>{replayModel.graph.edges.length} links</span>
         </div>
-      </div>
+      </TheaterBlock>
 
       {fullModel.highlights.length ? (
-        <div className="theater-block highlights-block">
-          <div className="theater-block__heading">
-            <div><span>{copy.highlights}</span><h3>{copy.highlightsTitle}</h3></div>
-          </div>
+        <TheaterBlock eyebrow={copy.highlights} title={copy.highlightsTitle}>
           <p className="highlight-note">{copy.highlightNote}</p>
           <div className="highlight-grid">
             {fullModel.highlights.map((highlight) => (
@@ -294,16 +272,47 @@ export function ConsultationTheater({
                 type="button"
                 className="highlight-card"
                 key={highlight.kind}
-                onClick={() => highlight.provenanceEventIds[0] && focus(highlight.provenanceEventIds[0], onFocusEvent)}
+                onClick={() => {
+                  const eventId = highlight.provenanceEventIds[0];
+                  if (eventId) onFocusEvent(eventId);
+                }}
               >
                 <b>{highlight.icon}</b>
-                <div><span>{highlight.title}</span><strong>{highlight.participantName}</strong><small>{highlight.detail}</small></div>
+                <div>
+                  <span>{highlight.title}</span>
+                  <strong>{highlight.participantName}</strong>
+                  <small>{highlight.detail}</small>
+                </div>
               </button>
             ))}
           </div>
-        </div>
+        </TheaterBlock>
       ) : null}
     </section>
+  );
+}
+
+function TheaterBlock({
+  eyebrow,
+  title,
+  count,
+  extra,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  count?: number;
+  extra?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="theater-block">
+      <div className="theater-block__heading">
+        <div><span>{eyebrow}</span><h3>{title}</h3></div>
+        {typeof count === "number" ? <b>{count}</b> : extra ? <strong className="replay-stage">{extra}</strong> : null}
+      </div>
+      {children}
+    </div>
   );
 }
 
@@ -322,7 +331,7 @@ function InfluenceRow({
   strongLabel: string;
   interactionLabel: string;
   viewLabel: string;
-  onFocusEvent?: (eventId: string) => void;
+  onFocusEvent(eventId: string): void;
 }) {
   const source = participantName(participants, edge.sourceActorId);
   const target = participantName(participants, edge.targetActorId);
@@ -337,7 +346,7 @@ function InfluenceRow({
         <span>{edge.strength === "strong" ? strongLabel : interactionLabel}</span>
         <small>{kinds}</small>
       </div>
-      {edge.eventIds[0] ? <button type="button" onClick={() => focus(edge.eventIds[0]!, onFocusEvent)}>{viewLabel}</button> : null}
+      {edge.eventIds[0] ? <button type="button" onClick={() => onFocusEvent(edge.eventIds[0]!)}>{viewLabel}</button> : null}
     </article>
   );
 }
@@ -350,12 +359,12 @@ function ReplayNow({
   viewCopy,
   onFocusEvent,
 }: {
-  frame: ReturnType<typeof buildConsultationTheaterModel>["replay"][number];
+  frame: ConsultationReplayFrame;
   participants: readonly CouncilParticipant[];
   locale: Locale;
   startCopy: string;
   viewCopy: string;
-  onFocusEvent?: (eventId: string) => void;
+  onFocusEvent(eventId: string): void;
 }) {
   if (!frame.event) return <div className="replay-now replay-now--start">{startCopy}</div>;
   const event = frame.event;
@@ -363,13 +372,13 @@ function ReplayNow({
     <article className={`replay-now replay-now--${event.kind}`}>
       <div>
         <strong>{participantName(participants, event.actorId)}</strong>
-        <span>{eventLabel(event.kind, locale)} · {stageLabel(frame.stage, locale)} · R{event.round}</span>
+        <span>{eventKindLabel(event.kind, locale)} · {stageLabel(frame.stage, locale)} · R{event.round}</span>
       </div>
       <p>{truncate(event.content, 260)}</p>
       {frame.changedMind ? (
         <div className="replay-changed-mind">↻ {frame.changedMind.fromStance ?? "?"} → {frame.changedMind.toStance}</div>
       ) : null}
-      <button type="button" onClick={() => focus(event.id, onFocusEvent)}>{viewCopy}</button>
+      <button type="button" onClick={() => onFocusEvent(event.id)}>{viewCopy}</button>
     </article>
   );
 }
@@ -382,8 +391,8 @@ function stageLabel(stage: ConsultationReplayStage, locale: Locale): string {
   return copy.complete;
 }
 
-function eventLabel(kind: CouncilEvent["kind"], locale: Locale): string {
-  const labels: Record<CouncilEvent["kind"], [string, string]> = {
+function eventKindLabel(kind: CouncilEventKind, locale: Locale): string {
+  const labels: Record<CouncilEventKind, [string, string]> = {
     argument: ["Position", "立场"],
     challenge: ["Challenge", "质疑"],
     evidence: ["Evidence", "证据"],
@@ -398,17 +407,6 @@ function eventLabel(kind: CouncilEvent["kind"], locale: Locale): string {
   return locale === "zh-CN" ? labels[kind][1] : labels[kind][0];
 }
 
-function influenceKindFromEvent(kind: CouncilEventKindForCause): Parameters<typeof influenceKindLabel>[0] {
-  if (kind === "evidence") return "evidence";
-  if (kind === "support") return "support";
-  if (kind === "defense") return "defense";
-  if (kind === "concede") return "concede";
-  if (kind === "revision") return "revision";
-  return "challenge";
-}
-
-type CouncilEventKindForCause = CouncilEvent["kind"];
-
 function participantName(participants: readonly CouncilParticipant[], id: string): string {
   return participants.find((participant) => participant.id === id)?.name ?? id;
 }
@@ -418,18 +416,6 @@ function sortEdges(edges: readonly AggregatedInfluenceEdge[]): AggregatedInfluen
     if (a.strength !== b.strength) return a.strength === "strong" ? -1 : 1;
     return (b.strongCount + b.interactionCount) - (a.strongCount + a.interactionCount);
   });
-}
-
-function focus(eventId: string, callback?: (eventId: string) => void) {
-  callback?.(eventId);
-  if (callback) return;
-  const target = document.querySelector(`[data-consultation-event-id="${cssEscape(eventId)}"]`);
-  target?.scrollIntoView({ behavior: "smooth", block: "center" });
-}
-
-function cssEscape(value: string): string {
-  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") return CSS.escape(value);
-  return value.replace(/["\\]/g, "\\$&");
 }
 
 function format(value: string, vars: Record<string, string | number>): string {
