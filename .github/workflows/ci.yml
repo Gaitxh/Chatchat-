@@ -125,6 +125,37 @@ jobs:
           grep -q 'DETERMINISTIC 10-SEAT HOUSE SHOWCASE' artifacts/chatchat-extension-sidepanel.html
           ! grep -q "Cannot read properties of undefined" artifacts/chatchat-extension-sidepanel.html
 
+      - name: Capture Summon the House showcase
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          SUMMON_SHOWCASE='http://127.0.0.1:4180/extension/sidepanel.html?showcase=summon'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=6000 \
+            --window-size=440,1050 \
+            --screenshot=artifacts/chatchat-extension-summon-house.png \
+            "$SUMMON_SHOWCASE"
+          test -s artifacts/chatchat-extension-summon-house.png
+
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=6000 \
+            --dump-dom \
+            "$SUMMON_SHOWCASE" > artifacts/chatchat-extension-summon-house.html
+
+          grep -q 'SUMMON THE HOUSE' artifacts/chatchat-extension-summon-house.html
+          grep -q '召集 7 席' artifacts/chatchat-extension-summon-house.html
+          grep -q '新席位仍需 Test + Gate' artifacts/chatchat-extension-summon-house.html
+          grep -q 'DETERMINISTIC SUMMON SHOWCASE' artifacts/chatchat-extension-summon-house.html
+          ! grep -q 'COUNCIL GATE ✓' artifacts/chatchat-extension-summon-house.html
+
       - name: Upload Council Chamber screenshot
         uses: actions/upload-artifact@v4
         with:
@@ -148,6 +179,16 @@ jobs:
           path: |
             artifacts/chatchat-extension-sidepanel.png
             artifacts/chatchat-extension-sidepanel.html
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Summon the House screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-extension-summon-house
+          path: |
+            artifacts/chatchat-extension-summon-house.png
+            artifacts/chatchat-extension-summon-house.html
           if-no-files-found: error
           retention-days: 14
 
