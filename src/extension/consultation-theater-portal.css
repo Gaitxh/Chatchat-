@@ -1,5 +1,18 @@
 .consultation-theater-portal { display: contents; }
 
+.history-error {
+  display: grid;
+  gap: 3px;
+  margin: 10px 0;
+  padding: 9px 10px;
+  border: 1px solid #efcfcf;
+  border-radius: 10px;
+  background: #fff2f2;
+  color: #845050;
+}
+.history-error strong { font-size: 8px; }
+.history-error span { font-size: 7px; line-height: 1.45; }
+
 .event-provenance {
   position: fixed;
   z-index: 50;
