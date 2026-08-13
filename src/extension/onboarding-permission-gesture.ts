@@ -31,6 +31,10 @@ function installPermissionGestureGuard() {
     if (primed && primed.key === key) {
       const result = primed.granted;
       primed = null;
+      // The ordinary summon function has now captured its selected candidate
+      // array and consumed the exact permission grant. Selection can be
+      // unlocked without creating a grant/selection race.
+      setCandidateInputsDisabled(false);
       return result;
     }
     return originalRequest(details);
@@ -71,15 +75,22 @@ function installPermissionGestureGuard() {
           primed = { key: permissionKey(origins), granted: true };
           target.dataset[PRIMED_MARKER] = "true";
           target.disabled = false;
+          // Re-enter the ordinary onboarding handler. It may perform local
+          // storage work first; its later identical permissions.request() will
+          // consume `primed` rather than call Chrome outside user activation.
           target.click();
         })
         .catch((caught: unknown) => {
           showPermissionMessage(caught instanceof Error ? caught.message : String(caught));
         })
         .finally(() => {
-          setCandidateInputsDisabled(false);
-          target.disabled = false;
-          if (!primed) refreshSummonButtonLabel(target);
+          // A successful primed grant keeps the candidate set frozen until the
+          // ordinary summon path consumes it. Denial/error unlocks immediately.
+          if (!primed) {
+            setCandidateInputsDisabled(false);
+            target.disabled = false;
+            refreshSummonButtonLabel(target);
+          }
         });
     },
     true,
