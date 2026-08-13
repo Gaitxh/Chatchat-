@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chatchat.local/schemas/recipe-candidate-v1.schema.json",
   "title": "ChatChat Recipe Candidate v1",
-  "description": "Portable Composer / Send / Response selector hints. Importing this object never imports runtime trust, login state, Test Speech status, or Council Gate status.",
+  "description": "Portable Composer / Send / Response selector hints. capturedAt records when the map was captured; importing this object never imports runtime trust, login state, Test Speech status, or Council Gate status.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,7 +12,7 @@
     "composerSelector",
     "sendSelector",
     "responseSelector",
-    "testedAt"
+    "capturedAt"
   ],
   "properties": {
     "schemaVersion": { "const": 1 },
@@ -31,7 +31,7 @@
     "composerSelector": { "type": "string", "minLength": 1, "maxLength": 512 },
     "sendSelector": { "type": "string", "minLength": 1, "maxLength": 512 },
     "responseSelector": { "type": "string", "minLength": 1, "maxLength": 512 },
-    "testedAt": {
+    "capturedAt": {
       "type": "string",
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
     },
