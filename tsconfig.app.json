@@ -26,6 +26,9 @@
     "src/provider-sdk/**/*.ts",
     "src/providers/**/*.ts",
     "src/validation/**/*.ts",
-    "src/theater/**/*.ts"
+    "src/theater/**/*.ts",
+    "src/house/**/*.ts",
+    "src/extension/**/*.ts",
+    "src/extension/**/*.tsx"
   ]
 }
