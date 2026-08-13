@@ -23,13 +23,13 @@ const deepseekSeat = {
 
 const recipes = {
   [chatgptSeat.origin]: {
-    ...createEmptyAdapterRecipe(chatgptSeat.origin, "2026-08-13T00:00:00.000Z"),
+    ...createEmptyAdapterRecipe(chatgptSeat.origin),
     composerSelector: "#PRIVATE_CHATGPT_COMPOSER",
     sendSelector: "#PRIVATE_CHATGPT_SEND",
     responseSelector: "#PRIVATE_CHATGPT_RESPONSE",
   },
   [deepseekSeat.origin]: {
-    ...createEmptyAdapterRecipe(deepseekSeat.origin, "2026-08-13T00:00:00.000Z"),
+    ...createEmptyAdapterRecipe(deepseekSeat.origin),
     composerSelector: "#PRIVATE_DEEPSEEK_COMPOSER",
     sendSelector: "#PRIVATE_DEEPSEEK_SEND",
     responseSelector: "#PRIVATE_DEEPSEEK_RESPONSE",
