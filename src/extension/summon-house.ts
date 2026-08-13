@@ -41,6 +41,8 @@ async function bootSummonControl() {
   await whenDomReady();
   const host = document.createElement("div");
   host.id = "chatchat-summon-house";
+  host.dataset.summonCandidates = "0";
+  host.dataset.summonProviders = "";
   host.innerHTML = `
     <style>
       #chatchat-summon-house {
@@ -107,6 +109,8 @@ async function bootSummonControl() {
     try {
       const [tabs, existing] = await Promise.all([queryTabs(), loadSeats()]);
       const plan = planOpenAiTabsForHouse(tabs, existing);
+      host.dataset.summonCandidates = String(plan.candidates.length);
+      host.dataset.summonProviders = [...new Set(plan.candidates.map((item) => item.providerId))].join(",");
       if (!plan.candidates.length) {
         shell.classList.remove("is-visible");
         return;
@@ -115,8 +119,10 @@ async function bootSummonControl() {
       detail.className = "summon-detail";
       detail.textContent = `${summarizeSummonPlan(plan)} · 新席位仍需 Test + Gate`;
       button.textContent = `召集 ${plan.candidates.length} 席`;
+      button.dataset.summonCount = String(plan.candidates.length);
       button.disabled = false;
     } catch (caught) {
+      host.dataset.summonCandidates = "error";
       shell.classList.add("is-visible");
       detail.className = "summon-detail summon-error";
       detail.textContent = message(caught);
