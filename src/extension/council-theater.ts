@@ -14,8 +14,10 @@ import {
 const PATCH_MARKER = "__CHATCHAT_BROWSER_COUNCIL_THEATER_V1__";
 const PANEL_ID = "chatchat-browser-council-theater";
 const STYLE_ID = "chatchat-browser-council-theater-style";
+const ARCHIVE_LOAD_EVENT = "chatchat:theater-load-archive";
 
 type ReplaySpeed = "1x" | "2x" | "instant";
+type TheaterSource = "current" | "archive";
 
 interface TheaterSnapshot {
   report: CouncilReport;
@@ -23,8 +25,18 @@ interface TheaterSnapshot {
   participants: CouncilParticipant[];
 }
 
+interface TheaterArchiveLoadDetail {
+  source: "archive";
+  archive: {
+    report: CouncilReport;
+    events: CouncilEvent[];
+    participants: CouncilParticipant[];
+  };
+}
+
 const runtime = globalThis as typeof globalThis & Record<string, unknown>;
 let snapshot: TheaterSnapshot | null = null;
+let sourceMode: TheaterSource = "current";
 let cursor = 0;
 let replaySpeed: ReplaySpeed = "2x";
 let playing = false;
@@ -34,6 +46,7 @@ let timer: number | null = null;
 if (!runtime[PATCH_MARKER]) {
   runtime[PATCH_MARKER] = true;
   installCouncilCapture();
+  installArchiveLoader();
   installTheaterMount();
 }
 
@@ -52,13 +65,16 @@ function installCouncilCapture() {
       events: [...result.blackboard.events],
       participants,
     };
+    sourceMode = "current";
     stopReplay();
     cursor = snapshot.events.length;
     selectedEventId = null;
+    ensureTheaterPanel();
     renderTheater();
     window.dispatchEvent(
       new CustomEvent("chatchat:browser-theater-ready", {
         detail: {
+          source: sourceMode,
           sessionId: result.report.sessionId,
           eventCount: snapshot.events.length,
           participantCount: participants.length,
@@ -69,21 +85,60 @@ function installCouncilCapture() {
   } as CouncilOrchestrator["run"];
 }
 
+function installArchiveLoader() {
+  window.addEventListener(ARCHIVE_LOAD_EVENT, (event) => {
+    const detail = (event as CustomEvent<unknown>).detail;
+    if (!isArchiveLoadDetail(detail)) return;
+    snapshot = {
+      report: cloneJson(detail.archive.report),
+      events: cloneJson(detail.archive.events),
+      participants: cloneJson(detail.archive.participants),
+    };
+    sourceMode = "archive";
+    stopReplay();
+    cursor = snapshot.events.length;
+    selectedEventId = null;
+    ensureTheaterPanel();
+    renderTheater();
+    window.dispatchEvent(
+      new CustomEvent("chatchat:browser-theater-ready", {
+        detail: {
+          source: sourceMode,
+          sessionId: snapshot.report.sessionId,
+          eventCount: snapshot.events.length,
+          participantCount: snapshot.participants.length,
+        },
+      }),
+    );
+  });
+}
+
 function installTheaterMount() {
   injectStyles();
   const mount = () => {
     if (!snapshot || document.getElementById(PANEL_ID)) return;
-    const resultCard = document.querySelector(".result-card");
-    if (!resultCard) return;
-    const panel = document.createElement("section");
-    panel.id = PANEL_ID;
-    panel.className = "browser-theater";
-    resultCard.insertAdjacentElement("afterend", panel);
-    renderTheater();
+    ensureTheaterPanel();
   };
   mount();
   const observer = new MutationObserver(mount);
   observer.observe(document.documentElement, { childList: true, subtree: true });
+}
+
+function ensureTheaterPanel(): HTMLElement | null {
+  const existing = document.getElementById(PANEL_ID);
+  if (existing) return existing;
+  const resultCard = document.querySelector(".result-card");
+  const chronicle = document.getElementById("chatchat-browser-court-chronicle");
+  const command = document.querySelector("form.command-card");
+  const anchor = resultCard ?? chronicle ?? command;
+  if (!anchor) return null;
+  const panel = document.createElement("section");
+  panel.id = PANEL_ID;
+  panel.className = "browser-theater";
+  if (resultCard || chronicle) anchor.insertAdjacentElement("afterend", panel);
+  else anchor.insertAdjacentElement("beforebegin", panel);
+  renderTheater();
+  return panel;
 }
 
 function renderTheater() {
@@ -129,8 +184,12 @@ function renderTheater() {
   const changed = currentEvent?.kind === "revision"
     ? revisionMoment(currentEvent, currentSnapshot.events, names)
     : null;
+  const sourceBadge = sourceMode === "archive"
+    ? "📚 ARCHIVE REPLAY · 0 PROVIDER CALLS"
+    : "LOCAL REPLAY · 0 PROVIDER CALLS";
 
   panel.dataset.theaterState = cursor === total ? "complete" : playing ? "replaying" : "paused";
+  panel.dataset.theaterSource = sourceMode;
   panel.dataset.theaterVisibleEvents = String(cursor);
   panel.dataset.theaterTotalEvents = String(total);
   panel.dataset.theaterStrongLinks = String(fullGraph.edges.filter((edge) => edge.strength === "strong").length);
@@ -139,10 +198,10 @@ function renderTheater() {
   panel.innerHTML = `
     <header class="theater-head">
       <div>
-        <span>COUNCIL THEATER · 议会剧场</span>
+        <span>${sourceMode === "archive" ? "COURT ARCHIVE THEATER · 旧案回放" : "COUNCIL THEATER · 议会剧场"}</span>
         <strong>谁推动了谁的立场？</strong>
       </div>
-      <em>LOCAL REPLAY · 0 PROVIDER CALLS</em>
+      <em>${sourceBadge}</em>
     </header>
 
     <div class="theater-live-summary">
@@ -191,7 +250,7 @@ function renderTheater() {
     <div class="replay-console">
       <div class="replay-head">
         <div>
-          <span class="theater-kicker">COUNCIL REPLAY</span>
+          <span class="theater-kicker">${sourceMode === "archive" ? "ARCHIVE REPLAY" : "COUNCIL REPLAY"}</span>
           <strong>史官回放 · 不重新请求 AI</strong>
         </div>
         <div class="replay-controls">
@@ -436,6 +495,40 @@ function eventStance(event: CouncilEvent): string | null {
   return null;
 }
 
+function isArchiveLoadDetail(value: unknown): value is TheaterArchiveLoadDetail {
+  if (!value || typeof value !== "object") return false;
+  const detail = value as Partial<TheaterArchiveLoadDetail>;
+  if (detail.source !== "archive" || !detail.archive || typeof detail.archive !== "object") return false;
+  const archive = detail.archive as TheaterArchiveLoadDetail["archive"];
+  return (
+    archive.report && typeof archive.report === "object" &&
+    typeof archive.report.sessionId === "string" &&
+    Array.isArray(archive.events) &&
+    archive.events.every((event) => isMinimalCouncilEvent(event)) &&
+    Array.isArray(archive.participants) &&
+    archive.participants.every((participant) =>
+      participant &&
+      typeof participant === "object" &&
+      typeof participant.id === "string" &&
+      typeof participant.name === "string" &&
+      typeof participant.provider === "string"
+    )
+  );
+}
+
+function isMinimalCouncilEvent(value: unknown): value is CouncilEvent {
+  if (!value || typeof value !== "object") return false;
+  const event = value as Partial<CouncilEvent>;
+  return (
+    typeof event.id === "string" &&
+    typeof event.sessionId === "string" &&
+    typeof event.actorId === "string" &&
+    typeof event.kind === "string" &&
+    typeof event.round === "number" &&
+    typeof event.createdAt === "string"
+  );
+}
+
 function uniqueParticipants(values: readonly CouncilParticipant[]): CouncilParticipant[] {
   const seen = new Set<string>();
   const result: CouncilParticipant[] = [];
@@ -462,6 +555,11 @@ function escapeHtml(value: string): string {
 
 function escapeAttr(value: string): string {
   return escapeHtml(value).replaceAll("'", "&#39;");
+}
+
+function cloneJson<T>(value: T): T {
+  if (typeof structuredClone === "function") return structuredClone(value);
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function injectStyles() {
