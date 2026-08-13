@@ -1,0 +1,127 @@
+name: Browser Court Chronicle Showcase
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/extension/chronicle-store.ts'
+      - 'src/extension/court-chronicle.ts'
+      - 'src/extension/council-theater.ts'
+      - 'extension-public/chronicle-showcase-bootstrap.js'
+      - 'extension/sidepanel.html'
+      - 'tests/browser-chronicle.test.ts'
+  pull_request:
+    paths:
+      - 'src/extension/chronicle-store.ts'
+      - 'src/extension/court-chronicle.ts'
+      - 'src/extension/council-theater.ts'
+      - 'extension-public/chronicle-showcase-bootstrap.js'
+      - 'extension/sidepanel.html'
+      - 'tests/browser-chronicle.test.ts'
+
+jobs:
+  browser-chronicle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm install
+
+      - name: Full deterministic browser suite
+        run: |
+          npm run check
+          npm test
+
+      - name: Assert archive replay modules contain no Provider transport path
+        run: |
+          ! grep -q 'RUN_SPEECH' src/extension/court-chronicle.ts
+          ! grep -q 'chrome\.tabs' src/extension/court-chronicle.ts
+          ! grep -q 'sendMessage' src/extension/court-chronicle.ts
+          ! grep -q 'RUN_SPEECH' src/extension/council-theater.ts
+          ! grep -q 'chrome\.tabs' src/extension/council-theater.ts
+          ! grep -q 'sendMessage' src/extension/council-theater.ts
+
+      - name: Build Browser Extension
+        run: npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Start Browser Extension preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4185 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-chronicle-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4185/manifest.json >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4185/manifest.json >/dev/null
+
+      - name: Capture real production private Chronicle replay
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME_BIN" ]; then
+            echo "No Chromium-compatible browser found."
+            exit 1
+          fi
+          URL='http://127.0.0.1:4185/extension/sidepanel.html?showcase=chronicle'
+          # HOUSE VERDICT is intentionally no longer blocked on IndexedDB.
+          # Give the focused historian showcase a little more virtual event
+          # loop after Verdict so the fire-and-forget local transaction can
+          # settle, refresh the summary list and click REPLAY LOCALLY.
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=48000 \
+            --window-size=540,3200 \
+            --screenshot=artifacts/chatchat-browser-court-chronicle.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=48000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-browser-court-chronicle.html
+          test -s artifacts/chatchat-browser-court-chronicle.png
+          test -s artifacts/chatchat-browser-court-chronicle.html
+
+      - name: Upload Browser Chronicle evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-browser-court-chronicle
+          path: |
+            artifacts/chatchat-browser-court-chronicle.png
+            artifacts/chatchat-browser-court-chronicle.html
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Assert private Chronicle and zero-call archive replay
+        run: |
+          grep -q 'data-chatchat-chronicle-showcase="booted"' artifacts/chatchat-browser-court-chronicle.html
+          grep -q 'data-chatchat-chronicle-replayed="true"' artifacts/chatchat-browser-court-chronicle.html
+          grep -q 'id="chatchat-browser-court-chronicle"' artifacts/chatchat-browser-court-chronicle.html
+          grep -q 'data-chronicle-backend="indexeddb-local"' artifacts/chatchat-browser-court-chronicle.html
+          grep -q 'PRIVATE LOCAL HISTORY' artifacts/chatchat-browser-court-chronicle.html
+          grep -q 'REPLAY LOCALLY' artifacts/chatchat-browser-court-chronicle.html
+          grep -q 'data-theater-source="archive"' artifacts/chatchat-browser-court-chronicle.html
+          grep -q 'data-theater-provider-calls-during-replay="0"' artifacts/chatchat-browser-court-chronicle.html
+          grep -q 'ARCHIVE REPLAY · 0 PROVIDER CALLS' artifacts/chatchat-browser-court-chronicle.html
+          grep -q 'HOUSE VERDICT' artifacts/chatchat-browser-court-chronicle.html
