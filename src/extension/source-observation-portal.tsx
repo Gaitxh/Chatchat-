@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { CouncilEvent, CouncilParticipant, CouncilReport } from "../core/types.js";
-import { deriveEvidenceLedger } from "../evidence/evidence-ledger.js";
+import { deriveEvidenceLedger, type EvidenceRecord } from "../evidence/evidence-ledger.js";
 import { sourceAgeDays, type EvidenceSourceObservation } from "../evidence/source-metadata.js";
 import { normalizeLocale, type Locale } from "../i18n/index.js";
 import "./source-observation-portal.css";
@@ -14,6 +14,8 @@ const STORAGE_KEY = "chatchat.evidence.verifications.v1";
 
 interface LiveDetail { participants: CouncilParticipant[]; events: CouncilEvent[]; }
 interface CompleteDetail { report: CouncilReport; events: CouncilEvent[]; }
+interface ObservationCandidate { record: EvidenceRecord; observation: EvidenceSourceObservation | undefined; }
+interface VisibleObservation { record: EvidenceRecord; observation: EvidenceSourceObservation; }
 
 function SourceObservationPortal() {
   const [live, setLive] = useState<LiveDetail | null>(null);
@@ -83,9 +85,11 @@ function SourceObservationPortal() {
     () => data ? deriveEvidenceLedger(data.participants, data.events) : [],
     [data?.events, data?.participants],
   );
-  const visible = records
-    .map((record) => ({ record, observation: observations[record.evidenceEventId] }))
-    .filter(({ observation }) => hasObservationDetail(observation));
+  const candidates: ObservationCandidate[] = records.map((record) => ({
+    record,
+    observation: observations[record.evidenceEventId],
+  }));
+  const visible = candidates.filter(isVisibleObservation);
 
   if (!visible.length) return null;
   const zh = locale === "zh-CN";
@@ -111,9 +115,7 @@ function SourceObservationPortal() {
               </div>
               {observation.title ? <h4>{observation.title}</h4> : null}
               {observation.description ? <p className="source-description">{observation.description}</p> : null}
-              {observation.excerpt ? (
-                <blockquote>{observation.excerpt}</blockquote>
-              ) : null}
+              {observation.excerpt ? <blockquote>{observation.excerpt}</blockquote> : null}
               <dl>
                 {observation.pageDate ? (
                   <div><dt>{zh ? "页面日期信号" : "PAGE DATE SIGNAL"}</dt><dd>{observation.pageDate}<small>{dateKind(observation.pageDateKind, locale)}</small></dd></div>
@@ -146,6 +148,10 @@ function hasObservationDetail(observation: EvidenceSourceObservation | undefined
     observation?.state === "reachable" &&
     (observation.description || observation.excerpt || observation.pageDate || observation.bodyHash || observation.textCharacters),
   );
+}
+
+function isVisibleObservation(candidate: ObservationCandidate): candidate is VisibleObservation {
+  return hasObservationDetail(candidate.observation);
 }
 
 function dateKind(kind: EvidenceSourceObservation["pageDateKind"], locale: Locale): string {
