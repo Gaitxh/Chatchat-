@@ -6,6 +6,7 @@ declare const chrome: any;
 
 const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
 const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
+const resumeCooldown = new Map<string, number>();
 type Locale = "en" | "zh-CN";
 
 interface BrowserTab { id?: number; url?: string; title?: string; }
@@ -47,7 +48,10 @@ const COPY = {
   },
 } as const;
 
-if (document.documentElement.dataset.surface === "web-app") void mount();
+if (document.documentElement.dataset.surface === "web-app") {
+  installLoginResume();
+  void mount();
+}
 
 async function mount() {
   const root = document.getElementById("web-onboarding-root");
@@ -126,6 +130,33 @@ async function mount() {
     found.textContent = discovered.length ? strings.found(discovered.length) : strings.none;
     button.disabled = discovered.length === 0;
   }
+}
+
+function installLoginResume() {
+  if (!chrome.tabs?.onUpdated?.addListener) return;
+  chrome.tabs.onUpdated.addListener((tabId: number, changeInfo: { status?: string; url?: string }) => {
+    if (changeInfo.status !== "complete" && !changeInfo.url) return;
+    window.setTimeout(() => void retryAfterLogin(tabId), 1000);
+  });
+}
+
+async function retryAfterLogin(tabId: number) {
+  const session = chrome.storage.session ?? chrome.storage.local;
+  const stored = await session.get(PARTICIPANTS_KEY);
+  const participants = Array.isArray(stored[PARTICIPANTS_KEY])
+    ? (stored[PARTICIPANTS_KEY] as ParticipantRecord[])
+    : [];
+  const index = participants.findIndex((participant) => participant.tabId === tabId);
+  if (index < 0) return;
+  const seatId = participants[index]!.seatId;
+  const last = resumeCooldown.get(seatId) ?? 0;
+  if (Date.now() - last < 8000) return;
+  const row = [...document.querySelectorAll<HTMLElement>(".participant-row")][index];
+  if (!row || row.classList.contains("connection-ready") || row.classList.contains("connection-connecting")) return;
+  const retry = [...document.querySelectorAll<HTMLButtonElement>(".setup-participant .verify-button")][index];
+  if (!retry || retry.disabled || retry.classList.contains("is-ready")) return;
+  resumeCooldown.set(seatId, Date.now());
+  retry.click();
 }
 
 async function discover() {
