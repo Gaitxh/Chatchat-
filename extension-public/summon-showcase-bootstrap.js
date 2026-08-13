@@ -4,13 +4,13 @@
 
   const seatsKey = "chatchat.extension.seats.v1";
   const tabs = new Map([
-    tab(101, "https://chatgpt.com/", "ChatGPT"),
-    tab(102, "https://gemini.google.com/app?hl=zh", "Gemini"),
-    tab(103, "https://chat.deepseek.com/", "DeepSeek"),
-    tab(104, "https://yuanbao.tencent.com/chat/demo", "Yuanbao · 元宝"),
-    tab(105, "https://tongyi.aliyun.com/", "Tongyi · 通义"),
-    tab(106, "https://grok.com/", "Grok"),
-    tab(107, "https://chat.qwen.ai/", "Qwen"),
+    [101, tab(101, "https://chatgpt.com/", "ChatGPT")],
+    [102, tab(102, "https://gemini.google.com/app?hl=zh", "Gemini")],
+    [103, tab(103, "https://chat.deepseek.com/", "DeepSeek")],
+    [104, tab(104, "https://yuanbao.tencent.com/chat/demo", "Yuanbao · 元宝")],
+    [105, tab(105, "https://tongyi.aliyun.com/", "Tongyi · 通义")],
+    [106, tab(106, "https://grok.com/", "Grok")],
+    [107, tab(107, "https://chat.qwen.ai/", "Qwen")],
   ]);
   const localState = {};
   const sessionState = { [seatsKey]: [] };
