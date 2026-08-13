@@ -43,6 +43,8 @@ async function bootSummonControl() {
   host.id = "chatchat-summon-house";
   host.dataset.summonCandidates = "0";
   host.dataset.summonProviders = "";
+  host.dataset.summonTrust = "unverified";
+  host.dataset.summonAction = "attach-only";
   host.innerHTML = `
     <style>
       #chatchat-summon-house {
