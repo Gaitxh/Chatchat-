@@ -8,7 +8,7 @@ export interface RecipeCandidateV1 {
   composerSelector: string;
   sendSelector: string;
   responseSelector: string;
-  testedAt: string;
+  capturedAt: string;
   notes?: string;
 }
 
@@ -37,7 +37,7 @@ export interface ExportRecipeCandidateInput {
   providerId: string;
   origin: string;
   recipe: CompleteAdapterRecipe;
-  testedAt?: string;
+  capturedAt?: string;
   notes?: string;
 }
 
@@ -64,7 +64,7 @@ export function exportRecipeCandidate(input: ExportRecipeCandidateInput): Recipe
     composerSelector: input.recipe.composerSelector,
     sendSelector: input.recipe.sendSelector,
     responseSelector: input.recipe.responseSelector,
-    testedAt: input.testedAt ?? new Date().toISOString().slice(0, 10),
+    capturedAt: input.capturedAt ?? new Date().toISOString().slice(0, 10),
     ...(input.notes === undefined ? {} : { notes: input.notes }),
   };
   return parseRecipeCandidate(raw);
@@ -81,7 +81,7 @@ export function parseRecipeCandidate(input: unknown): RecipeCandidateV1 {
     "composerSelector",
     "sendSelector",
     "responseSelector",
-    "testedAt",
+    "capturedAt",
     "notes",
   ]);
   for (const key of Object.keys(raw)) {
@@ -98,9 +98,9 @@ export function parseRecipeCandidate(input: unknown): RecipeCandidateV1 {
   const composerSelector = validateShareableSelector(raw.composerSelector, "composerSelector");
   const sendSelector = validateShareableSelector(raw.sendSelector, "sendSelector");
   const responseSelector = validateShareableSelector(raw.responseSelector, "responseSelector");
-  const testedAt = cleanRequiredString(raw.testedAt, "testedAt", 10);
-  if (!ISO_DATE.test(testedAt) || Number.isNaN(Date.parse(`${testedAt}T00:00:00Z`))) {
-    throw new Error("Recipe Candidate testedAt must be a real YYYY-MM-DD date.");
+  const capturedAt = cleanRequiredString(raw.capturedAt, "capturedAt", 10);
+  if (!validIsoDate(capturedAt)) {
+    throw new Error("Recipe Candidate capturedAt must be a real YYYY-MM-DD date.");
   }
 
   const notes = raw.notes === undefined ? undefined : sanitizePublicNotes(raw.notes);
@@ -113,7 +113,7 @@ export function parseRecipeCandidate(input: unknown): RecipeCandidateV1 {
     composerSelector,
     sendSelector,
     responseSelector,
-    testedAt,
+    capturedAt,
     ...(notes === undefined ? {} : { notes }),
   };
 }
@@ -279,6 +279,20 @@ function portabilityLevel(score: number): SelectorPortabilityLevel {
   if (score <= 20) return "stable";
   if (score <= 50) return "caution";
   return "brittle";
+}
+
+function validIsoDate(value: string): boolean {
+  if (!ISO_DATE.test(value)) return false;
+  const [yearText, monthText, dayText] = value.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
 }
 
 function parseJson(value: string): unknown {
