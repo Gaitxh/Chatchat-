@@ -60,6 +60,20 @@ export const BUILT_IN_PROVIDER_MANIFESTS: readonly ProviderAdapterManifest[] = [
       councilTurns: true,
     },
   },
+  {
+    id: "web.qwen",
+    providerId: "qwen-chat",
+    displayName: "Qwen",
+    version: "0.9.0-taught-browser",
+    domains: ["chat.qwen.ai", "qwen.ai"],
+    defaultUrl: "https://chat.qwen.ai/",
+    monogram: "Q",
+    capabilities: {
+      webLogin: true,
+      streaming: true,
+      councilTurns: true,
+    },
+  },
 ];
 
 export function detectProviderUrl(input: string): ProviderDetection {
