@@ -96,6 +96,14 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Upload load-unpacked browser extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-browser-extension-unpacked
+          path: extension/**
+          if-no-files-found: error
+          retention-days: 14
+
   desktop-shell:
     runs-on: ubuntu-22.04
     steps:
