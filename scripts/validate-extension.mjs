@@ -8,6 +8,9 @@ assertFile(manifestPath);
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 
 assert(manifest.manifest_version === 3, "Extension must build as Manifest V3.");
+assert(manifest.name === "ChatChat — AI Consultation", "Primary extension name must describe AI Consultation.");
+assert(/equal participants/i.test(manifest.description), "Manifest description must describe equal participants.");
+assert(!/parliament|house|chairman/i.test(`${manifest.name} ${manifest.description}`), "Manifest must not reintroduce hierarchy language.");
 assert(manifest.side_panel?.default_path, "Manifest must declare a Side Panel entry.");
 assert(manifest.background?.service_worker, "Manifest must declare a service worker.");
 assert(!manifest.host_permissions, "Install-time host_permissions are forbidden; use optional_host_permissions.");
@@ -20,6 +23,10 @@ assertFile(path.join(root, manifest.side_panel.default_path));
 assertFile(path.join(root, manifest.background.service_worker));
 assertFile(path.join(root, "content-script.js"));
 
+const sidePanelHtml = fs.readFileSync(path.join(root, manifest.side_panel.default_path), "utf8");
+assert(/AI Consultation/.test(sidePanelHtml), "Built Side Panel must identify the consultation product.");
+assert(!/royal-onboarding|summon-house|committee-house|sidepanel\.tsx/.test(sidePanelHtml), "Legacy House/Royal UI modules must not load in the primary Side Panel.");
+
 const javascriptFiles = walk(root).filter((file) => file.endsWith(".js"));
 for (const file of javascriptFiles) {
   const source = fs.readFileSync(file, "utf8");
@@ -28,7 +35,7 @@ for (const file of javascriptFiles) {
 }
 
 console.log(
-  `✓ ChatChat browser extension package validated (${javascriptFiles.length} JS files, optional Provider host permissions only)`,
+  `✓ ChatChat AI Consultation extension validated (${javascriptFiles.length} JS files, optional Provider host permissions only)`,
 );
 
 function assertFile(file) {
