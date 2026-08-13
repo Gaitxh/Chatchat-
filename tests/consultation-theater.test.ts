@@ -46,6 +46,7 @@ const events: CouncilEvent[] = [
     actorId: "c",
     kind: "evidence",
     targetEventId: "b-arg",
+    claim: "A browser extension can use the user's existing authenticated AI tabs directly.",
     source: "public test evidence",
     content: "Evidence against B assumption",
     confidence: 0.8,
