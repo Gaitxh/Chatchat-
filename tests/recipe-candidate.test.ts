@@ -25,16 +25,18 @@ const candidate = exportRecipeCandidate({
   providerId: "openai-chatgpt",
   origin: "https://chatgpt.com/c/private-conversation",
   recipe: localRecipe,
-  testedAt: "2026-08-13",
+  capturedAt: "2026-08-13",
   notes: "Public layout note only.\nNo account data.",
 });
 
 assert(candidate.origin === "https://chatgpt.com", "Export should reduce a URL to its public origin.");
+assert(candidate.capturedAt === "2026-08-13", "Candidate time should describe capture only.");
 assert(candidate.notes === "Public layout note only. No account data.", "Notes should be flattened.");
 const exported = recipeCandidateJson(candidate);
 assert(!exported.includes("PRIVATE_PROFILE_KEY_123"), "Portable recipe export must not leak the local profile id/key.");
 assert(!exported.includes("private-conversation"), "Portable recipe export must not leak Provider conversation paths.");
 assert(!exported.includes("createdAt"), "Portable recipes should not export local recipe metadata.");
+assert(!exported.includes("testedAt"), "Recipe Candidate v1 must not imply that selector capture equals runtime Test Speech proof.");
 
 const parsed = parseRecipeCandidate(exported);
 assert(parsed.providerId === "openai-chatgpt", "Exported candidates must round-trip through the strict parser.");
@@ -110,6 +112,23 @@ try {
   extraField = true;
 }
 assert(extraField, "Unknown fields must be rejected rather than silently preserved.");
+
+let legacyTrustName = false;
+try {
+  const { capturedAt: _capturedAt, ...rest } = candidate;
+  parseRecipeCandidate({ ...rest, testedAt: "2026-08-13" });
+} catch {
+  legacyTrustName = true;
+}
+assert(legacyTrustName, "The misleading testedAt field must not be accepted as a Recipe Candidate v1 alias.");
+
+let impossibleDate = false;
+try {
+  parseRecipeCandidate({ ...candidate, capturedAt: "2026-02-31" });
+} catch {
+  impossibleDate = true;
+}
+assert(impossibleDate, "capturedAt must reject calendar dates that only look ISO-shaped.");
 
 let privateNotes = false;
 try {
