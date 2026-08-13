@@ -35,7 +35,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends fonts-noto-cjk
           fc-cache -f
 
-      - name: Capture built Council Chamber
+      - name: Start production preview
         run: |
           mkdir -p artifacts
           nohup npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/chatchat-preview.log 2>&1 &
@@ -46,6 +46,9 @@ jobs:
             sleep 1
           done
           curl --fail http://127.0.0.1:4173 >/dev/null
+
+      - name: Capture built Council Chamber
+        run: |
           CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
           if [ -z "$CHROME_BIN" ]; then
             echo "No Chromium-compatible browser found on the runner."
@@ -61,11 +64,34 @@ jobs:
             http://127.0.0.1:4173
           test -s artifacts/chatchat-council-chamber.png
 
+      - name: Capture deterministic Council Theater showcase
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=24000 \
+            --window-size=1440,3400 \
+            --screenshot=artifacts/chatchat-council-theater.png \
+            'http://127.0.0.1:4173/?showcase=theater'
+          test -s artifacts/chatchat-council-theater.png
+
       - name: Upload Council Chamber screenshot
         uses: actions/upload-artifact@v4
         with:
           name: chatchat-council-chamber
           path: artifacts/chatchat-council-chamber.png
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Council Theater screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-council-theater
+          path: artifacts/chatchat-council-theater.png
           if-no-files-found: error
           retention-days: 14
 
