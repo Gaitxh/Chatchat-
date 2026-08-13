@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chatchat.local/schemas/recipe-candidate-v1.schema.json",
+  "title": "ChatChat Recipe Candidate v1",
+  "description": "Portable Composer / Send / Response selector hints. Importing this object never imports runtime trust, login state, Test Speech status, or Council Gate status.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "providerId",
+    "origin",
+    "composerSelector",
+    "sendSelector",
+    "responseSelector",
+    "testedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "providerId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 96,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "origin": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 512,
+      "pattern": "^https?://"
+    },
+    "composerSelector": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "sendSelector": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "responseSelector": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "testedAt": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "notes": { "type": "string", "maxLength": 500 }
+  }
+}
