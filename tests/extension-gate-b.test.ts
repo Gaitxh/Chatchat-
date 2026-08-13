@@ -1,225 +1,40 @@
 import type { CouncilEvent, CouncilReport } from "../src/core/types.js";
 import { createEmptyAdapterRecipe } from "../src/provider-sdk/recipe.js";
-import {
-  captureBrowserHouseProviderProof,
-  seatStillOnProviderOrigin,
-} from "../src/extension/gate-b.js";
+import { captureAdmittedBrowserHouseProviderProof, captureBrowserHouseProviderProof, seatStillOnProviderOrigin } from "../src/extension/gate-b.js";
 import { buildGateBProofPack, gateBProofJson } from "../src/validation/proof-pack.js";
 
-function assert(condition: unknown, message: string): asserts condition {
-  if (!condition) throw new Error(`Assertion failed: ${message}`);
-}
-
-const chatgptSeat = {
-  seatId: "extension:openai-chatgpt:101",
-  providerId: "openai-chatgpt",
-  origin: "https://chatgpt.com",
+function assert(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(`Assertion failed: ${message}`); }
+const a={seatId:"extension:openai-chatgpt:101",providerId:"openai-chatgpt",origin:"https://chatgpt.com"};
+const b={seatId:"extension:deepseek-chat:102",providerId:"deepseek-chat",origin:"https://chat.deepseek.com"};
+const recipes={
+  [a.origin]:{...createEmptyAdapterRecipe(a.origin),composerSelector:"#PRIVATE_A_COMPOSER",sendSelector:"#PRIVATE_A_SEND",responseSelector:"#PRIVATE_A_RESPONSE"},
+  [b.origin]:{...createEmptyAdapterRecipe(b.origin),composerSelector:"#PRIVATE_B_COMPOSER",sendSelector:"#PRIVATE_B_SEND",responseSelector:"#PRIVATE_B_RESPONSE"}
 };
-const deepseekSeat = {
-  seatId: "extension:deepseek-chat:102",
-  providerId: "deepseek-chat",
-  origin: "https://chat.deepseek.com",
-};
+const explicit=captureBrowserHouseProviderProof({seats:[a,b],recipes,tests:{[a.seatId]:"pass",[b.seatId]:"pass"},gates:{[a.seatId]:"pass",[b.seatId]:"pass"},providerHostSeatIds:[a.seatId,b.seatId]});
+assert(explicit.every(row=>row.testPassed&&row.councilGatePassed),"Explicit Browser proof should preserve per-seat Test/Gate state.");
+const admitted=captureAdmittedBrowserHouseProviderProof({seats:[a,b],recipes,providerHostSeatIds:[a.seatId,b.seatId]});
+assert(admitted.every(row=>row.testPassed&&row.councilGatePassed&&row.recipeReady&&row.providerHostHealthy),"Admitted participants may derive Test/Gate only while Recipe/Host remain explicit.");
+assert(seatStillOnProviderOrigin(a.origin,"https://chatgpt.com/c/private"),"Same Provider origin should be healthy.");
+assert(!seatStillOnProviderOrigin(a.origin,"https://auth.openai.com/login"),"OAuth/external origin should be unhealthy.");
+assert(!seatStillOnProviderOrigin(a.origin,"chrome://settings"),"Non-http(s) pages should be unhealthy.");
 
-const recipes = {
-  [chatgptSeat.origin]: {
-    ...createEmptyAdapterRecipe(chatgptSeat.origin),
-    composerSelector: "#PRIVATE_CHATGPT_COMPOSER",
-    sendSelector: "#PRIVATE_CHATGPT_SEND",
-    responseSelector: "#PRIVATE_CHATGPT_RESPONSE",
-  },
-  [deepseekSeat.origin]: {
-    ...createEmptyAdapterRecipe(deepseekSeat.origin),
-    composerSelector: "#PRIVATE_DEEPSEEK_COMPOSER",
-    sendSelector: "#PRIVATE_DEEPSEEK_SEND",
-    responseSelector: "#PRIVATE_DEEPSEEK_RESPONSE",
-  },
-};
-
-const tests = {
-  [chatgptSeat.seatId]: "pass" as const,
-  [deepseekSeat.seatId]: "pass" as const,
-};
-const gates = {
-  [chatgptSeat.seatId]: "pass" as const,
-  [deepseekSeat.seatId]: "pass" as const,
-};
-
-const providerProof = captureBrowserHouseProviderProof({
-  seats: [chatgptSeat, deepseekSeat],
-  recipes,
-  tests,
-  gates,
-  providerHostSeatIds: [chatgptSeat.seatId, deepseekSeat.seatId],
-});
-assert(providerProof.length === 2, "Two Browser House participants should become two Provider proof rows.");
-assert(providerProof.every((row) => row.adapterId === "extension.tab"), "Browser proof rows should identify extension.tab transport.");
-assert(providerProof[0]?.host === "chatgpt.com", "Proof should preserve host only, not tab paths.");
-assert(providerProof.every((row) => row.providerHostHealthy), "Both healthy provider tabs should be marked healthy.");
-
-assert(seatStillOnProviderOrigin("https://chatgpt.com", "https://chatgpt.com/c/private") === true, "Same Provider origin should remain healthy after Council navigation.");
-assert(seatStillOnProviderOrigin("https://chatgpt.com", "https://auth.openai.com/login") === false, "Auth/external origin must not count as Provider-host healthy.");
-assert(seatStillOnProviderOrigin("https://chatgpt.com", "chrome://settings") === false, "Non-http(s) pages are never Provider-host healthy.");
-
-const events: CouncilEvent[] = [
-  {
-    id: "event-chatgpt-argument",
-    sessionId: "session-browser-gate-b-private",
-    round: 1,
-    actorId: chatgptSeat.seatId,
-    kind: "argument",
-    stance: "A",
-    content: "PRIVATE CHATGPT ANSWER",
-    confidence: 0.72,
-    createdAt: "2026-08-13T00:00:00.000Z",
-  },
-  {
-    id: "event-deepseek-argument",
-    sessionId: "session-browser-gate-b-private",
-    round: 1,
-    actorId: deepseekSeat.seatId,
-    kind: "argument",
-    stance: "B",
-    content: "PRIVATE DEEPSEEK ANSWER",
-    confidence: 0.71,
-    createdAt: "2026-08-13T00:00:01.000Z",
-  },
-  {
-    id: "event-deepseek-challenge",
-    sessionId: "session-browser-gate-b-private",
-    round: 2,
-    actorId: deepseekSeat.seatId,
-    kind: "challenge",
-    targetEventId: "event-chatgpt-argument",
-    content: "PRIVATE CHALLENGE",
-    createdAt: "2026-08-13T00:00:02.000Z",
-  },
-  {
-    id: "event-chatgpt-revision",
-    sessionId: "session-browser-gate-b-private",
-    round: 2,
-    actorId: chatgptSeat.seatId,
-    kind: "revision",
-    previousEventId: "event-chatgpt-argument",
-    stance: "B",
-    content: "PRIVATE REVISION",
-    confidence: 0.8,
-    causedBy: ["event-deepseek-challenge"],
-    createdAt: "2026-08-13T00:00:03.000Z",
-  },
-  {
-    id: "event-chatgpt-final",
-    sessionId: "session-browser-gate-b-private",
-    round: 3,
-    actorId: chatgptSeat.seatId,
-    kind: "final_position",
-    stance: "B",
-    content: "PRIVATE FINAL A",
-    confidence: 0.82,
-    caveats: [],
-    createdAt: "2026-08-13T00:00:04.000Z",
-  },
-  {
-    id: "event-deepseek-final",
-    sessionId: "session-browser-gate-b-private",
-    round: 3,
-    actorId: deepseekSeat.seatId,
-    kind: "final_position",
-    stance: "B",
-    content: "PRIVATE FINAL B",
-    confidence: 0.84,
-    caveats: [],
-    createdAt: "2026-08-13T00:00:05.000Z",
-  },
+const events:CouncilEvent[]=[
+  {id:"a1",sessionId:"PRIVATE_SESSION",round:1,actorId:a.seatId,kind:"argument",stance:"A",content:"PRIVATE ANSWER A",confidence:.7,createdAt:"2026-08-13T00:00:00.000Z"},
+  {id:"b1",sessionId:"PRIVATE_SESSION",round:1,actorId:b.seatId,kind:"argument",stance:"B",content:"PRIVATE ANSWER B",confidence:.7,createdAt:"2026-08-13T00:00:01.000Z"},
+  {id:"b2",sessionId:"PRIVATE_SESSION",round:2,actorId:b.seatId,kind:"challenge",targetEventId:"a1",content:"PRIVATE CHALLENGE",createdAt:"2026-08-13T00:00:02.000Z"},
+  {id:"a2",sessionId:"PRIVATE_SESSION",round:2,actorId:a.seatId,kind:"revision",previousEventId:"a1",stance:"B",content:"PRIVATE REVISION",confidence:.8,causedBy:["b2"],createdAt:"2026-08-13T00:00:03.000Z"},
+  {id:"a3",sessionId:"PRIVATE_SESSION",round:3,actorId:a.seatId,kind:"final_position",stance:"B",content:"PRIVATE FINAL A",confidence:.82,caveats:[],createdAt:"2026-08-13T00:00:04.000Z"},
+  {id:"b3",sessionId:"PRIVATE_SESSION",round:3,actorId:b.seatId,kind:"final_position",stance:"B",content:"PRIVATE FINAL B",confidence:.84,caveats:[],createdAt:"2026-08-13T00:00:05.000Z"}
 ];
-
-const report: CouncilReport = {
-  sessionId: "session-browser-gate-b-private",
-  question: "PRIVATE KING QUESTION",
-  consensusStance: "B",
-  consensusRatio: 1,
-  confidence: 0.83,
-  rounds: 3,
-  positions: [
-    {
-      participant: {
-        id: chatgptSeat.seatId,
-        name: "PRIVATE CHATGPT TAB NAME",
-        provider: chatgptSeat.providerId,
-        role: "Browser Tab Delegate",
-      },
-      stance: "B",
-      content: "PRIVATE POSITION A",
-      confidence: 0.82,
-      caveats: [],
-    },
-    {
-      participant: {
-        id: deepseekSeat.seatId,
-        name: "PRIVATE DEEPSEEK TAB NAME",
-        provider: deepseekSeat.providerId,
-        role: "Browser Tab Delegate",
-      },
-      stance: "B",
-      content: "PRIVATE POSITION B",
-      confidence: 0.84,
-      caveats: [],
-    },
-  ],
-  disagreements: [],
-  eventCount: events.length,
-};
-
-const pack = buildGateBProofPack({
-  providers: providerProof,
-  report,
-  events,
-  mode: "live",
-  chatChatVersion: "0.9.0",
-  environment: "Chromium Side Panel · Linux",
-  generatedAt: "2026-08-13T00:01:00.000Z",
-});
-assert(pack.verdict === "gate-b-candidate", "A clean two-provider Browser House Council should satisfy the same Gate B candidate rule.");
-const exported = gateBProofJson(pack);
-for (const secret of [
-  "PRIVATE KING QUESTION",
-  "PRIVATE CHATGPT ANSWER",
-  "PRIVATE DEEPSEEK ANSWER",
-  "PRIVATE_CHATGPT_COMPOSER",
-  "PRIVATE_DEEPSEEK_COMPOSER",
-  "PRIVATE CHATGPT TAB NAME",
-]) {
-  assert(!exported.includes(secret), `Browser proof export must not leak ${secret}.`);
-}
-
-const offHostProof = captureBrowserHouseProviderProof({
-  seats: [chatgptSeat, deepseekSeat],
-  recipes,
-  tests,
-  gates,
-  providerHostSeatIds: [chatgptSeat.seatId],
-});
-const offHostPack = buildGateBProofPack({
-  providers: offHostProof,
-  report,
-  events,
-  mode: "live",
-  chatChatVersion: "0.9.0",
-  environment: "Chromium",
-});
-assert(offHostPack.verdict === "incomplete", "One off-host Browser tab must fail closed rather than qualify as Gate B candidate evidence.");
-
-const missingProviderRowPack = buildGateBProofPack({
-  providers: providerProof.slice(0, 1),
-  report,
-  events,
-  mode: "live",
-  chatChatVersion: "0.9.0",
-  environment: "Chromium",
-});
-assert(
-  missingProviderRowPack.verdict === "incomplete",
-  "A Gate B candidate must freeze one Provider proof row for every real Council participant.",
-);
-
+const report:CouncilReport={sessionId:"PRIVATE_SESSION",question:"PRIVATE KING QUESTION",consensusStance:"B",consensusRatio:1,confidence:.83,rounds:3,positions:[
+  {participant:{id:a.seatId,name:"PRIVATE TAB A",provider:a.providerId,role:"Browser Tab Delegate"},stance:"B",content:"PRIVATE POSITION A",confidence:.82,caveats:[]},
+  {participant:{id:b.seatId,name:"PRIVATE TAB B",provider:b.providerId,role:"Browser Tab Delegate"},stance:"B",content:"PRIVATE POSITION B",confidence:.84,caveats:[]}
+],disagreements:[],eventCount:events.length};
+const pack=buildGateBProofPack({providers:admitted,report,events,mode:"live",chatChatVersion:"0.9.0",environment:"Chromium"});
+assert(pack.verdict==="gate-b-candidate","Clean two-provider Browser Council should satisfy shared Gate B candidate rule.");
+const exported=gateBProofJson(pack);
+for(const secret of ["PRIVATE KING QUESTION","PRIVATE ANSWER","PRIVATE_A_COMPOSER","PRIVATE TAB"]){assert(!exported.includes(secret),`Browser proof export must not leak ${secret}.`)}
+const offHost=captureAdmittedBrowserHouseProviderProof({seats:[a,b],recipes,providerHostSeatIds:[a.seatId]});
+assert(buildGateBProofPack({providers:offHost,report,events,mode:"live",chatChatVersion:"0.9.0",environment:"Chromium"}).verdict==="incomplete","One off-host participant must fail closed.");
+assert(buildGateBProofPack({providers:admitted.slice(0,1),report,events,mode:"live",chatChatVersion:"0.9.0",environment:"Chromium"}).verdict==="incomplete","Every real participant needs a frozen Provider proof row.");
 console.log("✓ ChatChat Browser House Gate B proof tests passed");
