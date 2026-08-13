@@ -1,1 +1,0 @@
-This branch makes the Chromium Browser Side Panel the primary ChatChat product gate and moves desktop bundle validation to manual experimental workflows. The durable architecture documentation lives in `docs/BROWSER_EXTENSION.md`; this small merge note may be removed after the browser-first transition is established in `main`.
