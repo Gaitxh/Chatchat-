@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  browser-product:
+  browser-consultation:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -23,11 +23,8 @@ jobs:
       - name: Type check
         run: npm run check
 
-      - name: Deterministic protocol and browser tests
+      - name: Deterministic protocol and consultation tests
         run: npm test
-
-      - name: Build web demo
-        run: npm run build:web
 
       - name: Build Browser Extension
         run: npm run build:extension
@@ -35,201 +32,115 @@ jobs:
       - name: Upload unpacked Browser Extension
         uses: actions/upload-artifact@v4
         with:
-          name: chatchat-browser-extension-unpacked
+          name: chatchat-ai-consultation-extension
           path: dist-extension/**
           if-no-files-found: error
           retention-days: 14
 
-      - name: Install screenshot fonts
+      - name: Install CJK screenshot fonts
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends fonts-noto-cjk
           fc-cache -f
 
-      - name: Start production previews
+      - name: Start production extension preview
         run: |
           mkdir -p artifacts
-          nohup npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/chatchat-preview.log 2>&1 &
           nohup python3 -m http.server 4180 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-extension-preview.log 2>&1 &
           for attempt in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:4173 >/dev/null && curl --fail --silent http://127.0.0.1:4180/manifest.json >/dev/null; then
+            if curl --fail --silent http://127.0.0.1:4180/manifest.json >/dev/null; then
               break
             fi
             sleep 1
           done
-          curl --fail http://127.0.0.1:4173 >/dev/null
           curl --fail http://127.0.0.1:4180/manifest.json >/dev/null
 
-      - name: Capture built web Council Chamber
+      - name: Capture Chinese consultation product
         run: |
           CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
-          if [ -z "$CHROME_BIN" ]; then
-            echo "No Chromium-compatible browser found on the runner."
-            exit 1
-          fi
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --hide-scrollbars \
-            --window-size=1440,1900 \
-            --screenshot=artifacts/chatchat-council-chamber.png \
-            http://127.0.0.1:4173
-          test -s artifacts/chatchat-council-chamber.png
-
-      - name: Capture deterministic Council Theater showcase
-        run: |
-          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_BIN"
+          URL='http://127.0.0.1:4180/extension/sidepanel.html?showcase=consultation&lang=zh'
           "$CHROME_BIN" \
             --headless=new \
             --no-sandbox \
             --disable-gpu \
             --hide-scrollbars \
             --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=24000 \
-            --window-size=1440,3400 \
-            --screenshot=artifacts/chatchat-council-theater.png \
-            'http://127.0.0.1:4173/?showcase=theater'
-          test -s artifacts/chatchat-council-theater.png
-
-      - name: Capture fresh Browser Extension 10-seat House showcase
-        run: |
-          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
-          EXTENSION_SHOWCASE='http://127.0.0.1:4180/extension/sidepanel.html?showcase=1'
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --hide-scrollbars \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=24000 \
-            --window-size=440,1650 \
-            --screenshot=artifacts/chatchat-extension-sidepanel.png \
-            "$EXTENSION_SHOWCASE"
-          test -s artifacts/chatchat-extension-sidepanel.png
-
+            --virtual-time-budget=16000 \
+            --window-size=440,2200 \
+            --screenshot=artifacts/chatchat-consultation-zh.png \
+            "$URL"
           "$CHROME_BIN" \
             --headless=new \
             --no-sandbox \
             --disable-gpu \
             --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=24000 \
+            --virtual-time-budget=16000 \
             --dump-dom \
-            "$EXTENSION_SHOWCASE" > artifacts/chatchat-extension-sidepanel.html
+            "$URL" > artifacts/chatchat-consultation-zh.html
+          test -s artifacts/chatchat-consultation-zh.png
+          grep -q 'data-chatchat-consultation-showcase="complete"' artifacts/chatchat-consultation-zh.html
+          grep -q '用户发起提案' artifacts/chatchat-consultation-zh.html
+          grep -q '平等 AI 参与者' artifacts/chatchat-consultation-zh.html
+          grep -q '没有议长' artifacts/chatchat-consultation-zh.html
+          grep -q '协商结果' artifacts/chatchat-consultation-zh.html
+          grep -q 'Browser Extension' artifacts/chatchat-consultation-zh.html
 
-          grep -q 'HOUSE VERDICT' artifacts/chatchat-extension-sidepanel.html
-          grep -q '×5' artifacts/chatchat-extension-sidepanel.html
-          grep -q '6/10' artifacts/chatchat-extension-sidepanel.html
-          grep -q '1/2' artifacts/chatchat-extension-sidepanel.html
-          grep -q '5/5 ready' artifacts/chatchat-extension-sidepanel.html
-          grep -q 'DETERMINISTIC 10-SEAT HOUSE SHOWCASE' artifacts/chatchat-extension-sidepanel.html
-          ! grep -q "Cannot read properties of undefined" artifacts/chatchat-extension-sidepanel.html
-
-      - name: Capture Summon the House showcase
+      - name: Capture English consultation product
         run: |
           CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
-          SUMMON_SHOWCASE='http://127.0.0.1:4180/extension/sidepanel.html?showcase=summon'
+          URL='http://127.0.0.1:4180/extension/sidepanel.html?showcase=consultation&lang=en'
           "$CHROME_BIN" \
             --headless=new \
             --no-sandbox \
             --disable-gpu \
             --hide-scrollbars \
             --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=6000 \
-            --window-size=440,1050 \
-            --screenshot=artifacts/chatchat-extension-summon-house.png \
-            "$SUMMON_SHOWCASE"
-          test -s artifacts/chatchat-extension-summon-house.png
-
+            --virtual-time-budget=16000 \
+            --window-size=440,2200 \
+            --screenshot=artifacts/chatchat-consultation-en.png \
+            "$URL"
           "$CHROME_BIN" \
             --headless=new \
             --no-sandbox \
             --disable-gpu \
             --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=6000 \
+            --virtual-time-budget=16000 \
             --dump-dom \
-            "$SUMMON_SHOWCASE" > artifacts/chatchat-extension-summon-house.html
-          test -s artifacts/chatchat-extension-summon-house.html
+            "$URL" > artifacts/chatchat-consultation-en.html
+          test -s artifacts/chatchat-consultation-en.png
+          grep -q 'data-chatchat-consultation-showcase="complete"' artifacts/chatchat-consultation-en.html
+          grep -q 'Propose once' artifacts/chatchat-consultation-en.html
+          grep -q 'Equal AI participants' artifacts/chatchat-consultation-en.html
+          grep -qi 'no chair' artifacts/chatchat-consultation-en.html
+          grep -q 'CONSULTATION OUTCOME' artifacts/chatchat-consultation-en.html
+          grep -q 'Browser Extension' artifacts/chatchat-consultation-en.html
 
-      - name: Upload Summon the House evidence
-        if: always()
+      - name: Enforce equal-consultation product language
+        run: |
+          for page in artifacts/chatchat-consultation-zh.html artifacts/chatchat-consultation-en.html; do
+            ! grep -q "KING'S COMMAND" "$page"
+            ! grep -q 'AI HOUSE' "$page"
+            ! grep -q 'HOUSE VERDICT' "$page"
+            ! grep -qi 'Delegation' "$page"
+            ! grep -q '众议院' "$page"
+          done
+
+      - name: Validate extension manifest product identity
+        run: |
+          grep -q 'ChatChat — AI Consultation' dist-extension/manifest.json
+          grep -q 'optional_host_permissions' dist-extension/manifest.json
+          ! grep -q 'AI Council' dist-extension/manifest.json
+          ! grep -q 'Parliament' dist-extension/manifest.json
+
+      - name: Upload bilingual product evidence
         uses: actions/upload-artifact@v4
         with:
-          name: chatchat-extension-summon-house
+          name: chatchat-ai-consultation-showcase
           path: |
-            artifacts/chatchat-extension-summon-house.png
-            artifacts/chatchat-extension-summon-house.html
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Assert Summon the House trust boundary
-        run: |
-          grep -q 'id="chatchat-summon-house"' artifacts/chatchat-extension-summon-house.html
-          grep -q 'data-summon-candidates="7"' artifacts/chatchat-extension-summon-house.html
-          grep -q 'data-summon-trust="unverified"' artifacts/chatchat-extension-summon-house.html
-          grep -q 'data-summon-action="attach-only"' artifacts/chatchat-extension-summon-house.html
-          grep -q 'data-chatchat-summon-showcase="booted"' artifacts/chatchat-extension-summon-house.html
-          grep -q 'SUMMON THE HOUSE' artifacts/chatchat-extension-summon-house.html
-          grep -q '新席位仍需 Test + Gate' artifacts/chatchat-extension-summon-house.html
-
-      - name: Capture Community Recipe preview showcase
-        run: |
-          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
-          RECIPE_SHOWCASE='http://127.0.0.1:4180/extension/sidepanel.html?showcase=recipe'
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --hide-scrollbars \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=8000 \
-            --window-size=620,1250 \
-            --screenshot=artifacts/chatchat-extension-community-recipe.png \
-            "$RECIPE_SHOWCASE"
-          test -s artifacts/chatchat-extension-community-recipe.png
-
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=8000 \
-            --dump-dom \
-            "$RECIPE_SHOWCASE" > artifacts/chatchat-extension-community-recipe.html
-          test -s artifacts/chatchat-extension-community-recipe.html
-
-      - name: Upload Community Recipe evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: chatchat-extension-community-recipe
-          path: |
-            artifacts/chatchat-extension-community-recipe.png
-            artifacts/chatchat-extension-community-recipe.html
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Assert Community Recipe trust boundary
-        run: |
-          grep -q 'data-chatchat-recipe-showcase="booted"' artifacts/chatchat-extension-community-recipe.html
-          grep -q 'data-chatchat-recipe-preview="ready"' artifacts/chatchat-extension-community-recipe.html
-          grep -q 'id="chatchat-recipe-share"' artifacts/chatchat-extension-community-recipe.html
-          grep -q 'data-recipe-trust="map-only"' artifacts/chatchat-extension-community-recipe.html
-          grep -q 'data-recipe-import-effect="test-required"' artifacts/chatchat-extension-community-recipe.html
-          grep -q 'data-recipe-candidate-level="stable"' artifacts/chatchat-extension-community-recipe.html
-          grep -q 'data-recipe-candidate-trust="test-required"' artifacts/chatchat-extension-community-recipe.html
-          grep -q 'IMPORT · TEST REQUIRED' artifacts/chatchat-extension-community-recipe.html
-          grep -q 'capturedAt' artifacts/chatchat-extension-community-recipe.html
-          ! grep -q 'COUNCIL GATE ✓' artifacts/chatchat-extension-community-recipe.html
-
-      - name: Upload web and Browser product screenshots
-        uses: actions/upload-artifact@v4
-        with:
-          name: chatchat-browser-product-showcase
-          path: |
-            artifacts/chatchat-council-chamber.png
-            artifacts/chatchat-council-theater.png
-            artifacts/chatchat-extension-sidepanel.png
-            artifacts/chatchat-extension-sidepanel.html
+            artifacts/chatchat-consultation-zh.png
+            artifacts/chatchat-consultation-en.png
+            artifacts/chatchat-consultation-zh.html
+            artifacts/chatchat-consultation-en.html
           if-no-files-found: error
           retention-days: 14

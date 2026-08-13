@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "ChatChat — AI Council",
+  "name": "ChatChat — AI Consultation",
   "version": "0.9.0",
-  "description": "Your local AI Council. Attach logged-in AI tabs, ask once, and let the House debate.",
+  "description": "Attach logged-in AI tabs as equal participants. Propose once, then let independent AIs consult, challenge, revise, and form final positions locally in your browser.",
   "permissions": [
     "sidePanel",
     "storage",
@@ -18,7 +18,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Open ChatChat AI Council"
+    "default_title": "Open ChatChat AI Consultation"
   },
   "side_panel": {
     "default_path": "extension/sidepanel.html"

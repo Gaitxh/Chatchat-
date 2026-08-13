@@ -13,6 +13,14 @@ export default defineConfig({
   define: {
     __CHATCHAT_VERSION__: JSON.stringify(chatChatVersion),
   },
+  resolve: {
+    alias: [
+      {
+        find: "../provider-sdk/council-agent.js",
+        replacement: path.resolve("src/extension/consultation-wire.ts"),
+      },
+    ],
+  },
   build: {
     outDir: "dist-extension",
     emptyOutDir: true,
