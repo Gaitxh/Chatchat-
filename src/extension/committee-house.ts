@@ -15,6 +15,8 @@ const MODE_KEY = "chatchat.extension.parliament-mode.v1";
 const PATCH_MARKER = "__CHATCHAT_COMMITTEE_PARLIAMENT_V1__";
 const PANEL_ID = "chatchat-committee-parliament";
 const STYLE_ID = "chatchat-committee-parliament-style";
+const FORCE_COMMITTEE_SHOWCASE =
+  new URLSearchParams(location.search).get("committee") === "1";
 
 type ParliamentMode = "free" | "committee";
 
@@ -28,7 +30,7 @@ interface StoredSeat {
 }
 
 const runtime = globalThis as typeof globalThis & Record<string, unknown>;
-let mode: ParliamentMode = "free";
+let mode: ParliamentMode = FORCE_COMMITTEE_SHOWCASE ? "committee" : "free";
 let armed = false;
 let activePlan: CommitteePlan | null = null;
 let assignmentByActor = new Map<string, CouncilParticipant>();
@@ -42,6 +44,11 @@ if (!runtime[PATCH_MARKER]) {
 }
 
 async function hydrateMode() {
+  if (FORCE_COMMITTEE_SHOWCASE) {
+    mode = "committee";
+    renderPanel();
+    return;
+  }
   try {
     const state = await chrome.storage.local.get(MODE_KEY);
     mode = state[MODE_KEY] === "committee" ? "committee" : "free";
@@ -246,7 +253,7 @@ function renderPanel() {
 }
 
 async function setMode(next: ParliamentMode) {
-  if (armed) return;
+  if (armed || FORCE_COMMITTEE_SHOWCASE) return;
   mode = next;
   activePlan = null;
   assignmentByActor = new Map();
