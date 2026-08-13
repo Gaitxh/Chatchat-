@@ -8,6 +8,7 @@ import type {
   CouncilParticipant,
   CouncilReport,
   CouncilRunOptions,
+  CouncilToolFact,
 } from "./types.js";
 
 const DEFAULT_MAX_ROUNDS = 3;
@@ -52,6 +53,7 @@ export class CouncilOrchestrator {
     const blackboard = new Blackboard();
 
     await options.onPhase?.({ phase: "sealed", round: 1 });
+    const sealedToolFacts = await this.#toolFactsFor(options, "sealed", 1, []);
 
     const sealed = await Promise.all(
       this.#agents.map(async (agent) => ({
@@ -65,6 +67,7 @@ export class CouncilOrchestrator {
             "sealed",
             1,
             [],
+            sealedToolFacts,
           ),
         ),
       })),
@@ -85,6 +88,7 @@ export class CouncilOrchestrator {
     for (let round = 2; round <= maxRounds; round += 1) {
       await options.onPhase?.({ phase: "debate", round });
       const snapshot = [...blackboard.events];
+      const toolFacts = await this.#toolFactsFor(options, "debate", round, snapshot);
       const turns = await Promise.all(
         this.#agents.map(async (agent) => ({
           agent,
@@ -97,6 +101,7 @@ export class CouncilOrchestrator {
               "debate",
               round,
               snapshot,
+              toolFacts,
             ),
           ),
         })),
@@ -130,6 +135,12 @@ export class CouncilOrchestrator {
     await options.onPhase?.({ phase: "final", round: finalRound });
 
     const finalSnapshot = [...blackboard.events];
+    const finalToolFacts = await this.#toolFactsFor(
+      options,
+      "final",
+      finalRound,
+      finalSnapshot,
+    );
     const finalTurns = await Promise.all(
       this.#agents.map(async (agent) => ({
         agent,
@@ -142,6 +153,7 @@ export class CouncilOrchestrator {
             "final",
             finalRound,
             finalSnapshot,
+            finalToolFacts,
           ),
         ),
       })),
@@ -176,6 +188,7 @@ export class CouncilOrchestrator {
     phase: CouncilContext["phase"],
     round: number,
     publicEvents: readonly CouncilEvent[],
+    toolFacts: readonly CouncilToolFact[],
   ): CouncilContext {
     return {
       sessionId,
@@ -185,7 +198,24 @@ export class CouncilOrchestrator {
       participant: agent.participant,
       publicEvents,
       ownEvents: blackboard.forActor(agent.participant.id),
+      ...(toolFacts.length ? { toolFacts } : {}),
     };
+  }
+
+  async #toolFactsFor(
+    options: CouncilRunOptions,
+    phase: CouncilContext["phase"],
+    round: number,
+    publicEvents: readonly CouncilEvent[],
+  ): Promise<readonly CouncilToolFact[]> {
+    if (!options.toolFactsProvider) return [];
+    try {
+      const result = await options.toolFactsProvider({ phase, round, publicEvents });
+      return [...result];
+    } catch (error) {
+      await options.onToolError?.(error);
+      return [];
+    }
   }
 
   #materialize(
