@@ -102,7 +102,7 @@ See the [Browser Extension guide](docs/BROWSER_EXTENSION.md) and [Consultation P
 
 **Now:** Browser-first bilingual consultation, structured Blackboard events, final reports, minority views, event provenance, Consultation Theater, and local replay.
 
-**In active work:** persistent [Consultation History](https://github.com/Gaitxh/Chatchat-/pull/52) and an [Evidence Layer](https://github.com/Gaitxh/Chatchat-/issues/53).
+**In active work:** [Consultation History](https://github.com/Gaitxh/Chatchat-/issues/57), [Evidence Layer](https://github.com/Gaitxh/Chatchat-/issues/53), [First Consultation Onboarding](https://github.com/Gaitxh/Chatchat-/issues/58), and [real two-Provider Browser validation](https://github.com/Gaitxh/Chatchat-/issues/12).
 
 ## Human-led, AI-assisted
 
