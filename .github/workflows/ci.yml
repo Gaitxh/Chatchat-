@@ -168,6 +168,17 @@ jobs:
           assert_dom 'Web + Extension' 'old stance'
           assert_dom 'Browser Extension' 'new stance'
 
+      - name: Upload English showcase debug
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-consultation-en-debug
+          path: |
+            artifacts/chatchat-consultation-en.png
+            artifacts/chatchat-consultation-en.html
+          if-no-files-found: warn
+          retention-days: 3
+
       - name: Enforce equal-consultation product language
         run: |
           for page in artifacts/chatchat-consultation-zh.html artifacts/chatchat-consultation-en.html; do
