@@ -64,7 +64,7 @@ export function useCouncilSession(realAgents: readonly CouncilAgent[] = []) {
     () => composeCouncil(realAgents),
     [realAgents],
   );
-  const participants = useMemo<readonly CouncilParticipant[]>(
+  const liveParticipants = useMemo<readonly CouncilParticipant[]>(
     () => councilComposition.agents.map((agent) => agent.participant),
     [councilComposition.agents],
   );
@@ -82,6 +82,16 @@ export function useCouncilSession(realAgents: readonly CouncilAgent[] = []) {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [resultSource, setResultSource] = useState<CouncilResultSource>(null);
   const [lastCompletedMode, setLastCompletedMode] = useState<CouncilRunMode | null>(null);
+
+  // Once a Council has a report, its participant roster belongs to that run.
+  // This keeps a completed LIVE Council and Chronicle replay stable even if the
+  // user's current Provider windows/seats change afterwards.
+  const participants = useMemo<readonly CouncilParticipant[]>(
+    () => report
+      ? report.positions.map((position) => position.participant)
+      : liveParticipants,
+    [liveParticipants, report],
+  );
 
   const refreshHistory = useCallback(async () => {
     try {
