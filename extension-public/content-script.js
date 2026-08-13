@@ -60,13 +60,20 @@
   }
 
   function probePage() {
+    const composer = bestComposer();
+    const send = composer ? bestSendButton(composer.element) : null;
     return {
       ...pageInfo(),
-      inputs: document.querySelectorAll("input,textarea,[contenteditable='true']").length,
+      inputs: document.querySelectorAll(
+        "input,textarea,[contenteditable]:not([contenteditable='false']),[role='textbox']",
+      ).length,
       buttons: document.querySelectorAll("button,[role='button']").length,
       assistantCandidates: document.querySelectorAll(
         "[data-message-author-role='assistant'],[data-testid*='assistant'],[data-role*='assistant'],[class*='assistant']",
       ).length,
+      composerScore: composer?.score ?? 0,
+      sendScore: send?.score ?? 0,
+      interactionReady: Boolean(composer && composer.score >= 35 && send && send.score >= 42),
     };
   }
 
@@ -105,8 +112,15 @@
       composer,
       baselineExpectedCount,
       timeoutMs,
+      prompt,
     );
     const responseSelector = inferResponseSelector(response.element, composer);
+    const responseSnapshotAfterSetup = responseSnapshot(responseSelector);
+    const responseText = responseSignal(
+      responseSnapshotAfterSetup.lastText || response.text,
+      prompt,
+      "",
+    ) || response.text;
     const now = new Date().toISOString();
 
     return {
@@ -118,7 +132,7 @@
         createdAt: startedAt,
         updatedAt: now,
       },
-      responseText: response.text,
+      responseText,
       elapsedMs: response.elapsedMs,
       diagnostics: {
         mode: "automatic",
@@ -132,7 +146,7 @@
   function bestComposer() {
     const candidates = [
       ...document.querySelectorAll(
-        "textarea,[contenteditable='true'],input:not([type='password']):not([type='hidden']):not([type='file'])",
+        "textarea,[contenteditable]:not([contenteditable='false']),[role='textbox'],input:not([type='password']):not([type='hidden']):not([type='file'])",
       ),
     ];
     let best = null;
@@ -147,6 +161,7 @@
       let score = 0;
       if (element instanceof HTMLTextAreaElement) score += 30;
       if (element.isContentEditable) score += 26;
+      if (element.getAttribute("role") === "textbox") score += 22;
       if (element instanceof HTMLInputElement) score += 12;
       if (/prompt|message|chat|ask|question|composer|send|输入|消息|提问|聊天|问/i.test(label)) score += 48;
       if (element.closest("main,[role='main']")) score += 10;
@@ -213,7 +228,7 @@
     );
   }
 
-  async function waitForExpectedResponse(expectedText, composer, baselineCount, timeoutMs) {
+  async function waitForExpectedResponse(expectedText, composer, baselineCount, timeoutMs, prompt) {
     const started = Date.now();
     let candidate = null;
     let candidateText = "";
@@ -222,7 +237,7 @@
     while (Date.now() - started < timeoutMs) {
       const bodyText = document.body?.innerText ?? "";
       if (countTextOccurrences(bodyText, expectedText) > baselineCount) {
-        const element = findSmallestExpectedElement(expectedText, composer);
+        const element = findSmallestExpectedElement(expectedText, composer, prompt);
         if (element) {
           const text = visibleText(element);
           if (element !== candidate || text !== candidateText) {
@@ -232,7 +247,7 @@
           } else if (Date.now() - stableSince >= AUTO_STABLE_MS) {
             return {
               element,
-              text: expectedText,
+              text,
               elapsedMs: Date.now() - started,
             };
           }
@@ -243,7 +258,7 @@
     throw new Error("The AI page did not return the automatic ChatChat connection reply in time.");
   }
 
-  function findSmallestExpectedElement(expectedText, composer) {
+  function findSmallestExpectedElement(expectedText, composer, prompt) {
     const all = [...document.querySelectorAll("main *,[role='main'] *,article,[role='article'],body *")];
     let best = null;
     let bestLength = Number.POSITIVE_INFINITY;
@@ -252,6 +267,7 @@
       if (element === composer || element.contains(composer) || composer.contains(element)) continue;
       const text = visibleText(element);
       if (!text.includes(expectedText)) continue;
+      if (looksLikePromptEcho(text, prompt)) continue;
       if (text.length < bestLength) {
         best = element;
         bestLength = text.length;
@@ -446,7 +462,7 @@
     }
 
     const tag = element.tagName.toLowerCase();
-    const contentEditable = element.getAttribute("contenteditable") === "true";
+    const contentEditable = element instanceof HTMLElement && element.isContentEditable;
     if (role === "composer" && !contentEditable && tag !== "textarea" && tag !== "input") {
       throw new Error("Composer must be an input, textarea, or contenteditable element.");
     }
@@ -522,8 +538,8 @@
     while (Date.now() - started < timeoutMs) {
       const composer = safeQuery(recipe?.composerSelector);
       const send = safeQuery(recipe?.sendSelector);
-      const responseCount = safeQueryAll(recipe?.responseSelector).length;
-      if (composer && send && responseCount >= 0) {
+      const responseReady = selectorIsValid(recipe?.responseSelector);
+      if (composer && send && responseReady) {
         return { ready: true, elapsedMs: Date.now() - started };
       }
       await sleep(350);
@@ -592,7 +608,7 @@
   }
 
   function responseSignal(text, prompt, baselineText) {
-    const source = String(text ?? "");
+    const source = stripPromptEcho(String(text ?? ""), prompt);
     const open = "<CHATCHAT_COUNCIL_JSON>";
     const close = "</CHATCHAT_COUNCIL_JSON>";
     const start = source.lastIndexOf(open);
@@ -603,12 +619,40 @@
 
     const exact = prompt.match(/reply\s+with\s+exactly\s*:?\s*([A-Z0-9_-]{4,80})/i)?.[1];
     if (exact) {
-      const before = countTextOccurrences(String(baselineText ?? ""), exact);
+      const before = countTextOccurrences(stripPromptEcho(String(baselineText ?? ""), prompt), exact);
       const after = countTextOccurrences(source, exact);
       if (after > before) return exact;
       return "";
     }
     return source.trim();
+  }
+
+  function stripPromptEcho(source, prompt) {
+    const full = String(source ?? "");
+    const message = String(prompt ?? "").trim();
+    if (!message) return full;
+    if (full.includes(message)) return full.replace(message, "");
+
+    const fingerprint = promptFingerprint(message);
+    if (!fingerprint) return full;
+    const index = full.indexOf(fingerprint);
+    if (index < 0) return full;
+    return `${full.slice(0, index)}${full.slice(index + fingerprint.length)}`;
+  }
+
+  function looksLikePromptEcho(text, prompt) {
+    const source = String(text ?? "").trim();
+    const message = String(prompt ?? "").trim();
+    if (!source || !message) return false;
+    if (source.includes(message)) return true;
+    const fingerprint = promptFingerprint(message);
+    return Boolean(fingerprint && source.includes(fingerprint));
+  }
+
+  function promptFingerprint(prompt) {
+    const normalized = String(prompt ?? "").replace(/\s+/g, " ").trim();
+    if (normalized.length < 48) return normalized;
+    return normalized.slice(0, 96);
   }
 
   function fillComposer(element, text) {
@@ -662,6 +706,16 @@
       throw new Error(`Missing configured ${label} selector.`);
     }
     return selector.trim();
+  }
+
+  function selectorIsValid(selector) {
+    if (typeof selector !== "string" || !selector.trim()) return false;
+    try {
+      document.querySelectorAll(selector.trim());
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function safeQuery(selector) {
