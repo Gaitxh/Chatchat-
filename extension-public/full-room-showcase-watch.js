@@ -8,7 +8,9 @@
       const theater = document.querySelector(".consultation-theater");
       const history = document.querySelector(".history-entry");
       const evidence = document.querySelector(".evidence-ledger") || document.getElementById("evidence-root");
-      if (outcome && theater && history && evidence) {
+      const spectator = document.querySelector("#spectator-mode-root .spectator-buttons");
+      const spectatorMode = document.documentElement.dataset.spectatorMode;
+      if (outcome && theater && history && evidence && spectator && spectatorMode === "live") {
         document.documentElement.dataset.chatchatRoomShowcase = "complete";
         return;
       }
