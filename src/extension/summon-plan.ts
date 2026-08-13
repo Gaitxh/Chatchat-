@@ -33,6 +33,15 @@ export interface SummonPlan {
   ignoredHouseLimit: number;
 }
 
+export interface DelegationRepresentativePlan {
+  /** One default representative for every delegation not already seated. */
+  representatives: SummonCandidate[];
+  /** Extra already-open tabs that may be explicitly promoted into extra seats. */
+  reserveCandidates: SummonCandidate[];
+  /** Delegations already represented in the current House. */
+  alreadyRepresentedDelegationIds: string[];
+}
+
 /**
  * Build a deterministic, conservative bulk-summon plan.
  *
@@ -108,6 +117,63 @@ export function planOpenAiTabsForHouse(
   return plan;
 }
 
+/**
+ * Democratic Representative Congress default:
+ *
+ * - one model/provider origin = one delegation;
+ * - every delegation defaults to exactly one representative seat;
+ * - if a delegation already has any seat, bulk summon does not silently add
+ *   another one;
+ * - additional open tabs become reserve candidates and require an explicit
+ *   seat-count choice by the King.
+ */
+export function planDefaultDelegationRepresentatives(
+  plan: SummonPlan,
+  existingSeats: readonly SummonExistingSeat[],
+): DelegationRepresentativePlan {
+  const represented = new Set(
+    existingSeats.map((seat) => `${seat.providerId}@${seat.origin}`),
+  );
+  const chosen = new Set<string>();
+  const representatives: SummonCandidate[] = [];
+  const reserveCandidates: SummonCandidate[] = [];
+
+  for (const candidate of plan.candidates) {
+    if (represented.has(candidate.delegationId)) {
+      reserveCandidates.push(candidate);
+      continue;
+    }
+    if (chosen.has(candidate.delegationId)) {
+      reserveCandidates.push(candidate);
+      continue;
+    }
+    chosen.add(candidate.delegationId);
+    representatives.push(candidate);
+  }
+
+  return {
+    representatives,
+    reserveCandidates,
+    alreadyRepresentedDelegationIds: [...represented].sort(),
+  };
+}
+
+/**
+ * Default selection for Royal Onboarding. Exactly one candidate per not-yet-
+ * represented delegation is preselected. The King may then explicitly move a
+ * delegation quota to 0 or select additional tabs for ×2 / ×3 / ... seats.
+ */
+export function defaultRepresentativeTabIds(
+  plan: SummonPlan,
+  existingSeats: readonly SummonExistingSeat[],
+): Set<number> {
+  return new Set(
+    planDefaultDelegationRepresentatives(plan, existingSeats)
+      .representatives
+      .map((candidate) => candidate.tabId),
+  );
+}
+
 export function summarizeSummonPlan(plan: SummonPlan): string {
   if (!plan.candidates.length) return "没有发现新的、可自动召集的已知 AI 标签页。";
   const delegations = new Map<string, number>();
@@ -116,5 +182,14 @@ export function summarizeSummonPlan(plan: SummonPlan): string {
   }
   return [...delegations.entries()]
     .map(([name, count]) => `${name} ×${count}`)
+    .join(" · ");
+}
+
+export function summarizeDefaultRepresentatives(
+  representatives: readonly SummonCandidate[],
+): string {
+  if (!representatives.length) return "当前已没有缺席的已知 AI 代表团。";
+  return representatives
+    .map((candidate) => `${candidate.providerName} ×1`)
     .join(" · ");
 }
