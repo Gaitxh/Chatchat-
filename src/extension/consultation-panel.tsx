@@ -1,0 +1,949 @@
+import {
+  FormEvent,
+  StrictMode,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { createRoot } from "react-dom/client";
+import { CouncilOrchestrator } from "../core/orchestrator.js";
+import type {
+  CouncilAgent,
+  CouncilContext,
+  CouncilEvent,
+  CouncilParticipant,
+  CouncilReport,
+} from "../core/types.js";
+import {
+  MAX_CONSULTATION_PARTICIPANTS,
+  canJoinConsultation,
+  deriveConsultationOutcome,
+  equalParticipantDisplayName,
+  type ConsultationParticipantIdentity,
+} from "../consultation/equality.js";
+import {
+  MESSAGES,
+  normalizeLocale,
+  translate,
+  type Locale,
+  type MessageKey,
+} from "../i18n/index.js";
+import {
+  BrowserCouncilAgent,
+  buildProviderCouncilPrompt,
+  parseProviderCouncilResponse,
+} from "../provider-sdk/council-agent.js";
+import {
+  BUILT_IN_PROVIDER_MANIFESTS,
+  detectProviderUrl,
+} from "../provider-sdk/catalog.js";
+import {
+  adapterRecipeComplete,
+  applyTeachSelection,
+  createEmptyAdapterRecipe,
+  recipeProgress,
+  type AdapterRecipe,
+  type TeachRole,
+  type TeachSelection,
+} from "../provider-sdk/recipe.js";
+import type { ProviderProfile } from "../provider-sdk/types.js";
+import "./consultation-panel.css";
+
+declare const chrome: any;
+declare const __CHATCHAT_VERSION__: string;
+
+const RECIPES_KEY = "chatchat.extension.recipes.v1";
+const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
+const LOCALE_KEY = "chatchat.locale.v1";
+
+interface BrowserTab {
+  id?: number;
+  url?: string;
+  title?: string;
+  active?: boolean;
+  status?: string;
+}
+
+interface ExtensionParticipant extends ConsultationParticipantIdentity {
+  seatId: string;
+  url: string;
+  hostname: string;
+  startUrl: string;
+  createdByChatChat: boolean;
+}
+
+interface BridgeResponse<T> {
+  ok: boolean;
+  result?: T;
+  error?: string;
+}
+
+interface SpeechResult {
+  responseText: string;
+  elapsedMs: number;
+  responseCount?: number;
+  truncatedByTimeout?: boolean;
+}
+
+type ConsultationStage = "idle" | "sealed" | "debate" | "final" | "complete" | "error";
+type TestState = "idle" | "running" | "pass" | "fail";
+
+function ConsultationApp() {
+  const initialLocale = normalizeLocale(
+    typeof navigator === "undefined" ? "en" : navigator.language,
+  );
+  const [locale, setLocale] = useState<Locale>(initialLocale);
+  const [proposal, setProposal] = useState(() => MESSAGES[initialLocale].defaultProposal);
+  const [participants, setParticipants] = useState<ExtensionParticipant[]>([]);
+  const [recipes, setRecipes] = useState<Record<string, AdapterRecipe>>({});
+  const [tests, setTests] = useState<Record<string, TestState>>({});
+  const [gates, setGates] = useState<Record<string, TestState>>({});
+  const [candidateTabs, setCandidateTabs] = useState<BrowserTab[]>([]);
+  const [urlDraft, setUrlDraft] = useState("https://chatgpt.com/");
+  const [stage, setStage] = useState<ConsultationStage>("idle");
+  const [events, setEvents] = useState<CouncilEvent[]>([]);
+  const [report, setReport] = useState<CouncilReport | null>(null);
+  const [activeActorId, setActiveActorId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const tr = (key: MessageKey, vars: Readonly<Record<string, string | number>> = {}) =>
+    translate(locale, key, vars);
+
+  useEffect(() => {
+    void hydrate();
+    void refreshCandidateTabs();
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
+
+  const readyParticipants = useMemo(
+    () => participants.filter((item) => isParticipantReady(item, recipes, tests, gates)),
+    [participants, recipes, tests, gates],
+  );
+  const outcome = useMemo(
+    () => (report ? deriveConsultationOutcome(report, events) : null),
+    [report, events],
+  );
+
+  async function hydrate() {
+    try {
+      const stored = await chrome.storage.local.get([RECIPES_KEY, LOCALE_KEY]);
+      setRecipes(stored[RECIPES_KEY] ?? {});
+      if (stored[LOCALE_KEY]) {
+        const nextLocale = normalizeLocale(stored[LOCALE_KEY]);
+        setLocale(nextLocale);
+        setProposal((current) =>
+          current === MESSAGES[initialLocale].defaultProposal
+            ? MESSAGES[nextLocale].defaultProposal
+            : current,
+        );
+      }
+
+      const sessionStore = chrome.storage.session ?? chrome.storage.local;
+      const participantState = await sessionStore.get(PARTICIPANTS_KEY);
+      const restored = Array.isArray(participantState[PARTICIPANTS_KEY])
+        ? (participantState[PARTICIPANTS_KEY] as ExtensionParticipant[])
+        : [];
+      const alive: ExtensionParticipant[] = [];
+      for (const participant of restored) {
+        try {
+          const tab = await chrome.tabs.get(participant.tabId);
+          if (tab?.id && tab?.url) {
+            alive.push({ ...participant, url: tab.url });
+          }
+        } catch {
+          // Browser tab ids are runtime-local; stale participants disappear.
+        }
+      }
+      setParticipants(dedupeByOrigin(alive));
+      await persistParticipants(dedupeByOrigin(alive));
+    } catch (caught) {
+      setError(message(caught));
+    }
+  }
+
+  async function changeLocale(next: Locale) {
+    if (next === locale) return;
+    const oldDefault = MESSAGES[locale].defaultProposal;
+    setLocale(next);
+    setProposal((current) =>
+      current === oldDefault ? MESSAGES[next].defaultProposal : current,
+    );
+    await chrome.storage.local.set({ [LOCALE_KEY]: next });
+  }
+
+  async function refreshCandidateTabs() {
+    try {
+      const tabs: BrowserTab[] = await chrome.tabs.query({});
+      const known = tabs.filter((tab) => {
+        if (!tab.id || !tab.url || !/^https?:/i.test(tab.url)) return false;
+        try {
+          return detectProviderUrl(tab.url).kind === "known";
+        } catch {
+          return false;
+        }
+      });
+      setCandidateTabs(known);
+    } catch (caught) {
+      setError(message(caught));
+    }
+  }
+
+  async function attachActiveTab() {
+    const [tab] = (await chrome.tabs.query({ active: true, currentWindow: true })) as BrowserTab[];
+    if (!tab?.id || !tab.url) {
+      setError(tr("invalidTab"));
+      return;
+    }
+    await attachTab(tab, false);
+  }
+
+  async function attachTab(tab: BrowserTab, createdByChatChat: boolean) {
+    if (!tab.id || !tab.url) return;
+    if (!/^https?:/i.test(tab.url)) {
+      setError(tr("httpOnly"));
+      return;
+    }
+    if (participants.some((item) => item.tabId === tab.id)) return;
+
+    setBusy(`attach:${tab.id}`);
+    setError(null);
+    try {
+      const detection = detectProviderUrl(tab.url);
+      const candidate: ConsultationParticipantIdentity = {
+        participantId: `extension:${detection.providerId}:${tab.id}`,
+        providerId: detection.providerId,
+        providerName: detection.displayName,
+        origin: detection.origin,
+        tabId: tab.id,
+      };
+      const join = canJoinConsultation(participants, candidate);
+      if (!join.ok) {
+        throw new Error(
+          join.reason === "duplicate-origin"
+            ? tr("duplicateParticipant")
+            : tr("maxParticipants", { count: MAX_CONSULTATION_PARTICIPANTS }),
+        );
+      }
+
+      await requestOriginPermission(detection.origin, locale);
+      await ensureBridge(tab.id);
+      const next: ExtensionParticipant = {
+        ...candidate,
+        seatId: candidate.participantId,
+        url: detection.normalizedUrl,
+        hostname: detection.hostname,
+        startUrl: detection.manifest?.defaultUrl ?? `${detection.origin}/`,
+        createdByChatChat,
+      };
+      const nextParticipants = [...participants, next];
+      setParticipants(nextParticipants);
+      await persistParticipants(nextParticipants);
+      await refreshCandidateTabs();
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function openUrl() {
+    const draft = urlDraft.trim();
+    if (!draft) return;
+    setBusy("open-url");
+    setError(null);
+    try {
+      const detection = detectProviderUrl(draft);
+      await chrome.tabs.create({ url: detection.normalizedUrl, active: true });
+      await refreshCandidateTabs();
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function removeParticipant(seatId: string) {
+    const next = participants.filter((item) => item.seatId !== seatId);
+    setParticipants(next);
+    setTests((current) => withoutKey(current, seatId));
+    setGates((current) => withoutKey(current, seatId));
+    await persistParticipants(next);
+  }
+
+  async function teachParticipant(participant: ExtensionParticipant, role: TeachRole) {
+    setBusy(`teach:${participant.seatId}:${role}`);
+    setError(null);
+    try {
+      await chrome.tabs.update(participant.tabId, { active: true });
+      await ensureBridge(participant.tabId);
+      const selection = await sendBridge<TeachSelection>(participant.tabId, {
+        type: "TEACH",
+        role,
+      });
+      const current = recipes[participant.origin] ?? createEmptyAdapterRecipe(participant.origin);
+      const nextRecipe = applyTeachSelection(current, participant.origin, selection);
+      const next = { ...recipes, [participant.origin]: nextRecipe };
+      setRecipes(next);
+      await chrome.storage.local.set({ [RECIPES_KEY]: next });
+      setTests((currentTests) => withoutKey(currentTests, participant.seatId));
+      setGates((currentGates) => withoutKey(currentGates, participant.seatId));
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function verifyParticipant(participant: ExtensionParticipant) {
+    const recipe = recipes[participant.origin];
+    if (!adapterRecipeComplete(recipe)) {
+      setError(tr("needSetup"));
+      return;
+    }
+
+    setBusy(`verify:${participant.seatId}`);
+    setError(null);
+    setTests((current) => ({ ...current, [participant.seatId]: "running" }));
+    setGates((current) => ({ ...current, [participant.seatId]: "idle" }));
+    try {
+      await ensureBridge(participant.tabId);
+      const speech = await sendBridge<SpeechResult>(participant.tabId, {
+        type: "RUN_SPEECH",
+        recipe,
+        prompt: "ChatChat connection test. Reply with exactly CHATCHAT_READY and nothing else.",
+        timeoutMs: 90_000,
+      });
+      if (!speech.responseText.toLocaleUpperCase().includes("CHATCHAT_READY")) {
+        throw new Error("Connection test did not return CHATCHAT_READY.");
+      }
+      setTests((current) => ({ ...current, [participant.seatId]: "pass" }));
+      setGates((current) => ({ ...current, [participant.seatId]: "running" }));
+      await verifyConsultationProtocol(participant, recipe);
+      setGates((current) => ({ ...current, [participant.seatId]: "pass" }));
+    } catch (caught) {
+      setTests((current) => ({
+        ...current,
+        [participant.seatId]: current[participant.seatId] === "pass" ? "pass" : "fail",
+      }));
+      setGates((current) => ({ ...current, [participant.seatId]: "fail" }));
+      setError(message(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function startConsultation(event: FormEvent) {
+    event.preventDefault();
+    if (!proposal.trim() || isRunningStage(stage)) return;
+    if (readyParticipants.length < 2) {
+      setError(tr("atLeastTwo"));
+      return;
+    }
+
+    setStage("sealed");
+    setEvents([]);
+    setReport(null);
+    setActiveActorId(null);
+    setError(null);
+    setBusy("consultation");
+
+    try {
+      const agents = readyParticipants.map((participant) =>
+        createTabConsultationAgent(participant, recipes[participant.origin]!),
+      );
+      const orchestrator = new CouncilOrchestrator(agents);
+      const result = await orchestrator.run(proposal.trim(), {
+        maxRounds: 3,
+        minDebateRounds: 1,
+        convergenceThreshold: 0.75,
+        onPhase: ({ phase }) => {
+          setStage(phase);
+          setActiveActorId(null);
+        },
+        onEvent: (consultationEvent) => {
+          setEvents((current) => [...current, consultationEvent]);
+          setActiveActorId(consultationEvent.actorId);
+        },
+      });
+      setReport(result.report);
+      setStage("complete");
+      setActiveActorId(null);
+    } catch (caught) {
+      setStage("error");
+      setError(message(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const stageText = stageLabel(stage, locale);
+  const readyCount = readyParticipants.length;
+
+  return (
+    <div className="consultation-app">
+      <header className="consultation-header">
+        <div className="consultation-brand">
+          <div className="consultation-logo">CC</div>
+          <div>
+            <strong>ChatChat</strong>
+            <span>{tr("appSubtitle")}</span>
+          </div>
+        </div>
+        <div className="consultation-header-actions">
+          <div className="locale-switch" aria-label={tr("language")}>
+            <button
+              type="button"
+              className={locale === "zh-CN" ? "is-active" : ""}
+              onClick={() => void changeLocale("zh-CN")}
+            >{tr("chinese")}</button>
+            <button
+              type="button"
+              className={locale === "en" ? "is-active" : ""}
+              onClick={() => void changeLocale("en")}
+            >{tr("english")}</button>
+          </div>
+          <span className="local-badge">{tr("local")}</span>
+        </div>
+      </header>
+
+      <section className="consultation-hero">
+        <div className="hero-orbit" aria-hidden="true">
+          <span>G</span><span>C</span><span>Gm</span><span>D</span>
+          <i>↔</i>
+        </div>
+        <h1>{tr("heroTitle").split("\n").map((line) => <span key={line}>{line}</span>)}</h1>
+        <p>{tr("heroBody")}</p>
+        <div className="principle-strip">{tr("independentPrinciple")}</div>
+      </section>
+
+      <section className="consultation-card participants-card">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">{tr("participantsKicker")}</span>
+            <h2>{tr("participantsTitle")}</h2>
+          </div>
+          <div className="participant-counter">
+            <b>{participants.length}</b>
+            <span>{tr("participantsCount", { count: participants.length })}</span>
+          </div>
+        </div>
+        <p className="section-description">{tr("participantRule")}</p>
+
+        {participants.length ? (
+          <div className="participant-list">
+            {participants.map((participant, index) => {
+              const recipe = recipes[participant.origin];
+              const ready = isParticipantReady(participant, recipes, tests, gates);
+              return (
+                <article className={`participant-row ${ready ? "is-ready" : ""}`} key={participant.seatId}>
+                  <div className="participant-avatar">{monogram(participant.providerName)}</div>
+                  <div className="participant-main">
+                    <div className="participant-title-line">
+                      <strong>{equalParticipantDisplayName(participant.providerName)}</strong>
+                      <span>{ready ? tr("ready") : tr("setupNeeded")}</span>
+                    </div>
+                    <small>{participant.hostname} · tab {participant.tabId}</small>
+                    <div className="participant-status-line">
+                      <span>{tr("statusTaught", { count: recipeProgress(recipe) })}</span>
+                      <span>{tr("statusVerified", {
+                        test: stateText(tests[participant.seatId], locale),
+                        gate: stateText(gates[participant.seatId], locale),
+                      })}</span>
+                    </div>
+                  </div>
+                  <div className="participant-row-actions">
+                    <button type="button" onClick={() => void chrome.tabs.update(participant.tabId, { active: true })}>{tr("open")}</button>
+                    <button type="button" onClick={() => void removeParticipant(participant.seatId)} disabled={Boolean(busy)}>{tr("remove")}</button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="consultation-empty">
+            <div className="empty-dots"><span>G</span><span>C</span><span>Q</span></div>
+            <strong>{tr("noParticipantsTitle")}</strong>
+            <p>{tr("noParticipantsBody")}</p>
+          </div>
+        )}
+
+        <div className="participant-actions">
+          <button className="primary-soft" type="button" onClick={() => void attachActiveTab()} disabled={Boolean(busy)}>{tr("attachActive")}</button>
+          <button className="secondary-soft" type="button" onClick={() => void refreshCandidateTabs()} disabled={Boolean(busy)}>{tr("refreshTabs")}</button>
+        </div>
+
+        <div className="url-opener">
+          <label htmlFor="consultation-url">{tr("addByUrl")}</label>
+          <div>
+            <input id="consultation-url" value={urlDraft} onChange={(event) => setUrlDraft(event.target.value)} placeholder={tr("addByUrlPlaceholder")} />
+            <button type="button" onClick={() => void openUrl()} disabled={Boolean(busy) || !urlDraft.trim()}>{tr("openAndAttach")}</button>
+          </div>
+        </div>
+
+        {candidateTabs.filter((tab) => tab.id && !participants.some((item) => item.tabId === tab.id)).length ? (
+          <div className="discovered-section">
+            <span className="eyebrow">{tr("discoveredTabs")}</span>
+            {candidateTabs
+              .filter((tab) => tab.id && !participants.some((item) => item.tabId === tab.id))
+              .slice(0, 6)
+              .map((tab) => (
+                <button type="button" className="discovered-tab" key={tab.id} onClick={() => void attachTab(tab, false)}>
+                  <span>{tab.title || tab.url}</span>
+                  <b>{tr("attach")}</b>
+                </button>
+              ))}
+          </div>
+        ) : null}
+      </section>
+
+      <form className="consultation-card proposal-card" onSubmit={startConsultation}>
+        <div className="section-heading compact">
+          <div>
+            <span className="eyebrow">{tr("proposalKicker")}</span>
+            <h2>{tr("proposalTitle")}</h2>
+          </div>
+          <span className={`stage-badge stage-${stage}`}>{stageText}</span>
+        </div>
+        <textarea
+          value={proposal}
+          onChange={(event) => setProposal(event.target.value)}
+          rows={5}
+          disabled={busy === "consultation"}
+          placeholder={tr("proposalPlaceholder")}
+        />
+        <div className="proposal-footer">
+          <span>{readyCount}/{participants.length} {tr("ready").toLocaleLowerCase()}</span>
+          <button className="start-button" type="submit" disabled={!proposal.trim() || Boolean(busy)}>
+            <span>{busy === "consultation" ? tr("consulting") : tr("startConsultation")}</span>
+            <b>{busy === "consultation" ? "···" : "→"}</b>
+          </button>
+        </div>
+      </form>
+
+      {stage !== "idle" ? (
+        <section className="consultation-card consultation-progress">
+          <div className="phase-track">
+            <Phase label={tr("phaseIndependent")} active={stage === "sealed"} done={["debate", "final", "complete"].includes(stage)} />
+            <i />
+            <Phase label={tr("phaseConsult")} active={stage === "debate"} done={["final", "complete"].includes(stage)} />
+            <i />
+            <Phase label={tr("phaseFinal")} active={stage === "final"} done={stage === "complete"} />
+          </div>
+          <div className="active-line">
+            <span className="activity-dot" />
+            {activeActorId
+              ? tr("participantSpeaking", { name: participantName(participants, activeActorId) })
+              : stage === "complete"
+                ? tr("consultationComplete")
+                : tr("waitingBatch")}
+          </div>
+        </section>
+      ) : null}
+
+      {events.length ? (
+        <section className="consultation-card shared-board-card">
+          <div className="section-heading compact">
+            <div><span className="eyebrow">BLACKBOARD</span><h2>{tr("sharedBoard")}</h2></div>
+            <span className="event-count">{events.length}</span>
+          </div>
+          <div className="consultation-events">
+            {events.slice(-14).map((item) => (
+              <article className={`consultation-event event-${item.kind}`} key={item.id}>
+                <div className="event-topline">
+                  <strong>{participantName(participants, item.actorId)}</strong>
+                  <span>{eventKindText(item.kind, locale)}</span>
+                  <small>R{item.round}</small>
+                </div>
+                <p>{truncate(item.content, 320)}</p>
+                {item.kind === "revision" ? <b className="changed-mind-badge">↻ {tr("eventRevision")}</b> : null}
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : stage !== "idle" ? (
+        <section className="consultation-card shared-board-card is-empty">
+          <h2>{tr("sharedBoard")}</h2><p>{tr("sharedBoardEmpty")}</p>
+        </section>
+      ) : null}
+
+      {report && outcome ? (
+        <section className="consultation-card outcome-card">
+          <span className="eyebrow">{tr("outcomeKicker")}</span>
+          <div className="outcome-hero">
+            <div>
+              <h2>{outcome.consensusStance ?? tr("noConsensus")}</h2>
+              <p>{tr("supportRatio", { ratio: Math.round(outcome.consensusRatio * 100) })}</p>
+            </div>
+            <div className="confidence-orb"><b>{Math.round(outcome.confidence * 100)}</b><span>{tr("confidence")}</span></div>
+          </div>
+          <p className="no-chair-note">{tr("noChairNote")}</p>
+
+          {outcome.changedMindCount ? (
+            <div className="changed-summary">↻ {tr("changedMinds", { count: outcome.changedMindCount })}</div>
+          ) : null}
+
+          <div className="final-position-list">
+            <h3>{tr("finalPositions")}</h3>
+            {outcome.finalPositions.map((position) => (
+              <article key={position.participant.id}>
+                <div><strong>{position.participant.name}</strong><span>{position.stance}</span></div>
+                <p>{truncate(position.content, 420)}</p>
+                <small>{Math.round(position.confidence * 100)}% {tr("confidence")}</small>
+              </article>
+            ))}
+          </div>
+
+          {report.disagreements.length ? (
+            <div className="minority-box">
+              <strong>{tr("minorityTitle")}</strong>
+              <span>{report.disagreements.map((item) => `${item.participant.name}: ${item.stance}`).join(" · ")}</span>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {error ? <div className="consultation-error" role="alert">{error}</div> : null}
+
+      <details className="consultation-card setup-card">
+        <summary><div><span className="eyebrow">SETUP</span><strong>{tr("advanced")}</strong></div><b>⌄</b></summary>
+        <div className="setup-body">
+          <p>{tr("advancedHint")}</p>
+          {participants.map((participant) => {
+            const recipe = recipes[participant.origin];
+            const ready = isParticipantReady(participant, recipes, tests, gates);
+            return (
+              <div className="setup-participant" key={participant.seatId}>
+                <div className="setup-title">
+                  <div><strong>{participant.providerName}</strong><small>{participant.hostname}</small></div>
+                  <span className={ready ? "is-pass" : ""}>{ready ? tr("verified") : `${recipeProgress(recipe)}/3`}</span>
+                </div>
+                <div className="teach-buttons">
+                  {(["composer", "send", "response"] as const).map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => void teachParticipant(participant, role)}
+                      disabled={Boolean(busy)}
+                      className={recipeFieldReady(recipe, role) ? "is-ready" : ""}
+                    >{teachText(role, locale)}</button>
+                  ))}
+                </div>
+                <button
+                  className={`verify-button ${ready ? "is-ready" : ""}`}
+                  type="button"
+                  disabled={Boolean(busy) || !adapterRecipeComplete(recipe)}
+                  onClick={() => void verifyParticipant(participant)}
+                >
+                  {ready ? `✓ ${tr("verified")}` : tr("verifyParticipant")}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </details>
+
+      {!participants.length ? (
+        <section className="quick-open">
+          <span>{tr("quickOpen")}</span>
+          <div>
+            {BUILT_IN_PROVIDER_MANIFESTS.map((provider) => (
+              <button type="button" key={provider.id} onClick={() => {
+                setUrlDraft(provider.defaultUrl);
+                void chrome.tabs.create({ url: provider.defaultUrl, active: true });
+              }}>
+                {provider.displayName}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="privacy-card">
+        <strong>{tr("privacyTitle")}</strong>
+        <p>{tr("privacyBody")}</p>
+      </section>
+
+      <footer className="consultation-footer">
+        <span>ChatChat {__CHATCHAT_VERSION__}</span>
+        <span>{tr("footerPrivacy")}</span>
+      </footer>
+    </div>
+  );
+
+  async function persistParticipants(next: ExtensionParticipant[]) {
+    const store = chrome.storage.session ?? chrome.storage.local;
+    await store.set({ [PARTICIPANTS_KEY]: next });
+  }
+}
+
+function Phase({ label, active, done }: { label: string; active: boolean; done: boolean }) {
+  return (
+    <div className={`phase-item ${active ? "is-active" : ""} ${done ? "is-done" : ""}`}>
+      <span>{done ? "✓" : active ? "•" : ""}</span><b>{label}</b>
+    </div>
+  );
+}
+
+function createTabConsultationAgent(
+  participant: ExtensionParticipant,
+  recipe: AdapterRecipe,
+): CouncilAgent {
+  const profile = profileForParticipant(participant);
+  const participantRecipe: AdapterRecipe = { ...recipe, profileId: participant.seatId };
+  const inner = new BrowserCouncilAgent(
+    profile,
+    participantRecipe,
+    async (_profile, currentRecipe, prompt) => {
+      await ensureBridge(participant.tabId);
+      const result = await sendBridge<SpeechResult>(participant.tabId, {
+        type: "RUN_SPEECH",
+        recipe: currentRecipe,
+        prompt,
+        timeoutMs: 120_000,
+      });
+      return { responseText: result.responseText, elapsedMs: result.elapsedMs };
+    },
+    async () => {
+      await chrome.tabs.update(participant.tabId, { url: participant.startUrl });
+      await waitForTabComplete(participant.tabId, 35_000);
+      await ensureBridge(participant.tabId);
+      await sendBridge(participant.tabId, {
+        type: "AWAIT_RECIPE",
+        recipe: participantRecipe,
+        timeoutMs: 35_000,
+      });
+    },
+  );
+  return {
+    participant: participantForExtension(participant),
+    respond: (context) => inner.respond(context),
+  };
+}
+
+async function verifyConsultationProtocol(
+  participant: ExtensionParticipant,
+  recipe: AdapterRecipe,
+): Promise<void> {
+  await ensureBridge(participant.tabId);
+  const context: CouncilContext = {
+    sessionId: `extension-consultation-gate:${participant.seatId}`,
+    question:
+      "Protocol handshake only. You are an equal participant in a ChatChat multi-AI consultation. If you can follow the requested structured format, return one argument whose stance is exactly READY. Otherwise use stance NOT_READY and explain why.",
+    phase: "sealed",
+    round: 1,
+    participant: participantForExtension(participant),
+    publicEvents: [],
+    ownEvents: [],
+  };
+  const prompt = buildProviderCouncilPrompt(context);
+  const result = await sendBridge<SpeechResult>(participant.tabId, {
+    type: "RUN_SPEECH",
+    recipe,
+    prompt,
+    timeoutMs: 90_000,
+  });
+  const contributions = parseProviderCouncilResponse(result.responseText, context);
+  const ready = contributions.some(
+    (item) => item.kind === "argument" && item.stance.trim().toLocaleLowerCase() === "ready",
+  );
+  if (!ready) throw new Error("Consultation protocol returned valid structured data but did not declare stance READY.");
+}
+
+function profileForParticipant(participant: ExtensionParticipant): ProviderProfile {
+  const now = new Date().toISOString();
+  return {
+    profileId: participant.seatId,
+    providerId: participant.providerId,
+    adapterId: "extension.tab",
+    displayName: equalParticipantDisplayName(participant.providerName),
+    url: participant.url,
+    origin: participant.origin,
+    profileKey: `tab:${participant.tabId}`,
+    authState: "ready",
+    seatState: "seated",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function participantForExtension(participant: ExtensionParticipant): CouncilParticipant {
+  return {
+    id: participant.seatId,
+    name: equalParticipantDisplayName(participant.providerName),
+    provider: participant.providerId,
+    role: "Independent AI Participant",
+  };
+}
+
+function isParticipantReady(
+  participant: ExtensionParticipant,
+  recipes: Readonly<Record<string, AdapterRecipe>>,
+  tests: Readonly<Record<string, TestState>>,
+  gates: Readonly<Record<string, TestState>>,
+): boolean {
+  return Boolean(
+    adapterRecipeComplete(recipes[participant.origin]) &&
+    tests[participant.seatId] === "pass" &&
+    gates[participant.seatId] === "pass",
+  );
+}
+
+async function ensureBridge(tabId: number) {
+  try {
+    await sendBridge(tabId, { type: "PING" });
+  } catch {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["content-script.js"] });
+    await sleep(80);
+    await sendBridge(tabId, { type: "PING" });
+  }
+}
+
+async function sendBridge<T = unknown>(
+  tabId: number,
+  payload: Record<string, unknown>,
+): Promise<T> {
+  const response = (await chrome.tabs.sendMessage(tabId, {
+    __chatchat: true,
+    ...payload,
+  })) as BridgeResponse<T>;
+  if (!response?.ok) throw new Error(response?.error || "Provider tab did not answer ChatChat.");
+  return response.result as T;
+}
+
+async function requestOriginPermission(origin: string, locale: Locale) {
+  const pattern = `${origin}/*`;
+  const descriptor = { origins: [pattern] };
+  if (await chrome.permissions.contains(descriptor)) return;
+  const granted = await chrome.permissions.request(descriptor);
+  if (!granted) {
+    throw new Error(translate(locale, "permissionDenied", { origin }));
+  }
+}
+
+async function waitForTabComplete(tabId: number, timeoutMs: number) {
+  const current = await chrome.tabs.get(tabId);
+  if (current.status === "complete") return;
+  await new Promise<void>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(listener);
+      reject(new Error("Timed out waiting for the AI tab to load."));
+    }, timeoutMs);
+    const listener = (updatedId: number, changeInfo: { status?: string }) => {
+      if (updatedId !== tabId || changeInfo.status !== "complete") return;
+      window.clearTimeout(timeout);
+      chrome.tabs.onUpdated.removeListener(listener);
+      resolve();
+    };
+    chrome.tabs.onUpdated.addListener(listener);
+  });
+}
+
+function recipeFieldReady(recipe: AdapterRecipe | undefined, role: TeachRole): boolean {
+  if (!recipe) return false;
+  if (role === "composer") return Boolean(recipe.composerSelector);
+  if (role === "send") return Boolean(recipe.sendSelector);
+  return Boolean(recipe.responseSelector);
+}
+
+function teachText(role: TeachRole, locale: Locale): string {
+  if (role === "composer") return translate(locale, "teachComposer");
+  if (role === "send") return translate(locale, "teachSend");
+  return translate(locale, "teachResponse");
+}
+
+function stateText(state: TestState | undefined, locale: Locale): string {
+  if (state === "pass") return translate(locale, "testStatePass");
+  if (state === "running") return translate(locale, "testStateRunning");
+  if (state === "fail") return translate(locale, "testStateFail");
+  return translate(locale, "testStateIdle");
+}
+
+function stageLabel(stage: ConsultationStage, locale: Locale): string {
+  if (stage === "sealed") return translate(locale, "stageSealed");
+  if (stage === "debate") return translate(locale, "stageDebate");
+  if (stage === "final") return translate(locale, "stageFinal");
+  if (stage === "complete") return translate(locale, "stageComplete");
+  if (stage === "error") return translate(locale, "stageError");
+  return translate(locale, "stageIdle");
+}
+
+function eventKindText(kind: CouncilEvent["kind"], locale: Locale): string {
+  const keys: Record<CouncilEvent["kind"], MessageKey> = {
+    argument: "eventArgument",
+    challenge: "eventChallenge",
+    evidence: "eventEvidence",
+    support: "eventSupport",
+    defense: "eventDefense",
+    revision: "eventRevision",
+    concede: "eventConcede",
+    question: "eventQuestion",
+    uncertain: "eventUncertain",
+    final_position: "eventFinal",
+  };
+  return translate(locale, keys[kind]);
+}
+
+function participantName(
+  participants: readonly ExtensionParticipant[],
+  actorId: string,
+): string {
+  return participants.find((item) => item.seatId === actorId)?.providerName ?? actorId;
+}
+
+function monogram(name: string): string {
+  if (/deepseek/i.test(name)) return "D";
+  if (/gemini/i.test(name)) return "Gm";
+  if (/claude/i.test(name)) return "C";
+  if (/qwen|通义/i.test(name)) return "Q";
+  if (/yuanbao|元宝/i.test(name)) return "Y";
+  if (/grok/i.test(name)) return "X";
+  if (/gpt/i.test(name)) return "G";
+  return name.slice(0, 2).toUpperCase();
+}
+
+function dedupeByOrigin(items: readonly ExtensionParticipant[]): ExtensionParticipant[] {
+  const seen = new Set<string>();
+  const result: ExtensionParticipant[] = [];
+  for (const item of items) {
+    const key = item.origin.toLocaleLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+  }
+  return result.slice(0, MAX_CONSULTATION_PARTICIPANTS);
+}
+
+function withoutKey<T>(record: Readonly<Record<string, T>>, key: string): Record<string, T> {
+  const next = { ...record };
+  delete next[key];
+  return next;
+}
+
+function isRunningStage(stage: ConsultationStage): boolean {
+  return stage === "sealed" || stage === "debate" || stage === "final";
+}
+
+function truncate(value: string, max: number): string {
+  const normalized = value.trim();
+  return normalized.length <= max ? normalized : `${normalized.slice(0, max)}…`;
+}
+
+function message(caught: unknown): string {
+  return caught instanceof Error ? caught.message : String(caught);
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+}
+
+const root = document.getElementById("extension-root");
+if (!root) throw new Error("ChatChat extension root is missing.");
+createRoot(root).render(
+  <StrictMode>
+    <ConsultationApp />
+  </StrictMode>,
+);
