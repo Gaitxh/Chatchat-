@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "ChatChat — AI Council",
+  "version": "0.1.0",
+  "minimum_chrome_version": "116",
+  "description": "Summon the AI tabs you are already logged into. Ask once. Let them debate.",
+  "permissions": ["sidePanel", "storage", "scripting"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Open ChatChat Council"
+  }
+}
