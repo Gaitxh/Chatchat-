@@ -92,7 +92,7 @@ jobs:
             'http://127.0.0.1:4173/?showcase=theater'
           test -s artifacts/chatchat-council-theater.png
 
-      - name: Capture fresh Browser Extension 10-seat House showcase
+      - name: Capture fresh Browser Extension 10-seat Congress showcase
         run: |
           CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
           EXTENSION_SHOWCASE='http://127.0.0.1:4180/extension/sidepanel.html?showcase=1'
@@ -117,6 +117,9 @@ jobs:
             --dump-dom \
             "$EXTENSION_SHOWCASE" > artifacts/chatchat-extension-sidepanel.html
 
+          grep -q 'AI 民主代表大会' artifacts/chatchat-extension-sidepanel.html
+          grep -q 'AI REPRESENTATIVE CONGRESS' artifacts/chatchat-extension-sidepanel.html
+          grep -q '席位配额' artifacts/chatchat-extension-sidepanel.html
           grep -q 'HOUSE VERDICT' artifacts/chatchat-extension-sidepanel.html
           grep -q '×5' artifacts/chatchat-extension-sidepanel.html
           grep -q '6/10' artifacts/chatchat-extension-sidepanel.html
@@ -125,7 +128,7 @@ jobs:
           grep -q 'DETERMINISTIC 10-SEAT HOUSE SHOWCASE' artifacts/chatchat-extension-sidepanel.html
           ! grep -q "Cannot read properties of undefined" artifacts/chatchat-extension-sidepanel.html
 
-      - name: Capture Summon the House showcase
+      - name: Capture Summon the Congress showcase
         run: |
           CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
           SUMMON_SHOWCASE='http://127.0.0.1:4180/extension/sidepanel.html?showcase=summon'
@@ -151,7 +154,7 @@ jobs:
             "$SUMMON_SHOWCASE" > artifacts/chatchat-extension-summon-house.html
           test -s artifacts/chatchat-extension-summon-house.html
 
-      - name: Upload Summon the House evidence
+      - name: Upload Summon the Congress evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -162,15 +165,18 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Assert Summon the House trust boundary
+      - name: Assert Summon the Congress trust and default-quota boundary
         run: |
           grep -q 'id="chatchat-summon-house"' artifacts/chatchat-extension-summon-house.html
           grep -q 'data-summon-candidates="7"' artifacts/chatchat-extension-summon-house.html
+          grep -q 'data-summon-default-quota="1"' artifacts/chatchat-extension-summon-house.html
+          grep -q 'data-summon-reserve-tabs="0"' artifacts/chatchat-extension-summon-house.html
           grep -q 'data-summon-trust="unverified"' artifacts/chatchat-extension-summon-house.html
           grep -q 'data-summon-action="attach-only"' artifacts/chatchat-extension-summon-house.html
           grep -q 'data-chatchat-summon-showcase="booted"' artifacts/chatchat-extension-summon-house.html
-          grep -q 'SUMMON THE HOUSE' artifacts/chatchat-extension-summon-house.html
-          grep -q '新席位仍需 Test + Gate' artifacts/chatchat-extension-summon-house.html
+          grep -q 'SUMMON THE CONGRESS' artifacts/chatchat-extension-summon-house.html
+          grep -q '默认每代表团 1 席' artifacts/chatchat-extension-summon-house.html
+          grep -q '更多席位可在代表团旁' artifacts/chatchat-extension-summon-house.html
 
       - name: Capture Community Recipe preview showcase
         run: |
