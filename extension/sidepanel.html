@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ChatChat · AI Council</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">C</div>
+          <div>
+            <strong>ChatChat</strong>
+            <span>AI Council</span>
+          </div>
+        </div>
+        <div class="local-badge"><i></i> Local</div>
+      </header>
+
+      <main>
+        <section class="command-card">
+          <div class="command-meta">
+            <span class="eyebrow">King's Command</span>
+            <span id="houseSummary" class="house-summary">0 delegations · 0 seats</span>
+          </div>
+          <textarea
+            id="questionInput"
+            rows="4"
+            placeholder="问一个值得讨论的问题……"
+            aria-label="King's Command"
+          ></textarea>
+          <div class="command-footer">
+            <div id="modeBadge" class="mode-badge">Roundtable</div>
+            <button id="conveneButton" class="primary-button" type="button">
+              开廷
+            </button>
+          </div>
+        </section>
+
+        <section id="phaseRail" class="phase-rail" aria-label="Council phases">
+          <span data-phase="sealed">独立思考</span>
+          <i></i>
+          <span data-phase="debate">公开廷议</span>
+          <i></i>
+          <span data-phase="final">最终表态</span>
+        </section>
+
+        <section class="section-block">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">The House</span>
+              <h2>你的智囊团</h2>
+            </div>
+            <button id="addToggle" class="ghost-button" type="button">+ 添加</button>
+          </div>
+
+          <div id="addPanel" class="add-panel" hidden>
+            <div class="preset-row" id="providerPresets"></div>
+            <div class="url-row">
+              <input
+                id="providerUrlInput"
+                type="url"
+                placeholder="或输入任意 AI 网站 URL"
+                autocomplete="off"
+              />
+              <button id="addProviderButton" type="button">加入</button>
+            </div>
+            <p>
+              添加时只申请这个 AI 网站的权限。ChatChat 不读取 Cookie、密码或浏览历史。
+            </p>
+          </div>
+
+          <div id="delegationList" class="delegation-list"></div>
+          <div id="emptyHouse" class="empty-state">
+            <div class="empty-orbit" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
+            <strong>把 AI 召进议会</strong>
+            <p>一个模型可以拥有多个独立席位。每个席位会使用独立临时会话。</p>
+            <button id="emptyAddButton" type="button">添加第一位智囊</button>
+          </div>
+        </section>
+
+        <section id="debateSection" class="section-block debate-section" hidden>
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Live Council</span>
+              <h2>议政板</h2>
+            </div>
+            <span id="eventCount" class="counter-pill">0</span>
+          </div>
+          <div id="eventFeed" class="event-feed"></div>
+        </section>
+
+        <section id="reportSection" class="report-card" hidden>
+          <span class="eyebrow">Council Report</span>
+          <div class="report-answer">
+            <div>
+              <small>最终结论</small>
+              <h2 id="reportStance">—</h2>
+            </div>
+            <div id="reportConsensus" class="consensus-ring">0%</div>
+          </div>
+          <div id="delegationResults" class="delegation-results"></div>
+          <div id="minorityReport" class="minority-report" hidden></div>
+        </section>
+
+        <section class="privacy-note">
+          <strong>No ChatChat server.</strong>
+          <span>数据留在浏览器；你选择的 AI 仍会收到你主动发给它的 Council 内容。</span>
+        </section>
+      </main>
+
+      <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    </div>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>
