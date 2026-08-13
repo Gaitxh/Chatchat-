@@ -7,6 +7,7 @@ import type {
   CouncilReport,
   CouncilRunOptions,
 } from "../core/types.js";
+import type { ConsultationArchive } from "../history/consultation-history.js";
 import { normalizeLocale, type Locale } from "../i18n/index.js";
 import { ConsultationTheater } from "./components/ConsultationTheater.js";
 import { LiveMoments } from "./components/LiveMoments.js";
@@ -14,7 +15,8 @@ import "./consultation-theater-portal.css";
 
 const LIVE_EVENT = "chatchat:consultation-live";
 const COMPLETE_EVENT = "chatchat:consultation-complete";
-const PATCH_MARKER = "__chatchatConsultationTheaterObserverV2" as const;
+const OPEN_ARCHIVE_EVENT = "chatchat:consultation-open-archive";
+const PATCH_MARKER = "__chatchatConsultationTheaterObserverV3" as const;
 
 interface ConsultationLiveDetail {
   participants: CouncilParticipant[];
@@ -26,6 +28,10 @@ interface ConsultationCompletionDetail {
   events: CouncilEvent[];
 }
 
+interface OpenArchiveDetail {
+  archive: ConsultationArchive;
+}
+
 type ObservablePrototype = typeof CouncilOrchestrator.prototype & {
   [PATCH_MARKER]?: true;
 };
@@ -35,6 +41,7 @@ installReadOnlyObserver();
 function ConsultationTheaterPortal() {
   const [live, setLive] = useState<ConsultationLiveDetail | null>(null);
   const [completion, setCompletion] = useState<ConsultationCompletionDetail | null>(null);
+  const [archiveMode, setArchiveMode] = useState(false);
   const [locale, setLocale] = useState<Locale>(() => normalizeLocale(document.documentElement.lang));
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
@@ -43,18 +50,33 @@ function ConsultationTheaterPortal() {
       const detail = (event as CustomEvent<ConsultationLiveDetail>).detail;
       if (!Array.isArray(detail?.participants) || !Array.isArray(detail?.events)) return;
       setLive({ participants: [...detail.participants], events: [...detail.events] });
+      setCompletion(null);
+      setArchiveMode(false);
+      setSelectedEventId(null);
     };
     const onComplete = (event: Event) => {
       const detail = (event as CustomEvent<ConsultationCompletionDetail>).detail;
       if (!detail?.report || !Array.isArray(detail.events)) return;
       setCompletion({ report: detail.report, events: [...detail.events] });
+      setArchiveMode(false);
+      setSelectedEventId(null);
+    };
+    const onArchive = (event: Event) => {
+      const detail = (event as CustomEvent<OpenArchiveDetail>).detail;
+      const archive = detail?.archive;
+      if (!archive?.report || !Array.isArray(archive.events)) return;
+      setLive(null);
+      setCompletion({ report: archive.report, events: [...archive.events] });
+      setArchiveMode(true);
       setSelectedEventId(null);
     };
     window.addEventListener(LIVE_EVENT, onLive);
     window.addEventListener(COMPLETE_EVENT, onComplete);
+    window.addEventListener(OPEN_ARCHIVE_EVENT, onArchive);
     return () => {
       window.removeEventListener(LIVE_EVENT, onLive);
       window.removeEventListener(COMPLETE_EVENT, onComplete);
+      window.removeEventListener(OPEN_ARCHIVE_EVENT, onArchive);
     };
   }, []);
 
@@ -111,6 +133,12 @@ function ConsultationTheaterPortal() {
   const participants = completion.report.positions.map((position) => position.participant);
   return (
     <div className="consultation-theater-portal">
+      {archiveMode ? (
+        <div className="archive-replay-banner">
+          <b>↺ {locale === "zh-CN" ? "历史回放" : "ARCHIVE REPLAY"}</b>
+          <span>{locale === "zh-CN" ? "只读取本地保存的事件，不会重新调用任何 AI。" : "Reads saved local events only. No AI provider is called again."}</span>
+        </div>
+      ) : null}
       <ConsultationTheater
         participants={participants}
         events={completion.events}
