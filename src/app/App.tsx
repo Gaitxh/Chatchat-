@@ -3,6 +3,7 @@ import avatarUrl from "../../assets/chatchat-avatar-pixel.png";
 import { captureProviderProofSnapshot, type ProviderProofSnapshot } from "../validation/proof-pack.js";
 import { AdvisorDock } from "./components/AdvisorDock.js";
 import { CouncilReportPanel } from "./components/CouncilReportPanel.js";
+import { CouncilTheater } from "./components/CouncilTheater.js";
 import { DemoTheater } from "./components/DemoTheater.js";
 import { EventFeed } from "./components/EventFeed.js";
 import { GateBProofPanel } from "./components/GateBProofPanel.js";
@@ -51,12 +52,18 @@ export default function App() {
     if (archive) setQuestion(archive.question);
   };
 
-  const modeLabel =
-    council.mode === "live"
-      ? `🔥 LIVE · ${providers.liveSeatCount} HEALTHY REAL`
-      : council.mode === "hybrid"
-        ? "⚗️ HYBRID · 1 HEALTHY REAL"
-        : "🎭 DEMO · MOCK";
+  const viewMode = council.report
+    ? council.lastCompletedMode ?? council.mode
+    : council.mode;
+  const modeLabel = council.resultSource === "archive"
+    ? `📚 ARCHIVE · ${viewMode.toUpperCase()}`
+    : council.report
+      ? `🏛️ RESULT · ${viewMode.toUpperCase()}`
+      : council.mode === "live"
+        ? `🔥 LIVE · ${providers.liveSeatCount} HEALTHY REAL`
+        : council.mode === "hybrid"
+          ? "⚗️ HYBRID · 1 HEALTHY REAL"
+          : "🎭 DEMO · MOCK";
 
   return (
     <div className="app-shell">
@@ -67,8 +74,8 @@ export default function App() {
         </div>
         <div className="topbar-center">
           <span className="motto">YOU ASK · THEY DEBATE</span>
-          <span className="build-badge">v1 READINESS · GATE B PROOF</span>
-          <span className={`build-badge council-mode-badge council-mode-badge--${council.mode}`}>{modeLabel}</span>
+          <span className="build-badge">v1 READINESS · THEATER + PROOF</span>
+          <span className={`build-badge council-mode-badge council-mode-badge--${viewMode}`}>{modeLabel}</span>
         </div>
         <div className="privacy-badge" title="ChatChat itself has no relay server"><i />LOCAL-FIRST</div>
       </header>
@@ -81,13 +88,21 @@ export default function App() {
             participants={council.participants}
             events={council.events}
             stage={council.stage}
-            mode={council.mode}
+            mode={viewMode}
             round={council.round}
             activeActorId={council.activeActorId}
             question={council.activeQuestion}
           />
 
           {council.report ? <CouncilReportPanel report={council.report} /> : null}
+
+          {council.report ? (
+            <CouncilTheater
+              participants={council.participants}
+              events={council.events}
+              report={council.report}
+            />
+          ) : null}
 
           <GateBProofPanel
             providerSnapshot={proofSnapshot}
@@ -194,7 +209,7 @@ export default function App() {
       <footer className="app-footer">
         <span>NO CHATCHAT SERVER</span><span>•</span>
         <span>ROUND 1 SEALED</span><span>•</span>
-        <span>WINDOW HEALTH ENFORCED</span><span>•</span>
+        <span>TRACEABLE INFLUENCE</span><span>•</span>
         <span>PROOF PACK EXCLUDES CONTENT</span><span>•</span>
         <span>{modeLabel}</span>
       </footer>
@@ -204,10 +219,10 @@ export default function App() {
 
 function commandCopy(mode: ReturnType<typeof useCouncilSession>["mode"], liveSeatCount: number): string {
   if (mode === "live") {
-    return `${liveSeatCount} 位健康真实网页智囊已经入席。你只下令一次；之后 sealed → debate → final 全自动执行。Council 结束后会生成不含正文的 Royal Proof Pack。`;
+    return `${liveSeatCount} 位健康真实网页智囊已经入席。你只下令一次；之后 sealed → debate → final 全自动执行。Council 结束后会生成可追溯 Theater 和不含正文的 Royal Proof Pack。`;
   }
   if (mode === "hybrid") {
     return "1 位健康真实网页智囊已入席：当前是 HYBRID REHEARSAL；再入席 1 位健康真实 AI 即解锁纯 LIVE COUNCIL。";
   }
-  return "当前没有健康真实席位，所以自动退回 deterministic Mock Demo。Demo 可以展示协议，但 Proof Pack 会明确标记为不可用于 Gate B。";
+  return "当前没有健康真实席位，所以自动退回 deterministic Mock Demo。Demo 可以展示完整 Theater；Proof Pack 会明确标记为不可用于 Gate B。";
 }
