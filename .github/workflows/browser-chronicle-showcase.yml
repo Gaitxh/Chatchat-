@@ -77,13 +77,17 @@ jobs:
             exit 1
           fi
           URL='http://127.0.0.1:4185/extension/sidepanel.html?showcase=chronicle'
+          # HOUSE VERDICT is intentionally no longer blocked on IndexedDB.
+          # Give the focused historian showcase a little more virtual event
+          # loop after Verdict so the fire-and-forget local transaction can
+          # settle, refresh the summary list and click REPLAY LOCALLY.
           "$CHROME_BIN" \
             --headless=new \
             --no-sandbox \
             --disable-gpu \
             --hide-scrollbars \
             --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=34000 \
+            --virtual-time-budget=48000 \
             --window-size=540,3200 \
             --screenshot=artifacts/chatchat-browser-court-chronicle.png \
             "$URL"
@@ -92,7 +96,7 @@ jobs:
             --no-sandbox \
             --disable-gpu \
             --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=34000 \
+            --virtual-time-budget=48000 \
             --dump-dom \
             "$URL" > artifacts/chatchat-browser-court-chronicle.html
           test -s artifacts/chatchat-browser-court-chronicle.png
