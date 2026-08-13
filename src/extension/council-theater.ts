@@ -72,16 +72,13 @@ function installCouncilCapture() {
 function installTheaterMount() {
   injectStyles();
   const mount = () => {
-    if (!snapshot) return;
+    if (!snapshot || document.getElementById(PANEL_ID)) return;
     const resultCard = document.querySelector(".result-card");
     if (!resultCard) return;
-    let panel = document.getElementById(PANEL_ID);
-    if (!panel) {
-      panel = document.createElement("section");
-      panel.id = PANEL_ID;
-      panel.className = "browser-theater";
-      resultCard.insertAdjacentElement("afterend", panel);
-    }
+    const panel = document.createElement("section");
+    panel.id = PANEL_ID;
+    panel.className = "browser-theater";
+    resultCard.insertAdjacentElement("afterend", panel);
     renderTheater();
   };
   mount();
