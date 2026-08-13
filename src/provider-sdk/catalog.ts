@@ -3,12 +3,14 @@ import type {
   ProviderDetection,
 } from "./types.js";
 
+const TAUGHT_BROWSER_VERSION = "0.9.0-taught-browser";
+
 export const BUILT_IN_PROVIDER_MANIFESTS: readonly ProviderAdapterManifest[] = [
   {
     id: "web.chatgpt",
     providerId: "openai-chatgpt",
     displayName: "ChatGPT",
-    version: "0.9.0-taught-browser",
+    version: TAUGHT_BROWSER_VERSION,
     domains: ["chatgpt.com"],
     defaultUrl: "https://chatgpt.com/",
     monogram: "G",
@@ -22,7 +24,7 @@ export const BUILT_IN_PROVIDER_MANIFESTS: readonly ProviderAdapterManifest[] = [
     id: "web.claude",
     providerId: "anthropic-claude",
     displayName: "Claude",
-    version: "0.9.0-taught-browser",
+    version: TAUGHT_BROWSER_VERSION,
     domains: ["claude.ai"],
     defaultUrl: "https://claude.ai/",
     monogram: "C",
@@ -36,9 +38,9 @@ export const BUILT_IN_PROVIDER_MANIFESTS: readonly ProviderAdapterManifest[] = [
     id: "web.gemini",
     providerId: "google-gemini",
     displayName: "Gemini",
-    version: "0.9.0-taught-browser",
+    version: TAUGHT_BROWSER_VERSION,
     domains: ["gemini.google.com"],
-    defaultUrl: "https://gemini.google.com/",
+    defaultUrl: "https://gemini.google.com/app",
     monogram: "Gm",
     capabilities: {
       webLogin: true,
@@ -50,10 +52,52 @@ export const BUILT_IN_PROVIDER_MANIFESTS: readonly ProviderAdapterManifest[] = [
     id: "web.deepseek",
     providerId: "deepseek-chat",
     displayName: "DeepSeek",
-    version: "0.9.0-taught-browser",
+    version: TAUGHT_BROWSER_VERSION,
     domains: ["chat.deepseek.com"],
     defaultUrl: "https://chat.deepseek.com/",
     monogram: "D",
+    capabilities: {
+      webLogin: true,
+      streaming: true,
+      councilTurns: true,
+    },
+  },
+  {
+    id: "web.yuanbao",
+    providerId: "tencent-yuanbao",
+    displayName: "Yuanbao · 元宝",
+    version: TAUGHT_BROWSER_VERSION,
+    domains: ["yuanbao.tencent.com"],
+    defaultUrl: "https://yuanbao.tencent.com/",
+    monogram: "Yb",
+    capabilities: {
+      webLogin: true,
+      streaming: true,
+      councilTurns: true,
+    },
+  },
+  {
+    id: "web.tongyi",
+    providerId: "alibaba-tongyi",
+    displayName: "Tongyi · 通义",
+    version: TAUGHT_BROWSER_VERSION,
+    domains: ["tongyi.aliyun.com"],
+    defaultUrl: "https://tongyi.aliyun.com/",
+    monogram: "Ty",
+    capabilities: {
+      webLogin: true,
+      streaming: true,
+      councilTurns: true,
+    },
+  },
+  {
+    id: "web.grok",
+    providerId: "xai-grok",
+    displayName: "Grok",
+    version: TAUGHT_BROWSER_VERSION,
+    domains: ["grok.com"],
+    defaultUrl: "https://grok.com/",
+    monogram: "X",
     capabilities: {
       webLogin: true,
       streaming: true,
