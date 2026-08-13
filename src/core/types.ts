@@ -25,6 +25,12 @@ export interface CouncilParticipant {
   seatIndex?: number;
   /** Configured delegation size at the moment this Council was created. */
   seatCount?: number;
+  /** Optional neutral investigative assignment in Committee Parliament mode. */
+  committeeId?: string;
+  /** Human-facing committee name, e.g. `Evidence Committee`. */
+  committeeName?: string;
+  /** Public, stance-neutral task for this seat. It must not prescribe a winner. */
+  committeeTask?: string;
 }
 
 interface CouncilEventBase {
