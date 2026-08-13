@@ -1,5 +1,7 @@
 import type { CouncilEvent, CouncilParticipant } from "../core/types.js";
 
+export const EVIDENCE_VERIFICATIONS_STORAGE_KEY = "chatchat.evidence.verifications.v1";
+
 export type EvidenceSourceState =
   | "not_checked"
   | "reachable"
@@ -14,6 +16,12 @@ export interface EvidenceVerificationSnapshot {
   statusCode?: number;
   contentType?: string;
   title?: string;
+  description?: string;
+  excerpt?: string;
+  pageDate?: string;
+  pageDateKind?: "published" | "modified" | "page";
+  bodyHash?: string;
+  textCharacters?: number;
   bytesRead?: number;
   truncated?: boolean;
   error?: string;
@@ -48,7 +56,7 @@ export function deriveEvidenceLedger(
 
   for (const event of events) {
     if (event.kind !== "evidence") continue;
-    const source = safePublicSource(event.source);
+    const source = safeEvidenceSource(event.source);
     const target = event.targetEventId ? byId.get(event.targetEventId) : undefined;
     records.set(event.id, {
       evidenceEventId: event.id,
@@ -114,7 +122,7 @@ export function evidenceVerificationKey(eventId: string): string {
   return `evidence:${eventId}`;
 }
 
-function safePublicSource(value: string | undefined): { url: string; host: string } | undefined {
+export function safeEvidenceSource(value: string | undefined): { url: string; host: string } | undefined {
   if (!value) return undefined;
   try {
     const url = new URL(value);
