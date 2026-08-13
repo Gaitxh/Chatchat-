@@ -1,0 +1,129 @@
+name: Browser Royal Onboarding Showcase
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/extension/royal-onboarding.ts'
+      - 'src/extension/onboarding-model.ts'
+      - 'extension-public/onboarding-showcase-bootstrap.js'
+      - 'extension/sidepanel.html'
+      - 'tests/royal-onboarding.test.ts'
+  pull_request:
+    paths:
+      - 'src/extension/royal-onboarding.ts'
+      - 'src/extension/onboarding-model.ts'
+      - 'extension-public/onboarding-showcase-bootstrap.js'
+      - 'extension/sidepanel.html'
+      - 'tests/royal-onboarding.test.ts'
+
+jobs:
+  royal-onboarding:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm install
+
+      - name: Full deterministic browser suite
+        run: |
+          npm run check
+          npm test
+
+      - name: Build Browser Extension
+        run: npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Start Browser Extension preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4184 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-onboarding-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4184/manifest.json >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4184/manifest.json >/dev/null
+
+      - name: Capture Royal Onboarding acts
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME_BIN" ]; then
+            echo "No Chromium-compatible browser found."
+            exit 1
+          fi
+          for ACT in scan validation ready complete; do
+            URL="http://127.0.0.1:4184/extension/sidepanel.html?showcase=onboarding&act=${ACT}"
+            "$CHROME_BIN" \
+              --headless=new \
+              --no-sandbox \
+              --disable-gpu \
+              --hide-scrollbars \
+              --run-all-compositor-stages-before-draw \
+              --virtual-time-budget=10000 \
+              --window-size=520,1450 \
+              --screenshot="artifacts/chatchat-onboarding-${ACT}.png" \
+              "$URL"
+            "$CHROME_BIN" \
+              --headless=new \
+              --no-sandbox \
+              --disable-gpu \
+              --run-all-compositor-stages-before-draw \
+              --virtual-time-budget=10000 \
+              --dump-dom \
+              "$URL" > "artifacts/chatchat-onboarding-${ACT}.html"
+            test -s "artifacts/chatchat-onboarding-${ACT}.png"
+            test -s "artifacts/chatchat-onboarding-${ACT}.html"
+          done
+
+      - name: Upload Royal Onboarding evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-browser-royal-onboarding
+          path: artifacts/chatchat-onboarding-*
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Assert onboarding trust progression
+        run: |
+          grep -q 'data-chatchat-onboarding-showcase="booted"' artifacts/chatchat-onboarding-scan.html
+          grep -q 'data-onboarding-act="2"' artifacts/chatchat-onboarding-scan.html
+          grep -q 'data-onboarding-trust="gates-required"' artifacts/chatchat-onboarding-scan.html
+          grep -q 'UNVERIFIED' artifacts/chatchat-onboarding-scan.html
+          grep -q 'ChatGPT' artifacts/chatchat-onboarding-scan.html
+          grep -q 'Gemini' artifacts/chatchat-onboarding-scan.html
+          grep -q 'DeepSeek' artifacts/chatchat-onboarding-scan.html
+
+          grep -q 'data-onboarding-act="4"' artifacts/chatchat-onboarding-validation.html
+          grep -q '1/4 READY' artifacts/chatchat-onboarding-validation.html
+          grep -q 'Test Speech + Council Gate 必须每个 tab 独立通过' artifacts/chatchat-onboarding-validation.html
+          ! grep -q 'HOUSE READY' artifacts/chatchat-onboarding-validation.html
+
+          grep -q 'data-onboarding-act="5"' artifacts/chatchat-onboarding-ready.html
+          grep -q 'data-onboarding-ready-seats="3"' artifacts/chatchat-onboarding-ready.html
+          grep -q 'HOUSE READY' artifacts/chatchat-onboarding-ready.html
+          grep -q '自由议会' artifacts/chatchat-onboarding-ready.html
+          grep -q '委员会审议' artifacts/chatchat-onboarding-ready.html
+
+          grep -q 'data-onboarding-act="7"' artifacts/chatchat-onboarding-complete.html
+          grep -q '第一场廷议完成' artifacts/chatchat-onboarding-complete.html
+          grep -q '17' artifacts/chatchat-onboarding-complete.html
+          grep -q '公开改口' artifacts/chatchat-onboarding-complete.html
+          grep -q 'DETERMINISTIC ONBOARDING SHOWCASE · NO REAL ACCOUNT' artifacts/chatchat-onboarding-complete.html
+
+          ! grep -q 'COUNCIL GATE ✓' artifacts/chatchat-onboarding-scan.html
+          ! grep -q 'COUNCIL GATE ✓' artifacts/chatchat-onboarding-validation.html
