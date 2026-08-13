@@ -1,3 +1,9 @@
+import {
+  isTextualContent,
+  observeTextSource,
+  publicEvidenceUrl,
+} from "./source-extract.js";
+
 const MAX_EVIDENCE_BYTES = 256 * 1024;
 const EVIDENCE_TIMEOUT_MS = 8_000;
 
@@ -43,7 +49,7 @@ async function verifyEvidenceSource(rawUrl) {
       referrerPolicy: "no-referrer",
       signal: controller.signal,
       headers: {
-        Accept: "text/html,text/plain,application/json;q=0.9,*/*;q=0.4",
+        Accept: "text/html,text/plain,application/json,application/xml;q=0.9,*/*;q=0.4",
       },
     });
 
@@ -65,7 +71,10 @@ async function verifyEvidenceSource(rawUrl) {
     }
 
     const body = await readBoundedText(response, MAX_EVIDENCE_BYTES);
-    const title = extractTitle(body.text, contentType);
+    const observation = isTextualContent(contentType, body.text)
+      ? await observeTextSource(body.text, contentType)
+      : {};
+
     return {
       state: response.ok ? "reachable" : "unavailable",
       observedAt,
@@ -73,7 +82,7 @@ async function verifyEvidenceSource(rawUrl) {
       finalUrl: finalUrl.toString(),
       statusCode: response.status,
       contentType,
-      ...(title ? { title } : {}),
+      ...observation,
       bytesRead: body.bytesRead,
       truncated: body.truncated,
       ...(!response.ok ? { error: `HTTP ${response.status}` } : {}),
@@ -125,53 +134,6 @@ async function readBoundedText(response, maxBytes) {
   }
 
   return { text, bytesRead, truncated };
-}
-
-function publicEvidenceUrl(rawUrl) {
-  const url = new URL(rawUrl);
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new Error("Evidence source must use http or https.");
-  }
-  url.username = "";
-  url.password = "";
-  if (isPrivateHost(url.hostname)) {
-    throw new Error("ChatChat does not verify localhost or private-network evidence URLs.");
-  }
-  return url;
-}
-
-function isPrivateHost(hostname) {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host === "::1") return true;
-  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (!ipv4) return false;
-  const parts = ipv4.slice(1).map(Number);
-  if (parts.some((part) => part < 0 || part > 255)) return true;
-  const [a, b] = parts;
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    a >= 224
-  );
-}
-
-function extractTitle(text, contentType) {
-  if (!/html/i.test(contentType) && !/<title[\s>]/i.test(text)) return "";
-  const title = text.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "";
-  return decodeBasicEntities(title.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()).slice(0, 240);
-}
-
-function decodeBasicEntities(value) {
-  return value
-    .replaceAll("&amp;", "&")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&quot;", '"')
-    .replaceAll("&#39;", "'");
 }
 
 void enablePanelOnAction();
