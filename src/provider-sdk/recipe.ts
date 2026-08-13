@@ -23,6 +23,12 @@ export interface AdapterRecipe {
   updatedAt: string;
 }
 
+export interface CompleteAdapterRecipe extends AdapterRecipe {
+  composerSelector: string;
+  sendSelector: string;
+  responseSelector: string;
+}
+
 export type AdapterRecipeBackend = "sqlite" | "browser-local";
 
 export interface AdapterRecipeStore {
@@ -65,7 +71,9 @@ export function applyTeachSelection(
   return next;
 }
 
-export function adapterRecipeComplete(recipe: AdapterRecipe | null | undefined): boolean {
+export function adapterRecipeComplete(
+  recipe: AdapterRecipe | null | undefined,
+): recipe is CompleteAdapterRecipe {
   return Boolean(
     recipe?.composerSelector && recipe.sendSelector && recipe.responseSelector,
   );
