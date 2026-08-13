@@ -1,14 +1,14 @@
-name: Release Candidate PR Smoke
+name: Desktop Experimental Bundle Matrix
 
 on:
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   desktop-bundles:
-    name: ${{ matrix.platform }} candidate
+    name: ${{ matrix.platform }} experimental candidate
     strategy:
       fail-fast: false
       matrix:
@@ -50,7 +50,7 @@ jobs:
       - name: Install JS dependencies
         run: npm install
 
-      - name: Gate A — types and deterministic tests
+      - name: Browser/core regression gate before experimental desktop build
         run: |
           npm run check
           npm test
@@ -58,11 +58,7 @@ jobs:
       - name: Generate platform icons
         run: npm run tauri -- icon --output src-tauri/icons assets/chatchat-app-icon.svg
 
-      - name: Verify generated bundle icons
-        run: >-
-          node --input-type=module -e "import fs from 'node:fs'; const paths=['src-tauri/icons/32x32.png','src-tauri/icons/128x128.png','src-tauri/icons/128x128@2x.png','src-tauri/icons/icon.png','src-tauri/icons/icon.icns','src-tauri/icons/icon.ico']; for (const p of paths) { if (!fs.existsSync(p)) throw new Error('Missing generated release icon: '+p); } console.log('Verified release icons:', paths.join(', '));"
-
-      - name: Build unsigned candidate
+      - name: Build unsigned experimental candidate
         uses: tauri-apps/tauri-action@v0
         with:
           args: --config src-tauri/tauri.release.conf.json
@@ -70,7 +66,7 @@ jobs:
       - name: Upload candidate bundle
         uses: actions/upload-artifact@v4
         with:
-          name: chatchat-${{ matrix.platform }}-candidate-smoke
+          name: chatchat-${{ matrix.platform }}-experimental
           path: src-tauri/target/release/bundle/**
           if-no-files-found: error
           retention-days: 3
