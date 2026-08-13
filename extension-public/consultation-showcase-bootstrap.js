@@ -244,13 +244,28 @@
         await delay(600);
         document.querySelector(".start-button")?.click();
         document.documentElement.dataset.chatchatConsultationShowcase = "running";
-        await delay(2800);
-        document.documentElement.dataset.chatchatConsultationShowcase = "complete";
+
+        const historyReady = await waitFor(() => Boolean(
+          document.querySelector(".outcome-card") &&
+          document.querySelector(".consultation-theater") &&
+          document.querySelector(".history-entry"),
+        ), 12000, 120);
+
+        document.documentElement.dataset.chatchatConsultationShowcase = historyReady ? "complete" : "failed-history";
         return;
       }
       await delay(100);
     }
-    document.documentElement.dataset.chatchatConsultationShowcase = "failed";
+    document.documentElement.dataset.chatchatConsultationShowcase = "failed-setup";
+  }
+
+  async function waitFor(predicate, timeoutMs, intervalMs) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      if (predicate()) return true;
+      await delay(intervalMs);
+    }
+    return false;
   }
 
   function delay(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
