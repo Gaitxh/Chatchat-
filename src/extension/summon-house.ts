@@ -1,7 +1,9 @@
 import {
+  planDefaultDelegationRepresentatives,
   planOpenAiTabsForHouse,
-  summarizeSummonPlan,
+  summarizeDefaultRepresentatives,
   type SummonBrowserTab,
+  type SummonCandidate,
   type SummonExistingSeat,
 } from "./summon-plan.js";
 
@@ -28,9 +30,12 @@ interface BridgeResponse {
 /**
  * A deliberately small companion module for the Side Panel.
  *
- * It bulk-attaches only already-open, catalog-recognized AI tabs. It never
- * marks Test Speech or Council Gate as passed; the normal Side Panel validation
- * remains mandatory after the panel reloads.
+ * Democratic Congress default:
+ * - discover all known open AI tabs;
+ * - automatically propose only one representative per missing delegation;
+ * - additional same-model tabs remain reserves until the King explicitly
+ *   raises that delegation's seat quota with the + control;
+ * - attaching never marks Test Speech / Council Gate as passed.
  */
 void bootSummonControl();
 
@@ -45,6 +50,7 @@ async function bootSummonControl() {
   host.dataset.summonProviders = "";
   host.dataset.summonTrust = "unverified";
   host.dataset.summonAction = "attach-only";
+  host.dataset.summonDefaultQuota = "1";
   host.innerHTML = `
     <style>
       #chatchat-summon-house {
@@ -95,7 +101,7 @@ async function bootSummonControl() {
     </style>
     <div class="summon-shell" role="status">
       <div class="summon-copy">
-        <strong>👑 SUMMON THE HOUSE · 召集诸卿</strong>
+        <strong>🏛️ SUMMON THE CONGRESS · 召集代表团</strong>
         <span class="summon-detail">扫描已打开的 AI 标签页…</span>
       </div>
       <button type="button">召集</button>
@@ -106,24 +112,29 @@ async function bootSummonControl() {
   const shell = host.querySelector<HTMLElement>(".summon-shell")!;
   const detail = host.querySelector<HTMLElement>(".summon-detail")!;
   const button = host.querySelector<HTMLButtonElement>("button")!;
+  let cachedRepresentatives: SummonCandidate[] = [];
 
   async function refresh() {
     try {
       const [tabs, existing] = await Promise.all([queryTabs(), loadSeats()]);
       const plan = planOpenAiTabsForHouse(tabs, existing);
-      host.dataset.summonCandidates = String(plan.candidates.length);
-      host.dataset.summonProviders = [...new Set(plan.candidates.map((item) => item.providerId))].join(",");
-      if (!plan.candidates.length) {
+      const congress = planDefaultDelegationRepresentatives(plan, existing);
+      cachedRepresentatives = congress.representatives;
+      host.dataset.summonCandidates = String(cachedRepresentatives.length);
+      host.dataset.summonProviders = cachedRepresentatives.map((item) => item.providerId).join(",");
+      host.dataset.summonReserveTabs = String(congress.reserveCandidates.length);
+      if (!cachedRepresentatives.length) {
         shell.classList.remove("is-visible");
         return;
       }
       shell.classList.add("is-visible");
       detail.className = "summon-detail";
-      detail.textContent = `${summarizeSummonPlan(plan)} · 新席位仍需 Test + Gate`;
-      button.textContent = `召集 ${plan.candidates.length} 席`;
-      button.dataset.summonCount = String(plan.candidates.length);
+      detail.textContent = `${summarizeDefaultRepresentatives(cachedRepresentatives)} · 默认每代表团 1 席；更多席位可在代表团旁 ＋`;
+      button.textContent = `召集 ${cachedRepresentatives.length} 个代表团`;
+      button.dataset.summonCount = String(cachedRepresentatives.length);
       button.disabled = false;
     } catch (caught) {
+      cachedRepresentatives = [];
       host.dataset.summonCandidates = "error";
       shell.classList.add("is-visible");
       detail.className = "summon-detail summon-error";
@@ -132,68 +143,69 @@ async function bootSummonControl() {
     }
   }
 
-  button.addEventListener("click", async () => {
+  button.addEventListener("click", () => {
+    const representatives = [...cachedRepresentatives];
+    if (!representatives.length) return;
+
     button.disabled = true;
     detail.className = "summon-detail";
-    detail.textContent = "正在请求这些 AI 站点的本地标签页权限…";
+    detail.textContent = "正在请求这些代表团 AI 站点的本地标签页权限…";
 
-    try {
-      const [tabs, existing] = await Promise.all([queryTabs(), loadSeats()]);
-      const plan = planOpenAiTabsForHouse(tabs, existing);
-      if (!plan.candidates.length) {
-        await refresh();
-        return;
-      }
+    // Chrome optional permissions must originate in the actual user gesture.
+    // We already computed the deterministic ×1 delegation list during refresh,
+    // so permission request is the first async browser API started by click.
+    const origins = [...new Set(representatives.map((item) => `${item.origin}/*`))];
+    const permissionRequest = chrome.permissions.request({ origins });
+    void Promise.resolve(permissionRequest)
+      .then(async (granted: boolean) => {
+        if (!granted) throw new Error("未授予这些 AI 代表团的访问权限；没有任何席位被加入。 ");
 
-      const origins = [...new Set(plan.candidates.map((item) => `${item.origin}/*`))];
-      const granted = await chrome.permissions.request({ origins });
-      if (!granted) throw new Error("未授予这些 AI 标签页的访问权限；没有任何席位被加入。 ");
-
-      const joined: ExtensionSeat[] = [];
-      const failures: string[] = [];
-      for (const candidate of plan.candidates) {
-        try {
-          await ensureBridge(candidate.tabId);
-          joined.push({
-            seatId: `extension:${candidate.providerId}:${candidate.tabId}`,
-            tabId: candidate.tabId,
-            url: candidate.url,
-            origin: candidate.origin,
-            hostname: candidate.hostname,
-            providerId: candidate.providerId,
-            providerName: candidate.providerName,
-            delegationId: candidate.delegationId,
-            delegationName: candidate.delegationName,
-            startUrl: candidate.startUrl,
-            createdByChatChat: false,
-          });
-        } catch (caught) {
-          failures.push(`${candidate.providerName}: ${message(caught)}`);
+        const joined: ExtensionSeat[] = [];
+        const failures: string[] = [];
+        for (const candidate of representatives) {
+          try {
+            await ensureBridge(candidate.tabId);
+            joined.push({
+              seatId: `extension:${candidate.providerId}:${candidate.tabId}`,
+              tabId: candidate.tabId,
+              url: candidate.url,
+              origin: candidate.origin,
+              hostname: candidate.hostname,
+              providerId: candidate.providerId,
+              providerName: candidate.providerName,
+              delegationId: candidate.delegationId,
+              delegationName: candidate.delegationName,
+              startUrl: candidate.startUrl,
+              createdByChatChat: false,
+            });
+          } catch (caught) {
+            failures.push(`${candidate.providerName}: ${message(caught)}`);
+          }
         }
-      }
 
-      if (!joined.length) {
-        throw new Error(failures[0] ?? "没有标签页成功建立 ChatChat bridge。");
-      }
+        if (!joined.length) {
+          throw new Error(failures[0] ?? "没有代表席位成功建立 ChatChat bridge。");
+        }
 
-      const current = await loadSeats();
-      const existingIds = new Set(current.map((seat) => seat.tabId));
-      const merged = [...current, ...joined.filter((seat) => !existingIds.has(seat.tabId))];
-      const store = chrome.storage.session ?? chrome.storage.local;
-      await store.set({ [SEATS_KEY]: merged });
+        const current = await loadSeats();
+        const existingIds = new Set(current.map((seat) => seat.tabId));
+        const merged = [...current, ...joined.filter((seat) => !existingIds.has(seat.tabId))];
+        const store = chrome.storage.session ?? chrome.storage.local;
+        await store.set({ [SEATS_KEY]: merged });
 
-      detail.className = "summon-detail summon-result";
-      detail.textContent = failures.length
-        ? `✓ 已召集 ${joined.length} 席；${failures.length} 席 bridge 失败。刷新后请逐代表团验证。`
-        : `✓ 已召集 ${joined.length} 个真实标签页席位。刷新后请逐代表团 Test + Gate。`;
-      button.textContent = "已召集";
-      window.setTimeout(() => location.reload(), 900);
-    } catch (caught) {
-      detail.className = "summon-detail summon-error";
-      detail.textContent = message(caught);
-      button.disabled = false;
-      button.textContent = "重试召集";
-    }
+        detail.className = "summon-detail summon-result";
+        detail.textContent = failures.length
+          ? `✓ 已召集 ${joined.length} 个代表团默认席位；${failures.length} 席 bridge 失败。刷新后请逐代表团验证。`
+          : `✓ 已召集 ${joined.length} 个代表团，每团默认 ×1。刷新后可用 ＋ 增加独立代表席位，再逐席 Test + Gate。`;
+        button.textContent = "已召集";
+        window.setTimeout(() => location.reload(), 900);
+      })
+      .catch((caught: unknown) => {
+        detail.className = "summon-detail summon-error";
+        detail.textContent = message(caught);
+        button.disabled = false;
+        button.textContent = "重试召集";
+      });
   });
 
   await refresh();
