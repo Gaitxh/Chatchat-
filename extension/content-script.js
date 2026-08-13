@@ -42,17 +42,23 @@
     validateRecipe(recipe);
     const composer = document.querySelector(recipe.composer);
     const send = document.querySelector(recipe.send);
-    const responses = [...document.querySelectorAll(recipe.response)].filter(
-      (node) => node instanceof HTMLElement && visible(node),
-    );
+    let responseSelectorValid = false;
+    let responseMatches = 0;
+    try {
+      responseMatches = document.querySelectorAll(recipe.response).length;
+      responseSelectorValid = true;
+    } catch {
+      responseSelectorValid = false;
+    }
     return {
       composer: composer instanceof HTMLElement,
       send: send instanceof HTMLElement,
-      response: responses.length > 0,
+      responseSelectorValid,
+      responseMatches,
       ready:
         composer instanceof HTMLElement &&
         send instanceof HTMLElement &&
-        responses.length > 0,
+        responseSelectorValid,
     };
   }
 
@@ -205,7 +211,13 @@
   }
 
   function responseText(selector) {
-    const nodes = [...document.querySelectorAll(selector)].filter(
+    let candidates;
+    try {
+      candidates = [...document.querySelectorAll(selector)];
+    } catch {
+      throw new Error("Response selector is no longer valid.");
+    }
+    const nodes = candidates.filter(
       (node) => node instanceof HTMLElement && visible(node),
     );
     const node = nodes.at(-1);
