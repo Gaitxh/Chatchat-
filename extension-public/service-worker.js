@@ -1,17 +1,18 @@
-const enablePanelOnAction = async () => {
-  try {
-    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-  } catch (error) {
-    console.warn("ChatChat could not enable action-click side panel behavior", error);
+const APP_PATH = "app/app.html";
+
+async function openChatChatApp() {
+  const appUrl = chrome.runtime.getURL(APP_PATH);
+  const tabs = await chrome.tabs.query({});
+  const existing = tabs.find((tab) => typeof tab.url === "string" && tab.url.startsWith(appUrl));
+  if (existing?.id) {
+    await chrome.tabs.update(existing.id, { active: true });
+    return;
   }
-};
+  await chrome.tabs.create({ url: appUrl, active: true });
+}
 
-chrome.runtime.onInstalled.addListener(() => {
-  void enablePanelOnAction();
+chrome.action.onClicked.addListener(() => {
+  void openChatChatApp().catch((error) => {
+    console.warn("ChatChat could not open the full-page consultation room", error);
+  });
 });
-
-chrome.runtime.onStartup.addListener(() => {
-  void enablePanelOnAction();
-});
-
-void enablePanelOnAction();
