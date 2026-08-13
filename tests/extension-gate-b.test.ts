@@ -1,6 +1,7 @@
 import type { CouncilEvent, CouncilReport } from "../src/core/types.js";
 import { createEmptyAdapterRecipe } from "../src/provider-sdk/recipe.js";
 import {
+  captureAdmittedBrowserHouseProviderProof,
   captureBrowserHouseProviderProof,
   seatStillOnProviderOrigin,
 } from "../src/extension/gate-b.js";
@@ -56,6 +57,20 @@ assert(providerProof.length === 2, "Two Browser House participants should become
 assert(providerProof.every((row) => row.adapterId === "extension.tab"), "Browser proof rows should identify extension.tab transport.");
 assert(providerProof[0]?.host === "chatgpt.com", "Proof should preserve host only, not tab paths.");
 assert(providerProof.every((row) => row.providerHostHealthy), "Both healthy provider tabs should be marked healthy.");
+
+const admittedProof = captureAdmittedBrowserHouseProviderProof({
+  seats: [chatgptSeat, deepseekSeat],
+  recipes,
+  providerHostSeatIds: [chatgptSeat.seatId, deepseekSeat.seatId],
+});
+assert(
+  admittedProof.every((row) => row.testPassed && row.councilGatePassed),
+  "Seats admitted into the Side Panel Council may freeze Test/Gate=true through the documented admission invariant.",
+);
+assert(
+  admittedProof.every((row) => row.recipeReady && row.providerHostHealthy),
+  "Admitted proof still checks recipe presence and post-run Provider-host health instead of blindly passing every gate.",
+);
 
 assert(seatStillOnProviderOrigin("https://chatgpt.com", "https://chatgpt.com/c/private") === true, "Same Provider origin should remain healthy after Council navigation.");
 assert(seatStillOnProviderOrigin("https://chatgpt.com", "https://auth.openai.com/login") === false, "Auth/external origin must not count as Provider-host healthy.");
@@ -171,7 +186,7 @@ const report: CouncilReport = {
 };
 
 const pack = buildGateBProofPack({
-  providers: providerProof,
+  providers: admittedProof,
   report,
   events,
   mode: "live",
@@ -192,11 +207,9 @@ for (const secret of [
   assert(!exported.includes(secret), `Browser proof export must not leak ${secret}.`);
 }
 
-const offHostProof = captureBrowserHouseProviderProof({
+const offHostProof = captureAdmittedBrowserHouseProviderProof({
   seats: [chatgptSeat, deepseekSeat],
   recipes,
-  tests,
-  gates,
   providerHostSeatIds: [chatgptSeat.seatId],
 });
 const offHostPack = buildGateBProofPack({
@@ -210,7 +223,7 @@ const offHostPack = buildGateBProofPack({
 assert(offHostPack.verdict === "incomplete", "One off-host Browser tab must fail closed rather than qualify as Gate B candidate evidence.");
 
 const missingProviderRowPack = buildGateBProofPack({
-  providers: providerProof.slice(0, 1),
+  providers: admittedProof.slice(0, 1),
   report,
   events,
   mode: "live",
