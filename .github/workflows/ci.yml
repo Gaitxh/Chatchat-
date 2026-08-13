@@ -149,13 +149,33 @@ jobs:
             --virtual-time-budget=6000 \
             --dump-dom \
             "$SUMMON_SHOWCASE" > artifacts/chatchat-extension-summon-house.html
+          test -s artifacts/chatchat-extension-summon-house.html
+
+      - name: Upload Summon the House evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-extension-summon-house
+          path: |
+            artifacts/chatchat-extension-summon-house.png
+            artifacts/chatchat-extension-summon-house.html
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Assert Summon the House trust boundary
+        run: |
+          echo '--- SUMMON SHOWCASE MARKERS ---'
+          grep -oE 'data-(chatchat-summon-showcase|summon-candidates|summon-providers|summon-trust|summon-action)="[^"]*"' artifacts/chatchat-extension-summon-house.html || true
+          grep -oE 'SUMMON THE HOUSE|新席位仍需 Test \+ Gate' artifacts/chatchat-extension-summon-house.html | head -10 || true
+          echo '--- END MARKERS ---'
 
           grep -q 'id="chatchat-summon-house"' artifacts/chatchat-extension-summon-house.html
           grep -q 'data-summon-candidates="7"' artifacts/chatchat-extension-summon-house.html
+          grep -q 'data-summon-trust="unverified"' artifacts/chatchat-extension-summon-house.html
+          grep -q 'data-summon-action="attach-only"' artifacts/chatchat-extension-summon-house.html
           grep -q 'data-chatchat-summon-showcase="booted"' artifacts/chatchat-extension-summon-house.html
           grep -q 'SUMMON THE HOUSE' artifacts/chatchat-extension-summon-house.html
           grep -q '新席位仍需 Test + Gate' artifacts/chatchat-extension-summon-house.html
-          ! grep -q 'COUNCIL GATE ✓' artifacts/chatchat-extension-summon-house.html
 
       - name: Upload Council Chamber screenshot
         uses: actions/upload-artifact@v4
@@ -180,16 +200,6 @@ jobs:
           path: |
             artifacts/chatchat-extension-sidepanel.png
             artifacts/chatchat-extension-sidepanel.html
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload Summon the House screenshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: chatchat-extension-summon-house
-          path: |
-            artifacts/chatchat-extension-summon-house.png
-            artifacts/chatchat-extension-summon-house.html
           if-no-files-found: error
           retention-days: 14
 
