@@ -25,6 +25,7 @@
     "src/history/**/*.ts",
     "src/provider-sdk/**/*.ts",
     "src/providers/**/*.ts",
-    "src/validation/**/*.ts"
+    "src/validation/**/*.ts",
+    "src/theater/**/*.ts"
   ]
 }
