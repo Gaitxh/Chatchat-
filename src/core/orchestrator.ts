@@ -5,6 +5,7 @@ import type {
   CouncilContext,
   CouncilContribution,
   CouncilEvent,
+  CouncilParticipant,
   CouncilReport,
   CouncilRunOptions,
 } from "./types.js";
@@ -25,6 +26,10 @@ export class CouncilOrchestrator {
       throw new Error("Council participant ids must be unique.");
     }
     this.#agents = agents;
+  }
+
+  get participants(): readonly CouncilParticipant[] {
+    return this.#agents.map((agent) => agent.participant);
   }
 
   async run(
