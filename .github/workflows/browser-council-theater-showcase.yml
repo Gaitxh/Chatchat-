@@ -1,0 +1,115 @@
+name: Browser Council Theater Showcase
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/theater/**'
+      - 'src/extension/council-theater.ts'
+      - 'extension/sidepanel.html'
+      - 'extension-public/theater-showcase-bootstrap.js'
+  pull_request:
+    paths:
+      - 'src/theater/**'
+      - 'src/extension/council-theater.ts'
+      - 'extension/sidepanel.html'
+      - 'extension-public/theater-showcase-bootstrap.js'
+
+jobs:
+  browser-theater:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm install
+
+      - name: Full deterministic Council / influence tests
+        run: |
+          npm run check
+          npm test
+
+      - name: Assert replay module has no Provider transport call
+        run: |
+          ! grep -q 'chrome\.tabs' src/extension/council-theater.ts
+          ! grep -q 'RUN_SPEECH' src/extension/council-theater.ts
+          ! grep -q 'sendMessage' src/extension/council-theater.ts
+
+      - name: Build Browser Extension
+        run: npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Start Browser Extension preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4183 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-browser-theater.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4183/manifest.json >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4183/manifest.json >/dev/null
+
+      - name: Capture real production Browser Council Theater
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME_BIN" ]; then
+            echo "No Chromium-compatible browser found."
+            exit 1
+          fi
+          URL='http://127.0.0.1:4183/extension/sidepanel.html?showcase=theater'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=28000 \
+            --window-size=520,2850 \
+            --screenshot=artifacts/chatchat-browser-council-theater.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=28000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-browser-council-theater.html
+          test -s artifacts/chatchat-browser-council-theater.png
+          test -s artifacts/chatchat-browser-council-theater.html
+
+      - name: Upload Browser Council Theater evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-browser-council-theater
+          path: |
+            artifacts/chatchat-browser-council-theater.png
+            artifacts/chatchat-browser-council-theater.html
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Assert traceable theater truth boundary
+        run: |
+          grep -q 'data-chatchat-browser-theater-showcase="booted"' artifacts/chatchat-browser-council-theater.html
+          grep -q 'data-chatchat-browser-theater-jumped="revision"' artifacts/chatchat-browser-council-theater.html
+          grep -q 'id="chatchat-browser-council-theater"' artifacts/chatchat-browser-council-theater.html
+          grep -q 'data-theater-provider-calls-during-replay="0"' artifacts/chatchat-browser-council-theater.html
+          grep -q 'data-theater-strong-links="1"' artifacts/chatchat-browser-council-theater.html
+          grep -q 'CHANGED MIND' artifacts/chatchat-browser-council-theater.html
+          grep -q 'Most Influential' artifacts/chatchat-browser-council-theater.html
+          grep -q 'LOCAL REPLAY · 0 PROVIDER CALLS' artifacts/chatchat-browser-council-theater.html
+          grep -q 'HOUSE VERDICT' artifacts/chatchat-browser-council-theater.html
