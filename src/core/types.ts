@@ -17,6 +17,14 @@ export interface CouncilParticipant {
   name: string;
   provider: string;
   role?: string;
+  /** Stable model/profile grouping for AI House mode, e.g. `openai-chatgpt`. */
+  delegationId?: string;
+  /** Human-facing delegation label, e.g. `ChatGPT Delegation`. */
+  delegationName?: string;
+  /** 1-based seat number inside the delegation. */
+  seatIndex?: number;
+  /** Configured delegation size at the moment this Council was created. */
+  seatCount?: number;
 }
 
 interface CouncilEventBase {
