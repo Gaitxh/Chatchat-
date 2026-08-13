@@ -1,0 +1,112 @@
+name: Browser Committee Parliament Showcase
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/house/**'
+      - 'src/core/types.ts'
+      - 'src/extension/committee-house.ts'
+      - 'extension/sidepanel.html'
+      - 'extension-public/committee-showcase-bootstrap.js'
+      - 'package.json'
+  pull_request:
+    paths:
+      - 'src/house/**'
+      - 'src/core/types.ts'
+      - 'src/extension/committee-house.ts'
+      - 'extension/sidepanel.html'
+      - 'extension-public/committee-showcase-bootstrap.js'
+      - 'package.json'
+
+jobs:
+  committee-parliament:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm install
+
+      - name: Committee contracts and full deterministic suite
+        run: |
+          npm run check
+          npm test
+
+      - name: Build Browser Extension
+        run: npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Start Browser Extension preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4182 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-committee-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4182/manifest.json >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4182/manifest.json >/dev/null
+
+      - name: Capture real production Committee Parliament
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME_BIN" ]; then
+            echo "No Chromium-compatible browser found."
+            exit 1
+          fi
+          URL='http://127.0.0.1:4182/extension/sidepanel.html?showcase=committee'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=26000 \
+            --window-size=520,1900 \
+            --screenshot=artifacts/chatchat-committee-parliament.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=26000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-committee-parliament.html
+          test -s artifacts/chatchat-committee-parliament.png
+          test -s artifacts/chatchat-committee-parliament.html
+
+      - name: Upload Committee Parliament evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-browser-committee-parliament
+          path: |
+            artifacts/chatchat-committee-parliament.png
+            artifacts/chatchat-committee-parliament.html
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Assert the theatrical layer did not invent trust
+        run: |
+          grep -q 'data-chatchat-committee-showcase="booted"' artifacts/chatchat-committee-parliament.html
+          grep -q 'id="chatchat-committee-parliament"' artifacts/chatchat-committee-parliament.html
+          grep -q 'data-parliament-mode="committee"' artifacts/chatchat-committee-parliament.html
+          grep -q '委员会审议' artifacts/chatchat-committee-parliament.html
+          grep -q 'Evidence' artifacts/chatchat-committee-parliament.html
+          grep -q 'Counterexample' artifacts/chatchat-committee-parliament.html
+          grep -q 'HOUSE VERDICT' artifacts/chatchat-committee-parliament.html
+          ! grep -q 'COUNCIL GATE ✓' artifacts/chatchat-committee-parliament.html
