@@ -14,3 +14,9 @@ export type {
   ProviderConsultationTransport as ProviderCouncilTransport,
   ProviderConsultationSessionPreparer as ProviderCouncilSessionPreparer,
 } from "./consultation-protocol.js";
+
+export interface CouncilBridgeVerificationResult {
+  ok: true;
+  contributionCount: number;
+  elapsedMs: number;
+}
