@@ -6,10 +6,10 @@ import { CouncilReportPanel } from "./components/CouncilReportPanel.js";
 import { CouncilTheater } from "./components/CouncilTheater.js";
 import { DemoTheater } from "./components/DemoTheater.js";
 import { EventFeed } from "./components/EventFeed.js";
+import { FreshVerdict } from "./components/FreshVerdict.js";
 import { GateBProofPanel } from "./components/GateBProofPanel.js";
 import { HistorianPanel } from "./components/HistorianPanel.js";
 import { RoundTable } from "./components/RoundTable.js";
-import { StageRail } from "./components/StageRail.js";
 import { useCouncilSession } from "./useCouncilSession.js";
 import { useProviderProfiles } from "./useProviderProfiles.js";
 
@@ -21,6 +21,9 @@ export default function App() {
   const [proofSnapshot, setProofSnapshot] = useState<ProviderProofSnapshot[] | null>(null);
   const providers = useProviderProfiles();
   const council = useCouncilSession(providers.seatedAgents);
+  const theaterShowcase =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("showcase") === "theater";
 
   useEffect(() => {
     if (!council.report || council.resultSource !== "current") {
@@ -37,8 +40,8 @@ export default function App() {
         providerHostProfileIds: providers.providerHostProfileIds,
       }),
     );
-    // The session id is the freeze trigger: once captured, later Provider
-    // window-health changes must not rewrite evidence for the completed run.
+    // Freeze Provider state at Council completion. Later window-health changes
+    // must not rewrite evidence for the already-completed run.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [council.report?.sessionId, council.resultSource]);
 
@@ -56,173 +59,264 @@ export default function App() {
     ? council.lastCompletedMode ?? council.mode
     : council.mode;
   const modeLabel = council.resultSource === "archive"
-    ? `📚 ARCHIVE · ${viewMode.toUpperCase()}`
-    : council.report
-      ? `🏛️ RESULT · ${viewMode.toUpperCase()}`
-      : council.mode === "live"
-        ? `🔥 LIVE · ${providers.liveSeatCount} HEALTHY REAL`
-        : council.mode === "hybrid"
-          ? "⚗️ HYBRID · 1 HEALTHY REAL"
-          : "🎭 DEMO · MOCK";
+    ? `ARCHIVE · ${viewMode.toUpperCase()}`
+    : council.mode === "live"
+      ? `LIVE · ${providers.liveSeatCount} REAL`
+      : council.mode === "hybrid"
+        ? "HYBRID · 1 REAL"
+        : "DEMO · MOCK";
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="brand-lockup">
+    <div className="fresh-app-shell">
+      <header className="fresh-topbar">
+        <div className="fresh-brand">
           <img src={avatarUrl} alt="ChatChat pixel council avatar" />
-          <div><span>LOCAL AI COUNCIL</span><h1>ChatChat</h1></div>
+          <div><strong>ChatChat</strong><span>Your local AI Council</span></div>
         </div>
-        <div className="topbar-center">
-          <span className="motto">YOU ASK · THEY DEBATE</span>
-          <span className="build-badge">v1 READINESS · THEATER + PROOF</span>
-          <span className={`build-badge council-mode-badge council-mode-badge--${viewMode}`}>{modeLabel}</span>
+        <div className="fresh-top-actions">
+          <span className={`fresh-mode fresh-mode--${viewMode}`}>{modeLabel}</span>
+          <span className="fresh-local"><i /> LOCAL-FIRST</span>
         </div>
-        <div className="privacy-badge" title="ChatChat itself has no relay server"><i />LOCAL-FIRST</div>
       </header>
 
-      <StageRail stage={council.stage} />
+      <main className="fresh-main">
+        <section className="fresh-hero-card">
+          <div className="fresh-hero-copy">
+            <span className="fresh-eyebrow">YOU ASK · THEY DEBATE</span>
+            <h1>把问题交给你的<br />AI 议会。</h1>
+            <p>
+              你只需要下令一次。密室独立思考、公开廷议、质疑、改口与最终表态都会自动完成。
+            </p>
+          </div>
 
-      <main className="chamber-grid">
-        <div className="council-column">
-          <RoundTable
-            participants={council.participants}
-            events={council.events}
-            stage={council.stage}
-            mode={viewMode}
-            round={council.round}
-            activeActorId={council.activeActorId}
-            question={council.activeQuestion}
-          />
-
-          {council.report ? <CouncilReportPanel report={council.report} /> : null}
-
-          {council.report ? (
-            <CouncilTheater
-              participants={council.participants}
-              events={council.events}
-              report={council.report}
-            />
-          ) : null}
-
-          <GateBProofPanel
-            providerSnapshot={proofSnapshot}
-            report={council.report}
-            events={council.events}
-            mode={council.lastCompletedMode ?? council.mode}
-            currentRun={council.resultSource === "current"}
-            chatChatVersion={__CHATCHAT_VERSION__}
-          />
-
-          {council.error ? <div className="error-banner"><strong>廷议中断</strong><span>{council.error}</span></div> : null}
-
-          <form className="royal-command" onSubmit={submit}>
-            <div className="command-heading">
-              <span>👑 KING'S COMMAND</span>
-              <small>{commandCopy(council.mode, providers.liveSeatCount)}</small>
-            </div>
-            <div className="command-row">
-              <textarea
-                value={question}
-                onChange={(event) => setQuestion(event.target.value)}
-                disabled={council.isRunning}
-                rows={2}
-                aria-label="Ask the AI Council"
-                placeholder="向你的 AI 智囊团下令……"
-              />
-              <button type="submit" disabled={council.isRunning || !question.trim()}>
-                <span>{council.isRunning ? "廷议中" : council.mode === "live" ? "LIVE 开廷" : "下令"}</span>
-                <b>{council.isRunning ? "···" : "↵"}</b>
+          <div className="fresh-advisor-bar">
+            <div className="fresh-advisor-bar__head">
+              <span>本次席位</span>
+              <button
+                type="button"
+                onClick={() => document.getElementById("provider-settings")?.scrollIntoView({ behavior: "smooth" })}
+              >
+                管理 AI
               </button>
             </div>
-            <div className="command-actions">
-              <button type="button" className="text-action" onClick={() => setQuestion(DEMO_QUESTION)} disabled={council.isRunning}>
-                载入演示问题
+            <div className="fresh-advisors">
+              {council.participants.slice(0, 10).map((participant, index) => (
+                <div className="fresh-advisor" key={participant.id} title={participant.name}>
+                  <b>{monogram(participant.name)}</b>
+                  <span>{participant.name}</span>
+                  <small>{participant.delegationName ? `Seat ${participant.seatIndex ?? index + 1}` : participant.provider === "mock" ? "Mock" : "Live"}</small>
+                </div>
+              ))}
+              {council.participants.length > 10 ? (
+                <div className="fresh-advisor fresh-advisor--more">
+                  <b>+{council.participants.length - 10}</b><span>more seats</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <form className="fresh-command" onSubmit={submit}>
+            <label htmlFor="king-command">KING'S COMMAND · 今天议什么？</label>
+            <textarea
+              id="king-command"
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              disabled={council.isRunning}
+              rows={3}
+              placeholder="把问题、需求或一个艰难的决定交给 AI 议会……"
+            />
+            <div className="fresh-command__footer">
+              <span>{commandCopy(council.mode, providers.liveSeatCount)}</span>
+              <button type="submit" disabled={council.isRunning || !question.trim()}>
+                <strong>{council.isRunning ? "廷议中" : council.mode === "live" ? "LIVE 开廷" : "开廷"}</strong>
+                <b>{council.isRunning ? "···" : "→"}</b>
+              </button>
+            </div>
+            <div className="fresh-command__links">
+              <button type="button" onClick={() => setQuestion(DEMO_QUESTION)} disabled={council.isRunning}>
+                载入示例
               </button>
               {council.stage === "complete" || council.stage === "error" ? (
-                <button type="button" className="text-action" onClick={council.reset} disabled={council.isRunning}>
-                  清空议场
+                <button type="button" onClick={council.reset} disabled={council.isRunning}>
+                  新的廷议
                 </button>
               ) : null}
             </div>
           </form>
 
-          <DemoTheater
-            profiles={providers.profiles}
-            recipes={providers.recipes}
-            loginWindowProfileIds={providers.loginWindowProfileIds}
-            providerHostProfileIds={providers.providerHostProfileIds}
-            speechResults={providers.speechResults}
-            bridgeResults={providers.bridgeResults}
-            liveSeatCount={providers.liveSeatCount}
-            mode={council.mode}
-            disabled={council.isRunning || providers.isLoading}
-            onLoadQuestion={setQuestion}
-          />
+          <FreshStage stage={council.stage} round={council.round} />
+        </section>
 
-          <AdvisorDock
-            profiles={providers.profiles}
-            recipes={providers.recipes}
-            backend={providers.backend}
-            error={providers.error}
-            loginError={providers.loginError}
-            loginWindowProfileIds={providers.loginWindowProfileIds}
-            providerHostProfileIds={providers.providerHostProfileIds}
-            windowHealth={providers.windowHealth}
-            probeResults={providers.probeResults}
-            probingProfileId={providers.probingProfileId}
-            teaching={providers.teaching}
-            speechResults={providers.speechResults}
-            testingProfileId={providers.testingProfileId}
-            bridgeResults={providers.bridgeResults}
-            verifyingProfileId={providers.verifyingProfileId}
-            liveSeatCount={providers.liveSeatCount}
-            canOpenLogin={providers.canOpenLogin}
-            disabled={council.isRunning || providers.isLoading}
-            onInvite={providers.invite}
-            onLogin={providers.openLogin}
-            onProbe={providers.probe}
-            onTeach={providers.teach}
-            onCancelTeach={providers.cancelTeach}
-            onTestSpeech={providers.testSpeech}
-            onVerifyCouncil={providers.verifyCouncil}
-            onToggleSeat={providers.toggleSeat}
-            onRemove={providers.remove}
-          />
+        {council.error ? (
+          <div className="fresh-error"><strong>廷议中断</strong><span>{council.error}</span></div>
+        ) : null}
 
-          <HistorianPanel
-            entries={council.history}
-            backend={council.historyBackend}
-            error={council.historyError}
-            activeSessionId={council.report?.sessionId ?? null}
-            disabled={council.isRunning}
-            onOpen={(id) => void openArchive(id)}
-          />
-        </div>
+        {council.report ? <FreshVerdict report={council.report} /> : null}
 
-        <EventFeed
-          events={council.events}
-          participants={council.participants}
-          stage={council.stage}
-        />
+        <details className="fresh-disclosure" defaultOpen={theaterShowcase}>
+          <summary>
+            <div>
+              <b>查看议会过程</b>
+              <span>圆桌 · Blackboard · 谁说服了谁 · 完整奏议</span>
+            </div>
+            <small>{council.events.length ? `${council.events.length} events` : "等待开廷"}</small>
+          </summary>
+          <div className="fresh-disclosure__body">
+            <div className="fresh-process-grid">
+              <div>
+                <RoundTable
+                  participants={council.participants}
+                  events={council.events}
+                  stage={council.stage}
+                  mode={viewMode}
+                  round={council.round}
+                  activeActorId={council.activeActorId}
+                  question={council.activeQuestion}
+                />
+              </div>
+              <EventFeed
+                events={council.events}
+                participants={council.participants}
+                stage={council.stage}
+              />
+            </div>
+
+            {council.report ? <CouncilReportPanel report={council.report} /> : null}
+            {council.report ? (
+              <CouncilTheater
+                participants={council.participants}
+                events={council.events}
+                report={council.report}
+              />
+            ) : null}
+          </div>
+        </details>
+
+        <details className="fresh-disclosure fresh-disclosure--advanced" id="provider-settings">
+          <summary>
+            <div>
+              <b>AI 与高级设置</b>
+              <span>Provider · Teach · Test/Gate · Proof · 史官</span>
+            </div>
+            <small>{providers.profiles.length} providers</small>
+          </summary>
+          <div className="fresh-disclosure__body fresh-advanced-stack">
+            <DemoTheater
+              profiles={providers.profiles}
+              recipes={providers.recipes}
+              loginWindowProfileIds={providers.loginWindowProfileIds}
+              providerHostProfileIds={providers.providerHostProfileIds}
+              speechResults={providers.speechResults}
+              bridgeResults={providers.bridgeResults}
+              liveSeatCount={providers.liveSeatCount}
+              mode={council.mode}
+              disabled={council.isRunning || providers.isLoading}
+              onLoadQuestion={setQuestion}
+            />
+
+            <AdvisorDock
+              profiles={providers.profiles}
+              recipes={providers.recipes}
+              backend={providers.backend}
+              error={providers.error}
+              loginError={providers.loginError}
+              loginWindowProfileIds={providers.loginWindowProfileIds}
+              providerHostProfileIds={providers.providerHostProfileIds}
+              windowHealth={providers.windowHealth}
+              probeResults={providers.probeResults}
+              probingProfileId={providers.probingProfileId}
+              teaching={providers.teaching}
+              speechResults={providers.speechResults}
+              testingProfileId={providers.testingProfileId}
+              bridgeResults={providers.bridgeResults}
+              verifyingProfileId={providers.verifyingProfileId}
+              liveSeatCount={providers.liveSeatCount}
+              canOpenLogin={providers.canOpenLogin}
+              disabled={council.isRunning || providers.isLoading}
+              onInvite={providers.invite}
+              onLogin={providers.openLogin}
+              onProbe={providers.probe}
+              onTeach={providers.teach}
+              onCancelTeach={providers.cancelTeach}
+              onTestSpeech={providers.testSpeech}
+              onVerifyCouncil={providers.verifyCouncil}
+              onToggleSeat={providers.toggleSeat}
+              onRemove={providers.remove}
+            />
+
+            <GateBProofPanel
+              providerSnapshot={proofSnapshot}
+              report={council.report}
+              events={council.events}
+              mode={council.lastCompletedMode ?? council.mode}
+              currentRun={council.resultSource === "current"}
+              chatChatVersion={__CHATCHAT_VERSION__}
+            />
+
+            <HistorianPanel
+              entries={council.history}
+              backend={council.historyBackend}
+              error={council.historyError}
+              activeSessionId={council.report?.sessionId ?? null}
+              disabled={council.isRunning}
+              onOpen={(id) => void openArchive(id)}
+            />
+          </div>
+        </details>
       </main>
 
-      <footer className="app-footer">
-        <span>NO CHATCHAT SERVER</span><span>•</span>
-        <span>ROUND 1 SEALED</span><span>•</span>
-        <span>TRACEABLE INFLUENCE</span><span>•</span>
-        <span>PROOF PACK EXCLUDES CONTENT</span><span>•</span>
-        <span>{modeLabel}</span>
+      <footer className="fresh-footer">
+        <span>ChatChat has no relay server.</span>
+        <span>Round 1 stays sealed until all advisors finish.</span>
+        <span>Advanced evidence stays available when you want it.</span>
       </footer>
     </div>
   );
 }
 
+function FreshStage({
+  stage,
+  round,
+}: {
+  stage: ReturnType<typeof useCouncilSession>["stage"];
+  round: number;
+}) {
+  const stages = [
+    { id: "sealed", name: "密室奏议", hint: "独立思考" },
+    { id: "debate", name: "公开廷议", hint: "质询与举证" },
+    { id: "final", name: "最终表态", hint: "形成奏议" },
+  ] as const;
+  const order = stage === "idle" || stage === "error" ? 0 : stage === "sealed" ? 1 : stage === "debate" ? 2 : 3;
+
+  return (
+    <div className="fresh-stage" role="status" aria-live="polite">
+      {stages.map((item, index) => {
+        const position = index + 1;
+        const active =
+          (item.id === stage) ||
+          (stage === "complete" && item.id === "final");
+        const done = stage === "complete" || order > position;
+        return (
+          <div className={`fresh-stage__step ${active ? "is-active" : ""} ${done ? "is-done" : ""}`} key={item.id}>
+            <span>{done ? "✓" : active ? "•" : position}</span>
+            <div><strong>{item.name}</strong><small>{active && round ? `Round ${round} · ` : ""}{item.hint}</small></div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function commandCopy(mode: ReturnType<typeof useCouncilSession>["mode"], liveSeatCount: number): string {
-  if (mode === "live") {
-    return `${liveSeatCount} 位健康真实网页智囊已经入席。你只下令一次；之后 sealed → debate → final 全自动执行。Council 结束后会生成可追溯 Theater 和不含正文的 Royal Proof Pack。`;
-  }
-  if (mode === "hybrid") {
-    return "1 位健康真实网页智囊已入席：当前是 HYBRID REHEARSAL；再入席 1 位健康真实 AI 即解锁纯 LIVE COUNCIL。";
-  }
-  return "当前没有健康真实席位，所以自动退回 deterministic Mock Demo。Demo 可以展示完整 Theater；Proof Pack 会明确标记为不可用于 Gate B。";
+  if (mode === "live") return `${liveSeatCount} 位真实网页智囊已入席。之后的讨论会自动进行。`;
+  if (mode === "hybrid") return "当前是 1 位真实智囊 + Mock 陪练；再入席 1 位真实 AI 即解锁纯 LIVE。";
+  return "当前使用 deterministic Mock Council，适合先体验完整流程。";
+}
+
+function monogram(name: string): string {
+  const clean = name.replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (!parts.length) return "AI";
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
 }
