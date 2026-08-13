@@ -1,0 +1,35 @@
+.consultation-theater-portal { display: contents; }
+
+.event-provenance {
+  position: fixed;
+  z-index: 50;
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
+  max-height: min(58vh, 480px);
+  overflow: auto;
+  padding: 13px;
+  border: 1px solid #d9cbe0;
+  border-radius: 16px;
+  background: rgba(255, 252, 255, .98);
+  color: #413745;
+  box-shadow: 0 18px 55px rgba(37, 27, 44, .22);
+  backdrop-filter: blur(16px);
+}
+
+.event-provenance__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.event-provenance__top > div { display: grid; gap: 2px; }
+.event-provenance__top span { color: #936f99; font-size: 7px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
+.event-provenance__top strong { font-size: 12px; }
+.event-provenance__top > button { width: 27px; height: 27px; border: 0; border-radius: 8px; background: #eee6f1; color: #6b536f; font-size: 16px; }
+
+.event-provenance dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; margin: 11px 0; }
+.event-provenance dl > div { min-width: 0; padding: 7px; border-radius: 8px; background: #f5f0f6; }
+.event-provenance dt { color: #918693; font-size: 6.5px; text-transform: uppercase; }
+.event-provenance dd { margin: 3px 0 0; font-size: 8px; overflow-wrap: anywhere; }
+.event-provenance code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 7px; }
+.event-provenance > p { margin: 0; padding: 9px; border-radius: 10px; background: #fff; border: 1px solid #ece4ee; color: #5d535f; font-size: 8px; line-height: 1.55; white-space: pre-wrap; }
+.event-provenance__refs { display: grid; gap: 4px; margin-top: 9px; }
+.event-provenance__refs span { color: #897c8a; font-size: 7px; }
+.event-provenance__refs code { padding: 5px 6px; border-radius: 7px; background: #efe6f2; color: #684e70; overflow-wrap: anywhere; }
+.event-provenance__close { width: 100%; margin-top: 10px; border: 0; border-radius: 9px; padding: 8px; background: #292d35; color: white; font-size: 8px; font-weight: 800; }
