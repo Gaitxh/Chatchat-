@@ -35,31 +35,41 @@ function installChronicleCapture() {
     ...args: Parameters<CouncilOrchestrator["run"]>
   ): ReturnType<CouncilOrchestrator["run"]> {
     const result = await originalRun.apply(this, args);
-    try {
-      const archive = createBrowserChronicleArchive(
-        result.report,
-        result.blackboard.events,
-      );
-      await saveBrowserChronicle(archive);
-      status = "📚 史官已把本次廷议写入本机。";
-      await refreshChronicle();
-      window.dispatchEvent(
-        new CustomEvent("chatchat:chronicle-saved", {
-          detail: {
-            sessionId: archive.sessionId,
-            eventCount: archive.events.length,
-          },
-        }),
-      );
-    } catch (caught) {
-      // A local history failure must not convert a successful Council into a
-      // failed Council. The verdict remains valid and the storage error stays
-      // local/visible in Chronicle.
-      status = `史官写入失败：${message(caught)}`;
-      renderChronicle();
-    }
+    const archive = createBrowserChronicleArchive(
+      result.report,
+      result.blackboard.events,
+    );
+
+    // The King should see HOUSE VERDICT as soon as Council computation is
+    // complete. Local history persistence is useful, but it must never sit in
+    // the critical path between CouncilOrchestrator and the result UI.
+    void persistCompletedCouncil(archive);
     return result;
   } as CouncilOrchestrator["run"];
+}
+
+async function persistCompletedCouncil(
+  archive: ReturnType<typeof createBrowserChronicleArchive>,
+): Promise<void> {
+  try {
+    await saveBrowserChronicle(archive);
+    status = "📚 史官已把本次廷议写入本机。";
+    await refreshChronicle();
+    window.dispatchEvent(
+      new CustomEvent("chatchat:chronicle-saved", {
+        detail: {
+          sessionId: archive.sessionId,
+          eventCount: archive.events.length,
+        },
+      }),
+    );
+  } catch (caught) {
+    // A local history failure must not convert a successful Council into a
+    // failed Council. The verdict is already visible; only the historian shows
+    // its local storage error.
+    status = `史官写入失败：${message(caught)}`;
+    renderChronicle();
+  }
 }
 
 function installChronicleMount() {
