@@ -70,6 +70,7 @@ async function bootBrowserProofUi() {
     </section>
   `;
   document.body.appendChild(host);
+  void placeBeforeSideFooter(host);
 
   host.addEventListener("click", (event) => {
     const action = (event.target as HTMLElement).closest<HTMLElement>("[data-action]")?.dataset.action;
@@ -168,6 +169,17 @@ function stat(label: string, value: string | number): string {
   return `<div class="proof-stat"><b>${escapeHtml(String(value))}</b><span>${escapeHtml(label)}</span></div>`;
 }
 
+async function placeBeforeSideFooter(host: HTMLElement) {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const footer = document.querySelector<HTMLElement>(".side-footer");
+    if (footer) {
+      footer.before(host);
+      return;
+    }
+    await sleep(50);
+  }
+}
+
 async function copyText(text: string) {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
@@ -193,6 +205,10 @@ function isProofPack(value: unknown): value is GateBProofPack {
 function whenDomReady(): Promise<void> {
   if (document.readyState !== "loading") return Promise.resolve();
   return new Promise((resolve) => document.addEventListener("DOMContentLoaded", () => resolve(), { once: true }));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function escapeHtml(value: string): string {
