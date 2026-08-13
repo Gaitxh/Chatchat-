@@ -11,16 +11,16 @@ import { ConsultationTheater } from "./components/ConsultationTheater.js";
 import "./consultation-theater-portal.css";
 
 const COMPLETE_EVENT = "chatchat:consultation-complete";
-const PATCH_MARKER = Symbol.for("chatchat.consultation-theater-observer.v1");
+const PATCH_MARKER = "__chatchatConsultationTheaterObserverV1" as const;
 
 interface ConsultationCompletionDetail {
   report: CouncilReport;
   events: CouncilEvent[];
 }
 
-interface PatchedPrototype {
-  [PATCH_MARKER]?: boolean;
-}
+type ObservablePrototype = typeof CouncilOrchestrator.prototype & {
+  [PATCH_MARKER]?: true;
+};
 
 installReadOnlyObserver();
 
@@ -139,7 +139,7 @@ function EventProvenanceDetail({
 }
 
 function installReadOnlyObserver() {
-  const prototype = CouncilOrchestrator.prototype as CouncilOrchestrator["constructor"]["prototype"] & PatchedPrototype;
+  const prototype = CouncilOrchestrator.prototype as ObservablePrototype;
   if (prototype[PATCH_MARKER]) return;
   prototype[PATCH_MARKER] = true;
 
