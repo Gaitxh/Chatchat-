@@ -19,8 +19,6 @@
     "types": ["vite/client"]
   },
   "include": [
-    "src/app/**/*.ts",
-    "src/app/**/*.tsx",
     "src/core/**/*.ts",
     "src/consultation/**/*.ts",
     "src/i18n/**/*.ts",
@@ -29,7 +27,6 @@
     "src/providers/**/*.ts",
     "src/validation/**/*.ts",
     "src/theater/**/*.ts",
-    "src/house/**/*.ts",
     "src/extension/**/*.ts",
     "src/extension/**/*.tsx"
   ]
