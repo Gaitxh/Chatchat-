@@ -5,6 +5,8 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Assertion failed: ${message}`);
 }
 
+let timestamp = 0;
+
 const participants: CouncilParticipant[] = [
   { id: "a", name: "ChatGPT", provider: "test" },
   { id: "b", name: "Claude", provider: "test" },
@@ -43,7 +45,6 @@ assert(!moments.some((moment) => moment.actionEventId === "support-c"), "Ordinar
 
 console.log("✓ ChatChat live persuasion provenance tests passed");
 
-let timestamp = 0;
 function event<T extends Omit<CouncilEvent, "sessionId" | "createdAt">>(value: T): CouncilEvent {
   return {
     ...value,
