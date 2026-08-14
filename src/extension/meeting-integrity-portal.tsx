@@ -1,6 +1,7 @@
-import { StrictMode, useEffect, useMemo, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { CouncilEvent, CouncilReport } from "../core/types.js";
+import { normalizeLocale, type Locale } from "../i18n/index.js";
 import { providerExecutionAuditSnapshot } from "../provider-sdk/execution-audit.js";
 import {
   providerTransportAuditSnapshot,
@@ -31,10 +32,16 @@ interface IntegrityView {
 
 function MeetingIntegrityPortal() {
   const [view, setView] = useState<IntegrityView | null>(null);
-  const zh = useMemo(
-    () => document.documentElement.lang.toLowerCase().startsWith("zh") || new URLSearchParams(location.search).get("lang") !== "en",
-    [],
-  );
+  const [locale, setLocale] = useState<Locale>(() => normalizeLocale(document.documentElement.lang));
+  const zh = locale === "zh-CN";
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setLocale(normalizeLocale(document.documentElement.lang));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const onComplete = (event: Event) => {
