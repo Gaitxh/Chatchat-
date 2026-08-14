@@ -49,7 +49,7 @@ export function ConflictBoard({
   const zh = locale === "zh-CN";
   const model = useMemo(() => deriveConflictBoard(participants, events), [participants, events]);
   const visible = model.threads.slice(0, compact ? 4 : 8);
-  const changed = model.threads.filter((thread) => thread.status === "position_changed" || thread.status === "conceded").length;
+  const changed = model.threads.filter((thread) => thread.counts.revision > 0 || thread.counts.concede > 0).length;
   const open = model.threads.filter((thread) => thread.status === "open").length;
 
   return (
@@ -58,6 +58,7 @@ export function ConflictBoard({
       data-conflict-board="event-provenance"
       data-conflict-thread-count={model.threads.length}
       data-conflict-open-count={open}
+      data-conflict-movement-count={changed}
     >
       <header className="conflict-board__header">
         <div>
@@ -123,12 +124,14 @@ function ConflictThreadCard({
 }) {
   const status = STATUS[thread.status];
   const activity = thread.activities.slice(-(compact ? 4 : 6));
+  const movement = thread.counts.revision > 0 ? "revision" : thread.counts.concede > 0 ? "concede" : "none";
   return (
     <article
       className={`conflict-thread status-${thread.status}`}
       data-conflict-thread={thread.id}
       data-conflict-anchor-event={thread.anchorEventId}
       data-conflict-status={thread.status}
+      data-conflict-movement={movement}
       data-conflict-open-issues={thread.openIssueIds.length}
     >
       <div className="conflict-thread__top">
@@ -137,8 +140,17 @@ function ConflictThreadCard({
           <span>{zh ? "事件锚点" : "EVENT ANCHOR"} · {thread.anchorActorName} · R{thread.anchorRound}</span>
           {thread.anchorStance ? <strong>{thread.anchorStance}</strong> : <strong>{KIND_META[thread.anchorKind][zh ? "zh" : "en"]}</strong>}
         </div>
-        <div className={`conflict-thread__status status-${thread.status}`}>
-          <i>{status.icon}</i>{zh ? status.zh : status.en}
+        <div className="conflict-thread__badges">
+          <div className={`conflict-thread__status status-${thread.status}`}>
+            <i>{status.icon}</i>{zh ? status.zh : status.en}
+          </div>
+          {movement !== "none" ? (
+            <small className={`conflict-thread__movement movement-${movement}`}>
+              {movement === "revision" ? "↻" : "🏳"} {movement === "revision"
+                ? (zh ? `${thread.counts.revision} 次修正` : `${thread.counts.revision} revision${thread.counts.revision === 1 ? "" : "s"}`)
+                : (zh ? `${thread.counts.concede} 次让步` : `${thread.counts.concede} concession${thread.counts.concede === 1 ? "" : "s"}`)}
+            </small>
+          ) : null}
         </div>
       </div>
 
