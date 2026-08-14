@@ -7,6 +7,8 @@ import type {
 } from "../../core/types.js";
 import type { Locale } from "../../i18n/index.js";
 import { buildPeerExchangeModel, type PeerExchangeItem, type PeerExchangeState } from "../../theater/peer-exchange.js";
+import { LiveAgenda } from "./LiveAgenda.js";
+import { OpenIssuesRadar } from "./OpenIssuesRadar.js";
 import "./peer-exchange-queue.css";
 
 interface PeerExchangeQueueProps {
@@ -94,29 +96,33 @@ export function PeerExchangeQueue({
   );
 
   return (
-    <section className="peer-exchange-queue">
-      <header className="peer-exchange-queue__header">
-        <div>
-          <span>{copy.eyebrow}</span>
-          <h3>{copy.title}</h3>
-          <p>{copy.body}</p>
-        </div>
-        <div className="peer-exchange-queue__stats">
-          <b data-peer-awaiting-count={model.pendingCount}>{model.pendingCount}</b><small>{copy.awaiting}</small>
-          <b data-peer-responding-count={model.respondingCount}>{model.respondingCount}</b><small>{copy.responding}</small>
-          <b data-peer-answered-count={model.answeredCount}>{model.answeredCount}</b><small>{copy.answered}</small>
-          {model.unresolvedCount ? <><b>{model.unresolvedCount}</b><small>{copy.unresolved}</small></> : null}
-        </div>
-      </header>
+    <div className="meeting-secretariat-stack">
+      <LiveAgenda phase={phase} events={events} participants={participants} locale={locale} />
+      <section className="peer-exchange-queue">
+        <header className="peer-exchange-queue__header">
+          <div>
+            <span>{copy.eyebrow}</span>
+            <h3>{copy.title}</h3>
+            <p>{copy.body}</p>
+          </div>
+          <div className="peer-exchange-queue__stats">
+            <b data-peer-awaiting-count={model.pendingCount}>{model.pendingCount}</b><small>{copy.awaiting}</small>
+            <b data-peer-responding-count={model.respondingCount}>{model.respondingCount}</b><small>{copy.responding}</small>
+            <b data-peer-answered-count={model.answeredCount}>{model.answeredCount}</b><small>{copy.answered}</small>
+            {model.unresolvedCount ? <><b>{model.unresolvedCount}</b><small>{copy.unresolved}</small></> : null}
+          </div>
+        </header>
 
-      {model.items.length ? (
-        <div className="peer-exchange-list">
-          {model.items.slice(0, 8).map((item) => (
-            <ExchangeCard key={item.requestEventId} item={item} locale={locale} onFocusEvent={onFocusEvent} />
-          ))}
-        </div>
-      ) : <div className="peer-exchange-empty">{copy.empty}</div>}
-    </section>
+        {model.items.length ? (
+          <div className="peer-exchange-list">
+            {model.items.slice(0, 8).map((item) => (
+              <ExchangeCard key={item.requestEventId} item={item} locale={locale} onFocusEvent={onFocusEvent} />
+            ))}
+          </div>
+        ) : <div className="peer-exchange-empty">{copy.empty}</div>}
+      </section>
+      <OpenIssuesRadar participants={participants} events={events} locale={locale} compact />
+    </div>
   );
 }
 
