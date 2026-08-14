@@ -8,6 +8,7 @@ import type {
   CouncilEvent,
   CouncilParticipant,
   CouncilReport,
+  CouncilResearchLane,
   CouncilRunOptions,
   CouncilStopReason,
   CouncilToolFact,
@@ -35,6 +36,7 @@ export class CouncilOrchestrator {
     const maxRounds = Math.max(2, options.maxRounds ?? 3);
     const minDebateRounds = Math.max(1, options.minDebateRounds ?? 1);
     const convergenceThreshold = options.convergenceThreshold ?? 0.75;
+    const researchLaneAssignments = { ...(options.researchLaneAssignments ?? {}) };
     if (convergenceThreshold <= 0 || convergenceThreshold > 1) {
       throw new Error("convergenceThreshold must be in the interval (0, 1].");
     }
@@ -48,7 +50,18 @@ export class CouncilOrchestrator {
       agent,
       contributions: await this.#respond(
         agent,
-        this.#context(agent, blackboard, sessionId, question, mode, "sealed", 1, [], sealedFacts),
+        this.#context(
+          agent,
+          blackboard,
+          sessionId,
+          question,
+          mode,
+          "sealed",
+          1,
+          [],
+          sealedFacts,
+          researchLaneAssignments[agent.participant.id],
+        ),
         options,
       ),
     })));
@@ -65,7 +78,18 @@ export class CouncilOrchestrator {
         agent,
         contributions: await this.#respond(
           agent,
-          this.#context(agent, blackboard, sessionId, question, mode, "debate", round, snapshot, facts),
+          this.#context(
+            agent,
+            blackboard,
+            sessionId,
+            question,
+            mode,
+            "debate",
+            round,
+            snapshot,
+            facts,
+            researchLaneAssignments[agent.participant.id],
+          ),
           options,
         ),
       })));
@@ -76,11 +100,6 @@ export class CouncilOrchestrator {
 
       const convergenceReached = this.#consensusRatio(blackboard) >= convergenceThreshold;
       const minimumReached = round - 1 >= minDebateRounds;
-      // Every participant in this batch responded to the same immutable pre-round
-      // snapshot. If the batch itself introduces a new claim, challenge, evidence,
-      // revision, question, or uncertainty, peers have not seen that information yet.
-      // A numerical majority must not gain the power to end deliberation before one
-      // follow-up batch can inspect the new signal.
       const needsPeerFollowUp = this.#roundNeedsPeerFollowUp(roundEvents);
       if (minimumReached && convergenceReached && !needsPeerFollowUp) {
         stopReason = "stable_alignment_no_new_signal";
@@ -96,14 +115,36 @@ export class CouncilOrchestrator {
       agent,
       contributions: await this.#respond(
         agent,
-        this.#context(agent, blackboard, sessionId, question, mode, "final", finalRound, finalSnapshot, finalFacts),
+        this.#context(
+          agent,
+          blackboard,
+          sessionId,
+          question,
+          mode,
+          "final",
+          finalRound,
+          finalSnapshot,
+          finalFacts,
+          researchLaneAssignments[agent.participant.id],
+        ),
         options,
       ),
     })));
     await this.#publish(blackboard, finalTurns.flatMap(({ agent, contributions }) =>
       contributions.map((item) => this.#materialize(sessionId, finalRound, agent.participant.id, item))), options);
 
-    return { report: this.#report(sessionId, question, mode, stopReason, finalRound, blackboard), blackboard };
+    return {
+      report: this.#report(
+        sessionId,
+        question,
+        mode,
+        stopReason,
+        researchLaneAssignments,
+        finalRound,
+        blackboard,
+      ),
+      blackboard,
+    };
   }
 
   #context(
@@ -116,6 +157,7 @@ export class CouncilOrchestrator {
     round: number,
     publicEvents: readonly CouncilEvent[],
     toolFacts: readonly CouncilToolFact[],
+    researchLane?: CouncilResearchLane,
   ): CouncilContext {
     return {
       sessionId,
@@ -123,6 +165,7 @@ export class CouncilOrchestrator {
       mode,
       phase,
       round,
+      ...(researchLane ? { researchLane } : {}),
       participant: agent.participant,
       publicEvents,
       ownEvents: blackboard.forActor(agent.participant.id),
@@ -140,6 +183,7 @@ export class CouncilOrchestrator {
       round: context.round,
       participant: agent.participant,
       state: "working",
+      ...(context.researchLane ? { researchLane: context.researchLane } : {}),
     });
     try {
       const contributions = await agent.respond(context);
@@ -148,6 +192,7 @@ export class CouncilOrchestrator {
         round: context.round,
         participant: agent.participant,
         state: "completed",
+        ...(context.researchLane ? { researchLane: context.researchLane } : {}),
         contributionKinds: contributions.map((item) => item.kind),
       });
       return contributions;
@@ -157,6 +202,7 @@ export class CouncilOrchestrator {
         round: context.round,
         participant: agent.participant,
         state: "failed",
+        ...(context.researchLane ? { researchLane: context.researchLane } : {}),
       });
       throw error;
     }
@@ -222,6 +268,7 @@ export class CouncilOrchestrator {
     question: string,
     mode: CouncilConsultationMode,
     stopReason: CouncilStopReason,
+    researchLaneAssignments: Readonly<Record<string, CouncilResearchLane>>,
     rounds: number,
     blackboard: Blackboard,
   ): CouncilReport {
@@ -233,9 +280,25 @@ export class CouncilOrchestrator {
       current.push(position);
       groups.set(key, current);
     }
+    const laneRecord = Object.keys(researchLaneAssignments).length
+      ? { researchLaneAssignments: { ...researchLaneAssignments } }
+      : {};
     const winner = [...groups.entries()].sort((a, b) => b[1].length - a[1].length)[0];
     if (!winner) {
-      return { sessionId, question, mode, stopReason, consensusStance: null, consensusRatio: 0, confidence: 0, rounds, positions, disagreements: [], eventCount: blackboard.events.length };
+      return {
+        sessionId,
+        question,
+        mode,
+        stopReason,
+        ...laneRecord,
+        consensusStance: null,
+        consensusRatio: 0,
+        confidence: 0,
+        rounds,
+        positions,
+        disagreements: [],
+        eventCount: blackboard.events.length,
+      };
     }
     const [winnerKey, winnerPositions] = winner;
     return {
@@ -243,6 +306,7 @@ export class CouncilOrchestrator {
       question,
       mode,
       stopReason,
+      ...laneRecord,
       consensusStance: winnerPositions[0]?.stance ?? null,
       consensusRatio: winnerPositions.length / this.#agents.length,
       confidence: winnerPositions.reduce((sum, position) => sum + position.confidence, 0) / winnerPositions.length,
