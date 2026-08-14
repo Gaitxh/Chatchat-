@@ -1,0 +1,47 @@
+.participant-row.connection-needs-login {
+  background: #fff8e8;
+  border-color: #ead9a8;
+}
+
+.participant-row.connection-needs-login .connection-chip {
+  font-size: 0 !important;
+  background: #f4dfad;
+  color: #76551c;
+}
+
+.participant-row.connection-needs-login .connection-chip::after {
+  content: "SIGN IN";
+  font-size: 7px;
+  font-weight: 850;
+}
+
+html[lang^="zh"] .participant-row.connection-needs-login .connection-chip::after {
+  content: "等待登录";
+}
+
+.participant-row.connection-needs-login .connection-friendly-status {
+  display: none;
+}
+
+.login-concierge-note {
+  display: grid;
+  gap: 2px;
+  margin-top: 7px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  background: rgba(255, 245, 218, .9);
+  color: #6f5422;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.login-concierge-note strong {
+  font-size: 9px;
+  color: #5e4314;
+}
+
+.participant-row.connection-needs-login .participant-row-actions button:first-child {
+  background: #292d34;
+  color: #fff;
+  font-weight: 800;
+}
