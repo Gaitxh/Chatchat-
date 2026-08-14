@@ -60,8 +60,11 @@ jobs:
           test -s artifacts/chatchat-self-healing-en.png
           grep -q 'data-chatchat-provider-self-healing-showcase="complete"' artifacts/chatchat-self-healing-en.html
           grep -q 'data-chatchat-self-healing-navigation-count="1"' artifacts/chatchat-self-healing-en.html
+          grep -q '>SELF-HEALING<' artifacts/chatchat-self-healing-en.html
           grep -q 'Claude is self-healing' artifacts/chatchat-self-healing-en.html
           grep -q 'No action needed' artifacts/chatchat-self-healing-en.html
+          ! grep -q '>NEEDS HELP<' artifacts/chatchat-self-healing-en.html
+          ! grep -q 'Automatic setup needs help' artifacts/chatchat-self-healing-en.html
 
       - name: Capture Chinese self-healing state
         run: |
@@ -71,8 +74,11 @@ jobs:
           test -s artifacts/chatchat-self-healing-zh.png
           grep -q 'data-chatchat-provider-self-healing-showcase="complete"' artifacts/chatchat-self-healing-zh.html
           grep -q 'data-chatchat-self-healing-navigation-count="1"' artifacts/chatchat-self-healing-zh.html
+          grep -q '>自动修复中<' artifacts/chatchat-self-healing-zh.html
           grep -q 'Claude 正在自动修复连接' artifacts/chatchat-self-healing-zh.html
           grep -q '你不需要操作' artifacts/chatchat-self-healing-zh.html
+          ! grep -q '>需要帮助<' artifacts/chatchat-self-healing-zh.html
+          ! grep -q '自动识别没有完全成功' artifacts/chatchat-self-healing-zh.html
 
       - name: Prove automatic self-healing reaches READY
         run: |
@@ -84,6 +90,7 @@ jobs:
             grep -q 'data-chatchat-provider-self-healing-showcase="complete"' "artifacts/chatchat-self-healed-$LANG.html"
             grep -q 'data-chatchat-self-healing-navigation-count="1"' "artifacts/chatchat-self-healed-$LANG.html"
             grep -q 'participant-row connection-ready is-ready' "artifacts/chatchat-self-healed-$LANG.html"
+            ! grep -q 'data-chatchat-self-healing="true"' "artifacts/chatchat-self-healed-$LANG.html"
           done
 
       - name: Save preview log
