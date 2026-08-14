@@ -47,6 +47,10 @@ import {
   type TeachSelection,
 } from "../provider-sdk/recipe.js";
 import type { ProviderProfile } from "../provider-sdk/types.js";
+import {
+  CONNECTION_RETRY_REQUESTED_EVENT,
+  type ConnectionRetryRequestedDetail,
+} from "./connection-retry-wire.js";
 import "./consultation-panel.css";
 import "./consultation-live.css";
 
@@ -139,6 +143,19 @@ function ConsultationApp() {
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
+
+  useEffect(() => {
+    const onRetryRequested = (event: Event) => {
+      const seatId = (event as CustomEvent<ConnectionRetryRequestedDetail>).detail?.seatId;
+      if (!seatId) return;
+      const participant = participants.find((item) => item.seatId === seatId);
+      const connection = connections[seatId];
+      if (!participant || connection?.state === "ready" || connection?.state === "connecting") return;
+      void autoConnectParticipant(participant, recipes[participant.origin]);
+    };
+    window.addEventListener(CONNECTION_RETRY_REQUESTED_EVENT, onRetryRequested);
+    return () => window.removeEventListener(CONNECTION_RETRY_REQUESTED_EVENT, onRetryRequested);
+  }, [participants, recipes, connections]);
 
   const readyParticipants = useMemo(
     () => participants.filter((item) => isParticipantReady(item, recipes, connections)),
