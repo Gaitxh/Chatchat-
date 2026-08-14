@@ -1,0 +1,42 @@
+.participant-row.connection-self-healing {
+  border-color: rgba(125, 166, 221, .22);
+  box-shadow: inset 0 0 0 1px rgba(100, 146, 207, .045);
+}
+
+.provider-self-healing-note {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  background: rgba(70, 115, 176, .075);
+  color: #8999ad;
+  font-size: 6.3px;
+  line-height: 1.35;
+}
+
+.provider-self-healing-note__pulse {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 0 rgba(125, 166, 221, .28);
+  animation: chatchat-self-heal-pulse 1.25s ease-out infinite;
+}
+
+.provider-self-healing-note__en { display: none; }
+html[lang^="en"] .provider-self-healing-note__zh { display: none; }
+html[lang^="en"] .provider-self-healing-note__en { display: inline; }
+
+@keyframes chatchat-self-heal-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(125, 166, 221, .28); opacity: .95; }
+  70% { box-shadow: 0 0 0 5px rgba(125, 166, 221, 0); opacity: .75; }
+  100% { box-shadow: 0 0 0 0 rgba(125, 166, 221, 0); opacity: .95; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .provider-self-healing-note__pulse { animation: none; }
+}
