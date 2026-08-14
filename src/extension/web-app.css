@@ -130,6 +130,18 @@ html[data-surface="web-app"] .quick-open {
   display: none !important;
 }
 
+/* Fresh users get a focused launch lobby, not an empty control room. */
+html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] #spectator-mode-root,
+html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] .participants-card,
+html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] #consultation-history-root,
+html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] .setup-card {
+  display: none !important;
+}
+
+html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] .proposal-card {
+  grid-column: 1 / -1;
+}
+
 html[data-surface="web-app"] .proposal-card textarea {
   min-height: 160px;
   font-size: 14px;
