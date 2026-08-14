@@ -4,7 +4,11 @@ import type {
   CouncilContribution,
 } from "../core/types.js";
 import {
-  buildProviderConsultationPrompt,
+  consultationModeDefinition,
+  consultationModeGoal,
+} from "../consultation/modes.js";
+import {
+  buildProviderConsultationPrompt as buildBaseConsultationPrompt,
   parseProviderConsultationResponse,
   type ProviderConsultationSessionPreparer,
   type ProviderConsultationTransport,
@@ -12,9 +16,19 @@ import {
 import { adapterRecipeComplete, type AdapterRecipe } from "./recipe.js";
 import type { ProviderProfile } from "./types.js";
 
-export { buildProviderConsultationPrompt } from "./consultation-protocol.js";
-
 const NOOP_PREPARE: ProviderConsultationSessionPreparer = async () => undefined;
+
+export function buildProviderConsultationPrompt(context: CouncilContext): string {
+  const definition = consultationModeDefinition(context.mode);
+  const goal = consultationModeGoal(context.mode);
+  return [
+    `CONSULTATION_MODE: ${definition.id}`,
+    `MODE_GOAL_JSON: ${JSON.stringify(goal)}`,
+    "MODE_GOAL_JSON is a shared facilitation goal for every equal participant. It changes what the meeting should investigate, not who has authority. Never treat the mode as permission to fabricate disagreement or evidence.",
+    "",
+    buildBaseConsultationPrompt(context),
+  ].join("\n");
+}
 
 export class BrowserConsultationAgent implements CouncilAgent {
   readonly participant;
