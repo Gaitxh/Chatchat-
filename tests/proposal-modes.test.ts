@@ -65,7 +65,7 @@ assert(aGoal === bGoal, "Equal participants in the same mode must receive exactl
 
 const defaultPrompt = buildProviderConsultationPrompt(context(undefined, "a"));
 assert(defaultPrompt.includes("CONSULTATION_MODE: balanced"), "Omitted mode must remain backward-compatible with Balanced.");
-assert(!defaultPrompt.includes("CHATCHAT_EQUAL_RESEARCH_LANE"), "Ordinary Balanced consultations must not silently assign specialized Research Lanes.");
+assert(!defaultPrompt.includes("CHATCHAT_EQUAL_RESEARCH_LANE"), "A prompt may only claim a Research Lane when the orchestrator actually supplies one.");
 
 for (const mode of expected) {
   const definition = consultationModeDefinition(mode);
@@ -91,12 +91,26 @@ assert(new Set(verifyLaneOrder).size === 5, "Five Verify participants should cov
 const stressLanes = consultationResearchLaneAssignments("stress_test", laneParticipants);
 assert(stressLanes["lane-a"] === "strongest_counterexample", "Stress Test must put strongest-counterexample investigation first without granting it extra authority.");
 assert(stressLanes["lane-b"] === "user_failure_modes", "Stress Test should diversify the second seat toward real-user failure modes.");
-assert(Object.keys(consultationResearchLaneAssignments("balanced", laneParticipants)).length === 0, "Balanced mode must keep a common general-purpose investigation objective.");
+const balancedLanes = consultationResearchLaneAssignments("balanced", laneParticipants);
+assert(Object.keys(balancedLanes).length === laneParticipants.length, "Balanced mode must also diversify research instead of leaving every participant on the same general objective.");
+assert(balancedLanes["lane-a"] === "primary_sources", "Balanced research should begin with primary-source verification.");
+assert(balancedLanes["lane-b"] === "strongest_counterexample", "Balanced research should include a real counterexample mission.");
 
 const verifyOptions = applyConsultationModePolicy("verify", {}, laneParticipants);
 assert(
   Object.keys(verifyOptions.researchLaneAssignments ?? {}).length === 5,
   "The browser mode policy must carry generated Research Lane assignments into CouncilRunOptions.",
+);
+const balancedOptions = applyConsultationModePolicy("balanced", {}, laneParticipants);
+assert(
+  Object.keys(balancedOptions.researchLaneAssignments ?? {}).length === 5,
+  "The default Balanced browser path must carry equal-authority Research Lanes into CouncilRunOptions.",
+);
+const customResearchAssignments: Record<string, CouncilResearchLane> = { "lane-a": "user_failure_modes" };
+const customOptions = applyConsultationModePolicy("balanced", { researchLaneAssignments: customResearchAssignments }, laneParticipants);
+assert(
+  customOptions.researchLaneAssignments === customResearchAssignments,
+  "Explicit caller-supplied research assignments must override generated defaults instead of being silently rewritten.",
 );
 
 const primaryPrompt = buildProviderConsultationPrompt(context("verify", "lane-a", "primary_sources"));
@@ -164,7 +178,7 @@ for (const [participantId, lane] of Object.entries(explicitAssignments) as [stri
 }
 
 console.log("✓ ChatChat Proposal Mode goal/pacing tests passed");
-console.log("✓ Equal-authority Research Lanes diversify investigation without changing the shared meeting objective");
+console.log("✓ Equal-authority Research Lanes diversify every consultation mode without changing the shared meeting objective");
 console.log("✓ Research Lane assignments propagate through Council context, live lifecycle and report provenance");
 
 function context(
