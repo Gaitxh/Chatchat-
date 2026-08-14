@@ -42,7 +42,10 @@
     }
 
     const conflict = document.querySelector('[data-conflict-board="event-provenance"]');
-    const changedThread = conflict?.querySelector('[data-conflict-status="position_changed"][data-conflict-anchor-event]');
+    // A thread may remain OPEN even after an explicit revision. Movement and
+    // unresolved obligations are independent facts; do not force them into one
+    // mutually exclusive status just to make the showcase green.
+    const changedThread = conflict?.querySelector('[data-conflict-movement="revision"][data-conflict-anchor-event]');
     const changedChallenge = changedThread?.querySelector('[data-conflict-count-kind="challenge"]');
     const changedEvidence = changedThread?.querySelector('[data-conflict-count-kind="evidence"]');
     const changedRevision = changedThread?.querySelector('[data-conflict-count-kind="revision"]');
