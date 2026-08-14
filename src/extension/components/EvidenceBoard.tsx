@@ -8,6 +8,8 @@ import {
   type EvidenceRecord,
   type EvidenceVerificationSnapshot,
 } from "../../evidence/evidence-ledger.js";
+import { focusConsultationEvent } from "../provenance-wire.js";
+import { EvidenceGapRadar } from "./EvidenceGapRadar.js";
 import "./evidence-board.css";
 
 declare const chrome: any;
@@ -160,56 +162,66 @@ export function EvidenceBoard({
   }
 
   return (
-    <section className={`evidence-board ${readOnly ? "is-archive" : ""}`}>
-      <div className="evidence-board__heading">
-        <div><span>{copy.kicker}</span><h3>{copy.title}</h3><p>{copy.body}</p></div>
-        {readOnly ? <b className="evidence-archive-badge">{copy.archive}</b> : records.some((record) => record.sourceUrl) ? (
-          <button type="button" onClick={() => void checkAll()} disabled={busyIds.size > 0}>
-            {busyIds.size ? copy.checking : copy.checkAll}
-          </button>
-        ) : null}
-      </div>
-
-      {records.length ? (
-        <div className="evidence-list">
-          {records.map((record) => {
-            const verification = verifications[record.evidenceEventId];
-            const state = evidenceDisplayState(record, verification);
-            const busy = busyIds.has(record.evidenceEventId);
-            return (
-              <article className={`evidence-card source-${state.sourceState}`} key={record.evidenceEventId}>
-                <div className="evidence-card__top">
-                  <div className="evidence-source-mark">📎</div>
-                  <div><strong>{record.claim}</strong><span>R{record.round} · {copy.submittedBy} {record.actorName}</span></div>
-                  <div className="evidence-badges">
-                    <span className={`source-badge badge-${state.sourceState}`}>{sourceStateLabel(state.sourceState, copy)}</span>
-                    {state.disputed ? <span className="badge-disputed">⚔ {copy.disputed}</span> : null}
-                    {state.changedMind ? <span className="badge-influence">↻ {copy.changedMind}</span> : null}
-                  </div>
-                </div>
-                <p>{record.content}</p>
-                <dl>
-                  <div><dt>{copy.source}</dt><dd>{record.sourceHost ?? copy.noSafeUrl}</dd></div>
-                  <div><dt>{copy.sourceDate}</dt><dd>{record.sourceDate ?? copy.noDate}</dd></div>
-                  <div><dt>{copy.observed}</dt><dd>{verification ? formatObserved(verification.observedAt, locale) : copy.unchecked}</dd></div>
-                </dl>
-                {verification?.title ? <div className="evidence-page-title">“{verification.title}”</div> : null}
-                {verification?.statusCode ? <small>HTTP {verification.statusCode} · {verification.contentType || "unknown content type"}{verification.truncated ? " · bounded" : ""}</small> : null}
-                {!readOnly ? (
-                  <div className="evidence-actions">
-                    {record.sourceUrl ? <button type="button" onClick={() => void chrome.tabs.create({ url: record.sourceUrl, active: true })}>{copy.openSource}</button> : null}
-                    {record.sourceUrl ? <button type="button" className="primary" disabled={busy} onClick={() => void checkRecord(record)}>{busy ? copy.checking : copy.checkSource}</button> : null}
-                  </div>
-                ) : null}
-              </article>
-            );
-          })}
+    <>
+      <section className={`evidence-board ${readOnly ? "is-archive" : ""}`}>
+        <div className="evidence-board__heading">
+          <div><span>{copy.kicker}</span><h3>{copy.title}</h3><p>{copy.body}</p></div>
+          {readOnly ? <b className="evidence-archive-badge">{copy.archive}</b> : records.some((record) => record.sourceUrl) ? (
+            <button type="button" onClick={() => void checkAll()} disabled={busyIds.size > 0}>
+              {busyIds.size ? copy.checking : copy.checkAll}
+            </button>
+          ) : null}
         </div>
-      ) : <div className="evidence-empty">{copy.none}</div>}
 
-      <p className="evidence-boundary">⚠ {readOnly ? copy.archiveNote : copy.note}</p>
-      {error ? <p className="evidence-error">{error}</p> : null}
-    </section>
+        {records.length ? (
+          <div className="evidence-list">
+            {records.map((record) => {
+              const verification = verifications[record.evidenceEventId];
+              const state = evidenceDisplayState(record, verification);
+              const busy = busyIds.has(record.evidenceEventId);
+              return (
+                <article className={`evidence-card source-${state.sourceState}`} key={record.evidenceEventId}>
+                  <div className="evidence-card__top">
+                    <div className="evidence-source-mark">📎</div>
+                    <div><strong>{record.claim}</strong><span>R{record.round} · {copy.submittedBy} {record.actorName}</span></div>
+                    <div className="evidence-badges">
+                      <span className={`source-badge badge-${state.sourceState}`}>{sourceStateLabel(state.sourceState, copy)}</span>
+                      {state.disputed ? <span className="badge-disputed">⚔ {copy.disputed}</span> : null}
+                      {state.changedMind ? <span className="badge-influence">↻ {copy.changedMind}</span> : null}
+                    </div>
+                  </div>
+                  <p>{record.content}</p>
+                  <dl>
+                    <div><dt>{copy.source}</dt><dd>{record.sourceHost ?? copy.noSafeUrl}</dd></div>
+                    <div><dt>{copy.sourceDate}</dt><dd>{record.sourceDate ?? copy.noDate}</dd></div>
+                    <div><dt>{copy.observed}</dt><dd>{verification ? formatObserved(verification.observedAt, locale) : copy.unchecked}</dd></div>
+                  </dl>
+                  {verification?.title ? <div className="evidence-page-title">“{verification.title}”</div> : null}
+                  {verification?.statusCode ? <small>HTTP {verification.statusCode} · {verification.contentType || "unknown content type"}{verification.truncated ? " · bounded" : ""}</small> : null}
+                  {!readOnly ? (
+                    <div className="evidence-actions">
+                      {record.sourceUrl ? <button type="button" onClick={() => void chrome.tabs.create({ url: record.sourceUrl, active: true })}>{copy.openSource}</button> : null}
+                      {record.sourceUrl ? <button type="button" className="primary" disabled={busy} onClick={() => void checkRecord(record)}>{busy ? copy.checking : copy.checkSource}</button> : null}
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        ) : <div className="evidence-empty">{copy.none}</div>}
+
+        <p className="evidence-boundary">⚠ {readOnly ? copy.archiveNote : copy.note}</p>
+        {error ? <p className="evidence-error">{error}</p> : null}
+      </section>
+
+      <EvidenceGapRadar
+        participants={participants}
+        events={events}
+        verifications={verifications}
+        locale={locale}
+        onFocusEvent={focusConsultationEvent}
+      />
+    </>
   );
 }
 
