@@ -33,6 +33,11 @@ function install() {
     attributes: true,
     attributeFilter: ["class"],
   });
+  const localeObserver = new MutationObserver(queueRefresh);
+  localeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["lang"],
+  });
   chrome.tabs?.onUpdated?.addListener?.(() => queueRefresh());
   queueRefresh();
 }
@@ -72,6 +77,12 @@ async function refresh() {
       if (needsLogin) decorateLoginState(row, participant.providerName);
       else clearLoginState(row);
     }));
+
+    if (rows.some((row) => row.classList.contains("connection-needs-login"))) {
+      document.documentElement.dataset.chatchatLoginPending = "true";
+    } else {
+      delete document.documentElement.dataset.chatchatLoginPending;
+    }
   } catch {
     // Login guidance is best-effort and must never interfere with consultation.
   } finally {
@@ -162,20 +173,22 @@ function decorateLoginState(row: HTMLElement, providerName: string) {
     openButton.textContent = locale === "zh-CN" ? "去登录" : "Sign in";
   }
 
-  if (row.querySelector(".login-concierge-note")) return;
-  const note = document.createElement("div");
-  note.className = "login-concierge-note";
-  const strong = document.createElement("strong");
-  const body = document.createElement("span");
-  if (locale === "zh-CN") {
-    strong.textContent = `去 ${providerName} 完成登录`;
-    body.textContent = "登录完成后不用回来点重试。页面加载后，ChatChat 会自动继续连接。";
-  } else {
-    strong.textContent = `Sign in to ${providerName}`;
-    body.textContent = "No retry needed. After the page finishes loading, ChatChat will continue automatically.";
+  let note = row.querySelector<HTMLDivElement>(".login-concierge-note");
+  if (!note) {
+    note = document.createElement("div");
+    note.className = "login-concierge-note";
+    note.append(document.createElement("strong"), document.createElement("span"));
+    row.querySelector(".participant-main")?.append(note);
   }
-  note.append(strong, body);
-  row.querySelector(".participant-main")?.append(note);
+  const strong = note.querySelector("strong");
+  const body = note.querySelector("span");
+  if (locale === "zh-CN") {
+    if (strong) strong.textContent = `去 ${providerName} 完成登录`;
+    if (body) body.textContent = "登录完成后不用回来点重试。页面加载后，ChatChat 会自动继续连接。";
+  } else {
+    if (strong) strong.textContent = `Sign in to ${providerName}`;
+    if (body) body.textContent = "No retry needed. After the page finishes loading, ChatChat will continue automatically.";
+  }
 }
 
 function clearLoginState(row: HTMLElement) {
