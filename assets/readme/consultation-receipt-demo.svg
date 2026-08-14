@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="ChatChat Consultation Receipt demo">
+  <rect width="1200" height="630" rx="32" fill="#f7f5ef"/>
+  <g font-family="ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans CJK SC',sans-serif">
+    <text x="58" y="68" fill="#23221f" font-size="27" font-weight="760">ChatChat</text>
+    <text x="58" y="96" fill="#8b8479" font-size="12" font-weight="700" letter-spacing="1.6">CONSULTATION RECEIPT · 协商收据</text>
+    <rect x="914" y="42" width="228" height="56" rx="18" fill="#252824"/>
+    <text x="1028" y="77" fill="#ffffff" text-anchor="middle" font-size="17" font-weight="720">◉ Balanced · 平衡</text>
+
+    <rect x="50" y="126" width="1100" height="118" rx="22" fill="#fffdf9" stroke="#e4dfd6"/>
+    <text x="74" y="156" fill="#989084" font-size="11" font-weight="750" letter-spacing="1.2">PROPOSAL · 提案</text>
+    <text x="74" y="190" fill="#292723" font-size="23" font-weight="650">For a local-first multi-AI browser project, what should we prioritize now</text>
+    <text x="74" y="220" fill="#292723" font-size="23" font-weight="650">to maximize practical value and communication value?</text>
+
+    <text x="50" y="286" fill="#8f887e" font-size="11" font-weight="750" letter-spacing="1.2">OUTCOME · 协商结果</text>
+    <text x="50" y="330" fill="#1f201d" font-size="37" font-weight="760">Browser Extension</text>
+    <text x="1140" y="330" fill="#1f201d" text-anchor="end" font-size="32" font-weight="780">100%</text>
+    <text x="50" y="370" fill="#736d64" font-size="15">3 AIs · 4 rounds · ⚔ 2 challenges · 📎 1 evidence · ↻ 1 revision</text>
+
+    <rect x="50" y="410" width="530" height="142" rx="20" fill="#fffdf9" stroke="#e1dcd3"/>
+    <text x="72" y="440" fill="#8b8378" font-size="10" font-weight="760" letter-spacing="1">KEY TURN · 关键转折</text>
+    <text x="72" y="478" fill="#3b3833" font-size="20" font-weight="700">Gemini → Claude</text>
+    <text x="72" y="508" fill="#69635b" font-size="15">Web + Extension → Browser Extension</text>
+    <text x="72" y="532" fill="#9a9288" font-size="11">explicit revision.causedBy · evidence event</text>
+
+    <rect x="600" y="410" width="550" height="142" rx="20" fill="#eef3ec" stroke="#dbe4d8"/>
+    <text x="622" y="440" fill="#6d806c" font-size="10" font-weight="760" letter-spacing="1">EVIDENCE · 证据</text>
+    <text x="622" y="478" fill="#39483a" font-size="20" font-weight="700">developer.chrome.com</text>
+    <text x="622" y="508" fill="#60715f" font-size="14">REACHABLE · DISPUTED · ↻ CHANGED A VIEW</text>
+    <text x="622" y="532" fill="#879485" font-size="11">source reachability is not a truth verdict</text>
+
+    <text x="50" y="592" fill="#979086" font-size="11">No chair AI · Majority is not authority · Reachable is not proof · Local replay</text>
+    <text x="1150" y="592" fill="#aaa399" text-anchor="end" font-size="10">LOCAL · SHARE ONLY WHEN YOU CHOOSE</text>
+  </g>
+</svg>

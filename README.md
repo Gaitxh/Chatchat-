@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/readme/chatchat-hero-minimal.svg" width="100%" alt="ChatChat — one proposal, independent minds, shared reasoning" />
 
-  <p><strong>Bring the AI tabs you already use into one local consultation.</strong><br />Ask once. Let every AI think independently, challenge claims, bring evidence, revise positions, and keep its own final view.</p>
+  <p><strong>Bring the AI tabs you already use into one local consultation.</strong><br />Ask once. Let independent AIs think alone first, then challenge claims, bring evidence, revise positions, preserve disagreement, and decide what is still worth investigating.</p>
 
   <p><em>A small, polite intellectual riot — with receipts.</em></p>
 
@@ -12,42 +12,56 @@
 
 ## Three monologues are not a meeting
 
-```text
-ordinary multi-model UI             ChatChat
+Most multi-model interfaces stop here:
 
-You → ChatGPT                        one proposal
-You → Claude                             ↓
-You → Gemini                         sealed opinions
-                                         ↓
-                                    shared Blackboard
-                                         ↓
-                              challenge · evidence · support
-                                         ↓
-                              machine source observations
-                                         ↓
-                                revision · concede
-                                         ↓
-                         outcome · minority views · replay
+```text
+You → ChatGPT
+You → Claude
+You → Gemini
 ```
 
-There is **no chair AI**, no forced unanimity, and no mysterious “the models agreed.” Every participant is an equal peer. The user proposes; ChatChat coordinates.
+ChatChat keeps going:
 
-## Watch the room move
+```text
+one proposal
+    ↓
+sealed independent opinions
+    ↓
+shared Blackboard
+    ↓
+challenge · evidence · support · defense
+    ↓
+machine source observations
+    ↓
+revision · concede · surviving minority
+    ↓
+what is still unresolved?
+    ↓
+next move · local replay · shareable receipt
+```
+
+There is **no chair AI**, no privileged evidence feed, and no forced unanimity. The user proposes; every AI participates as an equal peer; ChatChat coordinates the public event protocol.
 
 <p align="center"><img src="assets/readme/demo-overview.svg" width="100%" alt="ChatChat consultation product demo" /></p>
 
-The Side Panel is not a scrolling wall of answers. It is a spectator view of the public, structured consultation:
+---
 
-**ROOM PULSE** shows current explicit positions and alignment.  
-**LIVE MOMENTS** surfaces real clashes, evidence drops, concessions and revisions.  
-**RELATIONSHIP MAP** draws only links backed by event IDs — prose mentions never invent influence.  
-**CONSULTATION THEATER** replays exactly what happened after the meeting.
+## 01 · Pick the kind of meeting
 
-> Spectacle is allowed. Invented drama is not.
+Not every question deserves the same discussion.
 
-## A source enters the room. The room does not bow to it.
+<table>
+<tr><td><strong>◉ Balanced</strong><br/>A practical default: disagree, update, finish.</td><td><strong>🌿 Explore</strong><br/>Keep alternatives alive longer; resist premature convergence.</td><td><strong>⚖ Decide</strong><br/>Make trade-offs explicit and finish with a usable recommendation.</td></tr>
+<tr><td><strong>🔎 Verify</strong><br/>Push on facts, source scope, dates, evidence gaps and uncertainty.</td><td><strong>🧨 Stress Test</strong><br/>Search for strongest counterexamples and failure conditions — without inventing disagreement for drama.</td><td><strong>Same mode, every AI</strong><br/>The mode changes the meeting goal and pacing, never participant authority.</td></tr>
+</table>
 
-This is the kind of consultation ChatChat is built to make visible:
+The selected mode is visible above the proposal. It changes both the public pacing and the shared `MODE_GOAL_JSON` seen by every participant.
+
+---
+
+## 02 · Watch evidence move the room
+
+A source entering the meeting does **not** end the argument.
 
 ```text
 R1 · SEALED
@@ -58,18 +72,15 @@ Gemini   → Browser Extension
 
         ↓
 
-R2 · OPEN CONSULTATION
-
 ⚔ ChatGPT → Claude
   “What evidence justifies maintaining two product cores?”
 
 📎 Gemini → Blackboard
-  Chrome extension permission documentation
   developer.chrome.com
 
         ↓
 
-👁 CHATCHAT SOURCE OBSERVATION
+👁 SOURCE OBSERVATION
 
 SOURCE STATE        REACHABLE
 PAGE DATE           2026-07-14
@@ -95,45 +106,67 @@ Browser Extension
 causedBy: Gemini evidence event
 ```
 
-The same evidence can be **reachable, disputed, and influential at the same time**. Those are different facts, so ChatChat keeps them different.
+The same evidence can be **reachable, disputed, and influential at the same time**. ChatChat keeps those facts separate.
 
-Machine observations enter later rounds through a separate `TOOL_FACTS_JSON` channel. Every AI in the same round receives the **same bounded snapshot**. A tool result is data — never a privileged model and never a truth badge.
+`ROOM PULSE` shows explicit positions. `LIVE MOMENTS` surfaces event-backed turning points. `RELATIONSHIP MAP` draws only traceable edges. `CONSULTATION THEATER` lets you open the original event that caused a revision.
 
-## Zero-touch for humans, strict underneath
+> Spectacle is allowed. Invented drama is not.
 
-A nontechnical user should mostly see:
+---
 
-```text
-1 · Open the AI sites you already use
-2 · Connect my discovered AIs
-3 · Write one proposal
-```
+## 03 · The meeting can tell you what is still unresolved
 
-Underneath, ChatChat automatically tries to:
+An outcome is not the end of inquiry.
+
+The **Evidence Gap Radar** looks only at structured events and asks things such as:
 
 ```text
-find composer → find send action → discover reply surface
-      ↓
-short connection handshake
-      ↓
-structured Consultation Gate
-      ↓
-READY ✓
+⚔ challenged claim · no evidence linked
+👁 source supplied · not observed yet
+🕒 source date missing
+🔎 evidence still disputed
+↻ evidence changed a view
+🧍 minority view survived the final round
 ```
 
-If an AI is on a login page, just sign in normally. When the tab finishes loading, ChatChat automatically resumes the connection flow. Manual selector teaching lives under **Advanced repair** only.
+From those gaps, **NEXT MOVE** offers transparent follow-ups:
 
-## Receipts, not vibes
+```text
+↻ Stress-test the evidence-driven revision
 
-<table>
-<tr><td width="50%"><strong>🧠 Sealed first round</strong><br/>Natural disagreement is recorded before peer influence begins.</td><td width="50%"><strong>⚖️ Equal participants</strong><br/>No moderator model gets a privileged voice or private evidence feed.</td></tr>
-<tr><td><strong>📎 Evidence Ledger</strong><br/>Who submitted a source, who challenged it, and whether it explicitly caused a revision remain separate facts.</td><td><strong>👁 Source Observation</strong><br/>Bounded title/date/excerpt/fingerprint observations describe what the page exposed — not whether a claim is true.</td></tr>
-<tr><td><strong>↻ Changed minds with receipts</strong><br/>Strong influence requires explicit provenance such as <code>revision.causedBy[]</code>.</td><td><strong>📚 Frozen local history</strong><br/>Meeting events and evidence observations are replayed from local IndexedDB with zero automatic network requests.</td></tr>
-</table>
+This evidence is disputed and also explicitly caused a later revision.
+That makes it worth a focused re-check.
 
-## Pick how much of the meeting you want to watch
+[ Use as next proposal ]   [ Trace why ]
+```
 
-The Full Room includes three spectator modes that never change the underlying AI prompts:
+Clicking a move only stages a new proposal and preselects a suggested meeting mode. **Nothing auto-sends.** You review it, change it, switch modes if you want, and decide whether another consultation happens.
+
+That makes ChatChat a continuing investigation without inventing a chairperson.
+
+---
+
+## 04 · Take the meeting with you
+
+A finished consultation can collapse into one local **Consultation Receipt** — enough context to share what happened without exporting the whole chat transcript.
+
+<p align="center"><img src="assets/readme/consultation-receipt-demo.svg" width="100%" alt="ChatChat local Consultation Receipt" /></p>
+
+The receipt is derived from structured events, final positions and frozen evidence observations. It can show:
+
+- meeting mode and outcome;
+- challenge / evidence / revision counts;
+- an explicit evidence → revision key turn;
+- reachable / disputed / changed-a-view evidence state;
+- surviving minority positions.
+
+**Copy Markdown** produces HTML-safe text. **Export SVG** creates the card locally in your browser. ChatChat uploads nothing on its own.
+
+---
+
+## Watch as much — or as little — as you want
+
+The Full Room has three spectator modes that never change the underlying consultation:
 
 ```text
 ◌ Quiet   → proposal + outcome
@@ -141,7 +174,25 @@ The Full Room includes three spectator modes that never change the underlying AI
 ⚡ Arena   → relationship battlefield + stronger motion
 ```
 
-Arena respects `prefers-reduced-motion`. “Room heat” means **interaction intensity**, not answer quality. 100% alignment still does not mean 100% truth.
+Arena respects `prefers-reduced-motion`. “Room heat” means interaction intensity, **not answer quality**. 100% alignment still does not mean 100% truth.
+
+---
+
+## Local-first by design
+
+For a normal user, setup should feel like:
+
+```text
+1 · Open the AI sites you already use
+2 · Let ChatChat connect the discovered AIs
+3 · Write one proposal
+```
+
+Underneath, ChatChat attempts page discovery → a short connection handshake → the structured Consultation Gate. If an AI is on a login page, sign in normally; after the page reloads, ChatChat resumes automatically. Manual selector teaching lives under **Advanced repair**.
+
+Provider accounts remain in their own browser tabs. ChatChat has no relay server. Evidence source checks use bounded, credential-free fetches after browser permission. Archive replay reads frozen local IndexedDB events and evidence observations with **zero automatic Provider calls and zero automatic source re-checks**.
+
+---
 
 ## Quick start
 
@@ -162,30 +213,12 @@ npm run dev:web
 
 See the [Browser Extension guide](docs/BROWSER_EXTENSION.md) and [Consultation Protocol](docs/CONSULTATION_PROTOCOL.md).
 
-## Trust boundaries
-
-- Provider accounts remain in their own browser tabs.
-- ChatChat has no relay server.
-- Round 1 is independent by design.
-- Majority support is not treated as truth.
-- Source reachability is not treated as claim verification.
-- New evidence origins require user-granted browser permission; already-permitted sources may be observed between rounds.
-- Tool observations use bounded, credential-free fetches and are shared equally within a round.
-- Broken event references are omitted, not guessed.
-- Archive replay makes no Provider call and no automatic source re-check.
-
-## On stage now
-
-**Browser-first bilingual consultation · automatic AI-page setup · login auto-resume · Room Pulse · Live Moments · Relationship Map · Evidence Ledger · Source Observation · shared tool facts · Consultation Theater · local Consultation History · frozen evidence replay.**
-
-The major real-world gate still ahead is [two-Provider Browser validation](https://github.com/Gaitxh/Chatchat-/issues/12): two genuinely signed-in AI websites completing one real-only consultation on a user machine.
+---
 
 ## Human-led, AI-assisted
 
 ChatChat is created and independently maintained by **Gaitxh**, with product ideation, interface and visual design, implementation, debugging, testing, and documentation assistance from **OpenAI's ChatGPT and Codex**.
 
 Every direction and final change remains human-directed and reviewed. ChatChat is an independent open-source project and is **not sponsored, endorsed, or operated by OpenAI**.
-
----
 
 <div align="center"><strong>One proposal. Independent minds. Shared reasoning.</strong><br /><sub>Evidence can matter without becoming authority.</sub></div>
