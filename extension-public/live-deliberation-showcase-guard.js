@@ -8,6 +8,11 @@
   let sawFreshSignalAgenda = false;
   let sawOpenIssue = false;
 
+  function markComplete(attribute) {
+    if (document.documentElement.getAttribute(attribute) === "complete") return;
+    document.documentElement.setAttribute(attribute, "complete");
+  }
+
   function inspect() {
     const stream = document.querySelector(".live-discussion-stream");
     if (!(stream instanceof HTMLElement)) return false;
@@ -21,14 +26,14 @@
     if (openIssues && openIssue) sawOpenIssue = true;
 
     const secretariatComplete = sawFreshSignalAgenda && sawOpenIssue;
-    if (secretariatComplete) document.documentElement.setAttribute(SECRETARIAT_ATTR, "complete");
+    if (secretariatComplete) markComplete(SECRETARIAT_ATTR);
 
     const answeredExchange = document.querySelector('[data-peer-response-state="answered"][data-peer-response-event]');
     const queuedStage = answeredExchange?.querySelector('[data-peer-stage="queued"]');
     const targetTurnStage = answeredExchange?.querySelector('[data-peer-stage="responding"]');
     const answeredStage = answeredExchange?.querySelector('[data-peer-stage="answered"]');
     const peerLifecycleComplete = Boolean(answeredExchange && queuedStage && targetTurnStage && answeredStage);
-    if (peerLifecycleComplete) document.documentElement.setAttribute(EXCHANGE_ATTR, "complete");
+    if (peerLifecycleComplete) markComplete(EXCHANGE_ATTR);
 
     const sealedRound = stream.querySelector(".discussion-round--sealed");
     const debateRound = stream.querySelector(".discussion-round--debate");
@@ -63,7 +68,7 @@
       && replyEdge
       && traceButton
     ) {
-      document.documentElement.setAttribute(COMPLETE_ATTR, "complete");
+      markComplete(COMPLETE_ATTR);
       return true;
     }
     return false;
