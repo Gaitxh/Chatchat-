@@ -1,6 +1,14 @@
 export type CouncilPhase = "sealed" | "debate" | "final";
 export type CouncilConsultationMode = "balanced" | "explore" | "decide" | "verify" | "stress_test";
 export type CouncilStopReason = "stable_alignment_no_new_signal" | "round_budget";
+export type CouncilPhaseReason =
+  | "sealed_start"
+  | "initial_debate"
+  | "fresh_signal_follow_up"
+  | "minimum_debate_rounds"
+  | "alignment_not_reached"
+  | "finalizing_stable_alignment"
+  | "finalizing_round_budget";
 export type CouncilResearchLane =
   | "primary_sources"
   | "strongest_counterexample"
@@ -150,7 +158,19 @@ export interface CouncilReport {
   eventCount: number;
 }
 
-export interface CouncilPhaseUpdate { phase: CouncilPhase; round: number; }
+export interface CouncilPhaseUpdate {
+  phase: CouncilPhase;
+  round: number;
+  /** Engine-owned explanation of why this phase/round exists. Optional keeps older callers/archives compatible. */
+  reason?: CouncilPhaseReason;
+  /** Exact previous-round events that forced another peer-visible debate snapshot. */
+  triggerEventIds?: readonly string[];
+  /** Descriptive alignment before this phase begins; never authority or a vote. */
+  alignmentRatio?: number;
+  convergenceThreshold?: number;
+  debateRoundsCompleted?: number;
+  minimumDebateRounds?: number;
+}
 export type CouncilParticipantTurnState = "working" | "completed" | "failed";
 export interface CouncilParticipantTurnUpdate {
   phase: CouncilPhase;
