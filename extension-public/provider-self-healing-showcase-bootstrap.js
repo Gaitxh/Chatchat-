@@ -3,7 +3,12 @@
   if (params.get("showcase") !== "provider-self-healing") return;
 
   const locale = params.get("lang") === "zh" ? "zh-CN" : "en";
-  const journey = params.get("journey") === "static" ? "static" : "resume";
+  const requestedJourney = params.get("journey");
+  const journey = requestedJourney === "static"
+    || requestedJourney === "exhausted"
+    || requestedJourney === "owned"
+    ? requestedJourney
+    : "resume";
   const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
   const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
   const RECIPES_KEY = "chatchat.extension.recipes.v1";
@@ -11,6 +16,7 @@
   const GUIDE_DONE_KEY = "chatchat.first-consultation-guide.done.v1";
 
   document.documentElement.lang = locale;
+  document.documentElement.dataset.chatchatSelfHealingNavigationCount = "0";
 
   const participant = {
     seatId: "extension:anthropic-claude:801",
@@ -22,7 +28,7 @@
     url: "https://claude.ai/new",
     hostname: "claude.ai",
     startUrl: "https://claude.ai/",
-    createdByChatChat: true,
+    createdByChatChat: journey !== "owned",
   };
 
   const localMemory = {
@@ -130,7 +136,7 @@
           tab.url = changes.url;
           tab.status = "complete";
           freshSession = true;
-          if (journey === "resume") {
+          if (journey === "resume" || journey === "exhausted") {
             window.setTimeout(() => {
               for (const listener of tabUpdatedListeners) {
                 listener(tab.id, { url: tab.url, status: "complete" }, { ...tab });
@@ -149,7 +155,7 @@
       async sendMessage(_tabId, payload) {
         if (payload?.type === "PING") return { ok: true, result: { url: tab.url, title: tab.title, readyState: "complete" } };
         if (payload?.type === "AUTO_SETUP") {
-          if (!freshSession) {
+          if (!freshSession || journey === "exhausted") {
             return { ok: false, error: "ChatChat found the message box but could not confidently identify the send button automatically." };
           }
           await delay(320);
@@ -164,7 +170,7 @@
           };
         }
         if (payload?.type === "RUN_SPEECH") {
-          if (!freshSession) return { ok: false, error: "Configured send control is stale." };
+          if (!freshSession || journey === "exhausted") return { ok: false, error: "Configured send control is stale." };
           await delay(320);
           const prompt = String(payload.prompt ?? "");
           return {
