@@ -13,12 +13,34 @@ export type ProviderRecoveryStep =
   | "fresh_session_rediscovery"
   | "advanced_repair";
 
+export type ProviderRecoveryAttemptPhase =
+  | "resetting"
+  | "reconnecting"
+  | "exhausted";
+
+export type ProviderRecoveryConnectionState =
+  | "idle"
+  | "connecting"
+  | "ready"
+  | "failed";
+
 export interface ProviderRecoveryPlanInput {
   failureKind: ProviderConnectionFailureKind;
   createdByChatChat: boolean;
   onExpectedOrigin: boolean;
   loginRequired: boolean;
   freshSessionAlreadyTried: boolean;
+}
+
+export interface ProviderRecoveryAttemptInput {
+  phase: ProviderRecoveryAttemptPhase;
+  connectionState: ProviderRecoveryConnectionState;
+  resetWaitExpired?: boolean;
+}
+
+export interface ProviderRecoveryAttemptState {
+  phase: ProviderRecoveryAttemptPhase | null;
+  visible: boolean;
 }
 
 export function classifyProviderConnectionFailure(error: unknown): ProviderConnectionFailureKind {
@@ -71,4 +93,42 @@ export function planProviderRecovery(input: ProviderRecoveryPlanInput): Provider
   }
 
   return "advanced_repair";
+}
+
+/**
+ * Advance one already-authorized self-healing attempt without ever granting a
+ * second automatic reset. `exhausted` is sticky until the participant reaches
+ * READY or leaves the room; this keeps retry prevention separate from the
+ * user-visible "currently healing" state.
+ */
+export function advanceProviderRecoveryAttempt(
+  input: ProviderRecoveryAttemptInput,
+): ProviderRecoveryAttemptState {
+  if (input.connectionState === "ready") {
+    return { phase: null, visible: false };
+  }
+
+  if (input.phase === "exhausted") {
+    return { phase: "exhausted", visible: false };
+  }
+
+  if (input.phase === "resetting") {
+    if (input.resetWaitExpired || input.connectionState === "idle") {
+      return { phase: "exhausted", visible: false };
+    }
+    if (input.connectionState === "connecting") {
+      return { phase: "reconnecting", visible: true };
+    }
+    return { phase: "resetting", visible: true };
+  }
+
+  if (input.connectionState === "failed" || input.connectionState === "idle") {
+    return { phase: "exhausted", visible: false };
+  }
+
+  if (input.connectionState === "connecting") {
+    return { phase: "reconnecting", visible: true };
+  }
+
+  return { phase: "reconnecting", visible: true };
 }
