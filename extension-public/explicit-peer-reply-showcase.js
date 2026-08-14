@@ -36,10 +36,11 @@
       );
       if (!directQuestion?.id) return response;
 
-      // Real provider turns take visible time. Preserve a tiny asynchronous window in
-      // the synthetic browser proof so the live UI can render the explicit "working"
-      // lifecycle before the structured answer arrives.
-      await delay(180);
+      // Yield across real browser tasks rather than setTimeout. Chromium's CI
+      // virtual-time budget can pause timer-based mocked provider responses, while
+      // task boundaries still let React commit the visible "responding" lifecycle.
+      await nextBrowserTask();
+      await nextBrowserTask();
       envelope.contributions.push({
         kind: "argument",
         stance: "Web + Extension",
@@ -90,7 +91,15 @@
     return value.match(pattern)?.[1] ?? null;
   }
 
-  function delay(milliseconds) {
-    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  function nextBrowserTask() {
+    return new Promise((resolve) => {
+      const channel = new MessageChannel();
+      channel.port1.onmessage = () => {
+        channel.port1.close();
+        channel.port2.close();
+        resolve();
+      };
+      channel.port2.postMessage(null);
+    });
   }
 })();
