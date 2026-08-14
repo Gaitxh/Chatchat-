@@ -26,8 +26,8 @@
         "#consultation-history-root",
         ".setup-card",
       ];
-      const manualHidden = manualSelectors.every(isHiddenOrMissing);
-      const firstRunNoiseHidden = focusSelectors.every(isHiddenOrMissing);
+      const manualHidden = manualSelectors.every(isVisuallyAbsent);
+      const firstRunNoiseHidden = focusSelectors.every(isVisuallyAbsent);
       const proposalIsWide = proposal instanceof HTMLElement
         && proposal.getBoundingClientRect().width >= window.innerWidth * 0.75;
       const proposalIsHigh = proposal instanceof HTMLElement
@@ -84,7 +84,7 @@
         const consultationReady = startButton instanceof HTMLButtonElement && !startButton.disabled;
         const legacyGuideAbsent = !document.querySelector(".first-run-guide");
         const fullRoomHeaderVisible = fullRoomHeader instanceof HTMLElement
-          && getComputedStyle(fullRoomHeader).display !== "none";
+          && !isVisuallyAbsentElement(fullRoomHeader);
 
         if (
           onboardingGone &&
@@ -108,9 +108,17 @@
     document.documentElement.dataset.chatchatZeroConfigAssembly = "failed";
   }
 
-  function isHiddenOrMissing(selector) {
+  function isVisuallyAbsent(selector) {
     const element = document.querySelector(selector);
-    return !element || getComputedStyle(element).display === "none";
+    return !(element instanceof HTMLElement) || isVisuallyAbsentElement(element);
+  }
+
+  function isVisuallyAbsentElement(element) {
+    if (element.hidden) return true;
+    const style = getComputedStyle(element);
+    if (style.display === "none" || style.visibility === "hidden") return true;
+    const rect = element.getBoundingClientRect();
+    return rect.width <= 1 || rect.height <= 1;
   }
 
   function delay(ms) {
