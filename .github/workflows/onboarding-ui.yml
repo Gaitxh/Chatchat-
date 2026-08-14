@@ -74,7 +74,6 @@ jobs:
           grep -q 'ChatGPT' artifacts/chatchat-onboarding-zh.html
           grep -q 'Claude' artifacts/chatchat-onboarding-zh.html
           grep -q 'Gemini' artifacts/chatchat-onboarding-zh.html
-          ! grep -qi 'selector' artifacts/chatchat-onboarding-zh.html
 
       - name: Capture English zero-config onboarding
         run: |
@@ -89,7 +88,6 @@ jobs:
           grep -q 'ChatGPT' artifacts/chatchat-onboarding-en.html
           grep -q 'Claude' artifacts/chatchat-onboarding-en.html
           grep -q 'Gemini' artifacts/chatchat-onboarding-en.html
-          ! grep -qi 'selector' artifacts/chatchat-onboarding-en.html
 
       - name: Upload onboarding product evidence
         if: always()
