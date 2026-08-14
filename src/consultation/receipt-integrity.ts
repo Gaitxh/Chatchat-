@@ -29,9 +29,7 @@ export function consultationReceiptIntegrityMarkdown(
     `- ${zh ? "失败" : "Failed"}: ${integrity.failedTurns}`,
     ...(integrity.unresolvedTurns ? [`- ${zh ? "未闭环" : "Unresolved"}: ${integrity.unresolvedTurns}`] : []),
     "",
-    zh
-      ? integrityBoundary(summary)
-      : integrityBoundary(summary),
+    integrityBoundary(summary, zh),
   ].join("\n");
 }
 
@@ -43,13 +41,13 @@ export function consultationReceiptSvgWithIntegrity(
   const zh = locale === "zh-CN";
   const { integrity, mode } = summary;
   const modeLabel = mode === "live-provider-tabs"
-    ? (zh ? "LIVE PROVIDER" : "LIVE PROVIDER")
+    ? "LIVE PROVIDER"
     : mode === "synthetic-showcase"
       ? "DEMO · SYNTHETIC"
       : "LEGACY / UNKNOWN";
   const title = zh ? "会议执行完整性" : "MEETING EXECUTION INTEGRITY";
   const state = integrityLabel(integrity.state, zh);
-  const note = integritySvgBoundary(summary, zh);
+  const note = integrityBoundary(summary, zh);
   const block = [
     '<g transform="translate(56 858)">',
     '<rect width="1088" height="108" rx="20" fill="#eef6f3" stroke="#d6e5df"/>',
@@ -74,25 +72,21 @@ export function integrityLabel(state: MeetingExecutionIntegrity["state"], zh: bo
   return zh ? "等待执行审计" : "Waiting for execution audit";
 }
 
-function integrityBoundary(summary: ConsultationReceiptExecutionIntegrity): string {
+function integrityBoundary(summary: ConsultationReceiptExecutionIntegrity, zh: boolean): string {
   const synthetic = summary.mode === "synthetic-showcase";
   if (synthetic) {
-    return "Synthetic execution integrity proves fixture/UI/protocol flow only; it is not evidence that live third-party models attended.";
+    return zh
+      ? "Synthetic 执行完整性只证明 fixture / UI / 协议流程，不代表真实第三方模型出席。"
+      : "Synthetic execution integrity proves fixture/UI/protocol flow only; it is not evidence that live third-party models attended.";
   }
   if (summary.integrity.state === "degraded" || summary.integrity.state === "incomplete") {
-    return "Stance alignment must be read together with this execution gap; it is not consensus after complete Provider participation.";
+    return zh
+      ? "立场对齐度必须和这个执行缺口一起阅读；它不是完整 Provider 参与以后形成的共识。"
+      : "Stance alignment must be read together with this execution gap; it is not consensus after complete Provider participation.";
   }
-  return "Execution integrity proves Provider execution provenance, not answer correctness or hidden chain-of-thought.";
-}
-
-function integritySvgBoundary(summary: ConsultationReceiptExecutionIntegrity, zh: boolean): string {
-  if (summary.mode === "synthetic-showcase") {
-    return zh ? "Synthetic 只证明演示执行链，不代表真实第三方 AI 出席。" : "Synthetic proves demo execution only, not live third-party attendance.";
-  }
-  if (summary.integrity.state === "degraded" || summary.integrity.state === "incomplete") {
-    return zh ? "对齐度必须和执行缺口一起阅读；不是完整 Provider 参与后的共识。" : "Read alignment with the execution gap; this is not full-Provider consensus.";
-  }
-  return zh ? "执行完整性证明执行 provenance，不证明答案正确，也不读取隐藏思维。" : "Execution provenance, not answer correctness or hidden reasoning.";
+  return zh
+    ? "执行完整性证明 Provider 执行 provenance，不证明答案正确，也不读取隐藏思维链。"
+    : "Execution integrity proves Provider execution provenance, not answer correctness or hidden chain-of-thought.";
 }
 
 function escapeXml(value: string): string {
