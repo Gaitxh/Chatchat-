@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import type { Locale } from "../../i18n/index.js";
 import {
   deriveInvestigationTrailForest,
@@ -71,9 +71,10 @@ function TrailNode({
   const mode = consultationModeDefinition(node.mode);
   const modeLabel = zh ? mode.zhCN.label : mode.en.label;
   const canOpen = knownSessionIds.has(node.sessionId);
+  const style = { "--trail-depth": String(Math.min(depth, 5)) } as CSSProperties;
 
   return (
-    <div className="trail-node-wrap" style={{ "--trail-depth": String(Math.min(depth, 5)) } as React.CSSProperties}>
+    <div className="trail-node-wrap" style={style}>
       <article className="trail-node">
         <div className="trail-node__top">
           <span>{depth === 0 ? (zh ? "起点" : "ROOT") : (zh ? "会议" : "MEETING")}</span>
