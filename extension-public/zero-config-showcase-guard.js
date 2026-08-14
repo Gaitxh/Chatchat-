@@ -25,6 +25,7 @@
         ".participants-card",
         "#consultation-history-root",
         ".setup-card",
+        ".team-settings-disclosure",
       ];
       const manualHidden = manualSelectors.every(isVisuallyAbsent);
       const firstRunNoiseHidden = focusSelectors.every(isVisuallyAbsent);
@@ -67,6 +68,7 @@
   async function verifyAssemblyJourney() {
     const expectedDraft = document.documentElement.dataset.chatchatZeroConfigJourneyDraft ?? "";
     let started = false;
+    let teamControlsVerified = false;
 
     for (let attempt = 0; attempt < 360; attempt += 1) {
       const card = document.querySelector(".zero-touch-card");
@@ -106,6 +108,12 @@
           legacyGuideAbsent &&
           fullRoomHeaderVisible
         ) {
+          if (!teamControlsVerified) teamControlsVerified = await verifyTeamControls();
+          if (!teamControlsVerified) {
+            await delay(50);
+            continue;
+          }
+
           document.documentElement.dataset.chatchatZeroConfigAssembly = "complete";
           document.documentElement.dataset.chatchatZeroConfigDraftPreserved = "complete";
           document.documentElement.dataset.chatchatZeroConfigLegacyGuide = "suppressed";
@@ -120,6 +128,37 @@
     document.documentElement.dataset.chatchatZeroConfigAssembly = "failed";
   }
 
+  async function verifyTeamControls() {
+    const disclosure = document.querySelector(".team-settings-disclosure");
+    if (!(disclosure instanceof HTMLDetailsElement)) return false;
+
+    const managementSelectors = [
+      ".participants-card > .participant-actions",
+      ".participants-card > .url-opener",
+      ".participant-row-actions button:nth-child(2)",
+    ];
+    const hiddenByDefault = managementSelectors.every(isVisuallyAbsent);
+    if (!hiddenByDefault || disclosure.open || document.documentElement.dataset.chatchatTeamEdit) return false;
+    document.documentElement.dataset.chatchatTeamControlsDefault = "hidden";
+
+    disclosure.open = true;
+    await delay(100);
+    const visibleOnDemand = managementSelectors.every(isVisuallyPresent);
+    if (!visibleOnDemand || document.documentElement.dataset.chatchatTeamEdit !== "open") {
+      disclosure.open = false;
+      return false;
+    }
+    document.documentElement.dataset.chatchatTeamControlsReveal = "complete";
+
+    disclosure.open = false;
+    await delay(100);
+    const hiddenAgain = managementSelectors.every(isVisuallyAbsent)
+      && !document.documentElement.dataset.chatchatTeamEdit;
+    if (!hiddenAgain) return false;
+    document.documentElement.dataset.chatchatTeamControlsRestore = "complete";
+    return true;
+  }
+
   function recordStaticDiagnostics(values) {
     document.documentElement.dataset.chatchatZeroConfigDiagnostics = Object.entries(values)
       .map(([key, value]) => `${key}:${value}`)
@@ -129,6 +168,11 @@
   function isVisuallyAbsent(selector) {
     const element = document.querySelector(selector);
     return !(element instanceof HTMLElement) || isVisuallyAbsentElement(element);
+  }
+
+  function isVisuallyPresent(selector) {
+    const element = document.querySelector(selector);
+    return element instanceof HTMLElement && !isVisuallyAbsentElement(element);
   }
 
   function isVisuallyAbsentElement(element) {
