@@ -22,7 +22,6 @@ import {
   type ConsultationParticipantIdentity,
 } from "../consultation/equality.js";
 import {
-  MESSAGES,
   normalizeLocale,
   translate,
   type Locale,
@@ -60,6 +59,7 @@ declare const __CHATCHAT_VERSION__: string;
 const RECIPES_KEY = "chatchat.extension.recipes.v1";
 const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
 const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
+const PROPOSAL_DRAFT_KEY = "chatchat.consultation.proposal-draft.v1";
 const LOCALE_KEY = "chatchat.locale.v1";
 const CONNECTION_TOKEN = "CHATCHAT_READY";
 
@@ -119,7 +119,7 @@ function ConsultationApp() {
     typeof navigator === "undefined" ? "en" : navigator.language,
   );
   const [locale, setLocale] = useState<Locale>(initialLocale);
-  const [proposal, setProposal] = useState(() => MESSAGES[initialLocale].defaultProposal);
+  const [proposal, setProposal] = useState("");
   const [participants, setParticipants] = useState<ExtensionParticipant[]>([]);
   const [recipes, setRecipes] = useState<Record<string, AdapterRecipe>>({});
   const [connections, setConnections] = useState<Record<string, ParticipantConnection>>({});
@@ -175,18 +175,13 @@ function ConsultationApp() {
       const stored = await chrome.storage.local.get([RECIPES_KEY, LOCALE_KEY]);
       const storedRecipes = (stored[RECIPES_KEY] ?? {}) as Record<string, AdapterRecipe>;
       setRecipes(storedRecipes);
-      if (stored[LOCALE_KEY]) {
-        const nextLocale = normalizeLocale(stored[LOCALE_KEY]);
-        setLocale(nextLocale);
-        setProposal((current) =>
-          current === MESSAGES[initialLocale].defaultProposal
-            ? MESSAGES[nextLocale].defaultProposal
-            : current,
-        );
-      }
+      if (stored[LOCALE_KEY]) setLocale(normalizeLocale(stored[LOCALE_KEY]));
 
       const sessionStore = chrome.storage.session ?? chrome.storage.local;
-      const session = await sessionStore.get([PARTICIPANTS_KEY, CONNECTIONS_KEY]);
+      const session = await sessionStore.get([PARTICIPANTS_KEY, CONNECTIONS_KEY, PROPOSAL_DRAFT_KEY]);
+      if (typeof session[PROPOSAL_DRAFT_KEY] === "string") {
+        setProposal(session[PROPOSAL_DRAFT_KEY] as string);
+      }
       const restored = Array.isArray(session[PARTICIPANTS_KEY])
         ? (session[PARTICIPANTS_KEY] as ExtensionParticipant[])
         : [];
@@ -225,10 +220,14 @@ function ConsultationApp() {
 
   async function changeLocale(next: Locale) {
     if (next === locale) return;
-    const oldDefault = MESSAGES[locale].defaultProposal;
     setLocale(next);
-    setProposal((current) => current === oldDefault ? MESSAGES[next].defaultProposal : current);
     await chrome.storage.local.set({ [LOCALE_KEY]: next });
+  }
+
+  function updateProposal(next: string) {
+    setProposal(next);
+    const store = chrome.storage.session ?? chrome.storage.local;
+    void store.set({ [PROPOSAL_DRAFT_KEY]: next }).catch(() => undefined);
   }
 
   async function refreshCandidateTabs() {
@@ -657,7 +656,7 @@ function ConsultationApp() {
           <div><span className="eyebrow">{tr("proposalKicker")}</span><h2>{tr("proposalTitle")}</h2></div>
           <span className={`stage-badge stage-${stage}`}>{stageText}</span>
         </div>
-        <textarea value={proposal} onChange={(event) => setProposal(event.target.value)} rows={5} disabled={busy === "consultation"} placeholder={tr("proposalPlaceholder")} />
+        <textarea value={proposal} onChange={(event) => updateProposal(event.target.value)} rows={5} disabled={busy === "consultation"} placeholder={tr("proposalPlaceholder")} />
         <div className="proposal-footer">
           <span>{readyCount}/{participants.length} {tr("ready").toLocaleLowerCase()}</span>
           <button className="start-button" type="submit" disabled={!proposal.trim() || busy === "consultation" || readyCount < 2}>
