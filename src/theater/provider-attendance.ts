@@ -11,6 +11,8 @@ export interface ProviderTransportAuditRecord {
   state: ProviderTransportAuditState;
   observedAt: string;
   snapshotEventIds: readonly string[];
+  pinnedOpenIssueEventIds?: readonly string[];
+  latestRoundEventIds?: readonly string[];
   repairAttempt: boolean;
   tabId?: number;
   host?: string;
@@ -41,6 +43,8 @@ export interface ProviderTurnAttendanceAudit {
   round: number;
   state: ProviderTurnAuditState;
   snapshotEventIds: string[];
+  pinnedOpenIssueEventIds: string[];
+  latestRoundEventIds: string[];
   publishedEventIds: string[];
   contributionKinds: string[];
   repairRequested: boolean;
@@ -174,6 +178,7 @@ function buildTurn(
   const failedTransport = [...turnTransports].reverse().find((item) => item.state === "failed");
   const initial = turnTransports.find((item) => !item.repairAttempt) ?? turnTransports[0];
   const parsed = [...turnExecution].reverse().find((item) => item.stage === "structured_parsed");
+  const started = turnExecution.find((item) => item.stage === "turn_started") ?? turnExecution[0];
   const repairRequested = turnExecution.some((item) => item.stage === "repair_requested") || turnTransports.some((item) => item.repairAttempt);
   const repairSucceeded = Boolean(parsed?.attempt === 2 && published.length);
   const fallback = [...turnExecution].reverse().find((item) => item.stage === "fallback_emitted");
@@ -200,6 +205,7 @@ function buildTurn(
   const tabId = received?.tabId ?? initial?.tabId;
   const elapsedMs = received?.elapsedMs;
   const responseChars = received?.responseChars;
+  const selectionAudit = parsed ?? started;
 
   return {
     key: `${sessionId}|${key}`,
@@ -210,7 +216,9 @@ function buildTurn(
     phase,
     round,
     state,
-    snapshotEventIds: [...(initial?.snapshotEventIds ?? parsed?.snapshotEventIds ?? [])],
+    snapshotEventIds: [...(initial?.snapshotEventIds ?? selectionAudit?.snapshotEventIds ?? [])],
+    pinnedOpenIssueEventIds: [...(initial?.pinnedOpenIssueEventIds ?? selectionAudit?.pinnedOpenIssueEventIds ?? [])],
+    latestRoundEventIds: [...(initial?.latestRoundEventIds ?? selectionAudit?.latestRoundEventIds ?? [])],
     publishedEventIds: published.map((event) => event.id),
     contributionKinds: [...(parsed?.contributionKinds ?? fallback?.contributionKinds ?? [])],
     repairRequested,
