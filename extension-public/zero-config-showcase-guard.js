@@ -28,15 +28,27 @@
       ];
       const manualHidden = manualSelectors.every(isVisuallyAbsent);
       const firstRunNoiseHidden = focusSelectors.every(isVisuallyAbsent);
-      const proposalIsWide = proposal instanceof HTMLElement
-        && proposal.getBoundingClientRect().width >= window.innerWidth * 0.75;
-      const proposalIsHigh = proposal instanceof HTMLElement
-        && proposal.getBoundingClientRect().top <= window.innerHeight * 0.42;
+      const proposalRect = proposal instanceof HTMLElement ? proposal.getBoundingClientRect() : null;
+      const proposalIsWide = Boolean(proposalRect && proposalRect.width >= window.innerWidth * 0.75);
+      const proposalIsHigh = Boolean(proposalRect && proposalRect.top <= window.innerHeight * 0.42);
+      const buttonEnabled = button instanceof HTMLButtonElement && !button.disabled;
+      recordStaticDiagnostics({
+        card: Boolean(card),
+        buttonEnabled,
+        teamVisible,
+        manualHidden,
+        firstRunNoiseHidden,
+        proposalIsWide,
+        proposalIsHigh,
+        proposalTop: Math.round(proposalRect?.top ?? -1),
+        proposalWidth: Math.round(proposalRect?.width ?? -1),
+        viewportHeight: window.innerHeight,
+        viewportWidth: window.innerWidth,
+      });
 
       if (
         card &&
-        button instanceof HTMLButtonElement &&
-        !button.disabled &&
+        buttonEnabled &&
         teamVisible &&
         manualHidden &&
         firstRunNoiseHidden &&
@@ -106,6 +118,12 @@
     }
 
     document.documentElement.dataset.chatchatZeroConfigAssembly = "failed";
+  }
+
+  function recordStaticDiagnostics(values) {
+    document.documentElement.dataset.chatchatZeroConfigDiagnostics = Object.entries(values)
+      .map(([key, value]) => `${key}:${value}`)
+      .join("|");
   }
 
   function isVisuallyAbsent(selector) {
