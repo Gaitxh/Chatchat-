@@ -103,6 +103,7 @@ jobs:
           test -s artifacts/chatchat-consultation-zh.png
           grep -q 'data-chatchat-consultation-showcase="complete"' artifacts/chatchat-consultation-zh.html
           grep -q 'data-chatchat-live-floor-showcase="complete"' artifacts/chatchat-consultation-zh.html
+          grep -q 'data-chatchat-live-deliberation-showcase="complete"' artifacts/chatchat-consultation-zh.html
           grep -q 'data-chatchat-deliberation-story-showcase="complete"' artifacts/chatchat-consultation-zh.html
           grep -q 'data-chatchat-evidence-radar-showcase="complete"' artifacts/chatchat-consultation-zh.html
           grep -q 'data-chatchat-next-move-showcase="complete"' artifacts/chatchat-consultation-zh.html
@@ -145,6 +146,7 @@ jobs:
           test -s artifacts/chatchat-consultation-en.png
           grep -q 'data-chatchat-consultation-showcase="complete"' artifacts/chatchat-consultation-en.html
           grep -q 'data-chatchat-live-floor-showcase="complete"' artifacts/chatchat-consultation-en.html
+          grep -q 'data-chatchat-live-deliberation-showcase="complete"' artifacts/chatchat-consultation-en.html
           grep -q 'data-chatchat-deliberation-story-showcase="complete"' artifacts/chatchat-consultation-en.html
           grep -q 'data-chatchat-evidence-radar-showcase="complete"' artifacts/chatchat-consultation-en.html
           grep -q 'data-chatchat-next-move-showcase="complete"' artifacts/chatchat-consultation-en.html
@@ -188,6 +190,7 @@ jobs:
           test -s artifacts/chatchat-room-zh.png
           grep -q 'data-chatchat-room-showcase="complete"' artifacts/chatchat-room-zh.html
           grep -q 'data-chatchat-live-floor-showcase="complete"' artifacts/chatchat-room-zh.html
+          grep -q 'data-chatchat-live-deliberation-showcase="complete"' artifacts/chatchat-room-zh.html
           grep -q 'data-chatchat-deliberation-story-showcase="complete"' artifacts/chatchat-room-zh.html
           grep -q 'data-chatchat-evidence-radar-showcase="complete"' artifacts/chatchat-room-zh.html
           grep -q 'data-chatchat-next-move-showcase="complete"' artifacts/chatchat-room-zh.html
@@ -226,6 +229,7 @@ jobs:
           test -s artifacts/chatchat-room-en.png
           grep -q 'data-chatchat-room-showcase="complete"' artifacts/chatchat-room-en.html
           grep -q 'data-chatchat-live-floor-showcase="complete"' artifacts/chatchat-room-en.html
+          grep -q 'data-chatchat-live-deliberation-showcase="complete"' artifacts/chatchat-room-en.html
           grep -q 'data-chatchat-deliberation-story-showcase="complete"' artifacts/chatchat-room-en.html
           grep -q 'data-chatchat-evidence-radar-showcase="complete"' artifacts/chatchat-room-en.html
           grep -q 'data-chatchat-next-move-showcase="complete"' artifacts/chatchat-room-en.html
