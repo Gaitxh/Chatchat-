@@ -1,0 +1,34 @@
+.open-issues-radar {
+  margin: 10px 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(255,255,255,.065);
+  border-radius: 11px;
+  background: rgba(255,255,255,.035);
+}
+.open-issues-radar.has-open-issues { border-color: rgba(221,156,93,.18); background: rgba(132,86,35,.055); }
+.open-issues-radar > header { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+.open-issues-radar > header > div { min-width:0; }
+.open-issues-radar > header span { color:#e8bc70; font-size:6.2px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+.open-issues-radar > header strong { display:block; margin-top:2px; color:#edf1f6; font-size:8.4px; }
+.open-issues-radar > header p { margin:3px 0 0; color:#8995a4; font-size:6.7px; line-height:1.45; }
+.open-issues-radar > header > b { min-width:26px; height:26px; display:grid; place-items:center; border-radius:8px; background:rgba(255,255,255,.05); color:#f0cc8d; font-size:11px; }
+.open-issues-radar.is-clear > header > b { color:#8ec4a0; }
+.open-issues-radar__counts { display:flex; flex-wrap:wrap; gap:4px; margin-top:7px; }
+.open-issues-radar__counts span { padding:3px 5px; border-radius:999px; background:rgba(255,255,255,.035); color:#758191; font-size:5.8px; }
+.open-issues-radar__counts span.has-count { color:#bdc8d7; background:rgba(90,125,168,.08); }
+.open-issues-radar__list { display:grid; gap:5px; margin-top:7px; }
+.open-issues-radar__list button { display:grid; grid-template-columns:22px minmax(0,1fr) auto; gap:7px; align-items:center; width:100%; padding:6px 7px; border:1px solid rgba(255,255,255,.055); border-radius:8px; background:rgba(255,255,255,.025); color:inherit; text-align:left; cursor:pointer; }
+.open-issues-radar__list button:hover { border-color:rgba(124,166,219,.24); background:rgba(76,117,168,.08); }
+.open-issues-radar__list button > b { width:22px; height:22px; display:grid; place-items:center; border-radius:6px; background:rgba(255,255,255,.05); color:#d8e5f5; font-size:8px; }
+.open-issues-radar__list button > div { min-width:0; display:grid; gap:2px; }
+.open-issues-radar__list button span { color:#7e8b9b; font-size:5.7px; }
+.open-issues-radar__list button strong { overflow:hidden; color:#cbd4df; font-size:6.8px; text-overflow:ellipsis; white-space:nowrap; }
+.open-issues-radar__list button i { color:#728094; font-size:7px; font-style:normal; }
+.open-issues-radar__more { display:block; margin-top:6px; color:#778495; font-size:5.8px; }
+.open-issues-radar.is-compact > header p { display:none; }
+.open-issues-radar.is-compact .open-issues-radar__counts { margin-top:5px; }
+@media (min-width: 900px) {
+  .consultation-full-room .open-issues-radar > header strong { font-size:10px; }
+  .consultation-full-room .open-issues-radar > header p { max-width:760px; font-size:8px; }
+}
+@media (max-width:520px) { .open-issues-radar__list button strong { white-space:normal; } }
