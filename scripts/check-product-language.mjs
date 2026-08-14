@@ -38,20 +38,31 @@ for (const forbidden of [
 }
 
 const webOnboarding = fs.readFileSync("src/extension/web-room-onboarding.tsx", "utf8");
+const automaticTeam = fs.readFileSync("src/extension/automatic-team.ts", "utf8");
 const webAppCss = fs.readFileSync("src/extension/web-app.css", "utf8");
 
 for (const required of [
   "ZERO-CONFIG START",
   "零配置开始",
-  "STARTER_PROVIDER_IDS",
-  "buildAssemblyPlan",
   "chrome.permissions.request",
   "permissionReady",
   "Automatic team:",
   "不用填 URL",
+  "buildAutomaticTeamPlan",
 ]) {
   if (!webOnboarding.includes(required)) {
     throw new Error(`Zero-config Web Room contract is missing: ${required}`);
+  }
+}
+
+for (const required of [
+  "DEFAULT_AUTOMATIC_PROVIDER_IDS",
+  "buildAutomaticTeamPlan",
+  "automaticTeamPermissionDescriptor",
+  "byOrigin.size >= 2",
+]) {
+  if (!automaticTeam.includes(required)) {
+    throw new Error(`Automatic team planner contract is missing: ${required}`);
   }
 }
 
