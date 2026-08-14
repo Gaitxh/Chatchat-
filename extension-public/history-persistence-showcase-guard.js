@@ -58,9 +58,24 @@
       }
 
       document.documentElement.dataset.chatchatExecutionHistoryPersistenceShowcase = "complete";
+
+      const historyButton = await waitForElement(() => document.querySelector(".history-entry-main"));
+      historyButton.click();
+      const audit = await waitForElement(() => {
+        const candidate = document.querySelector('[data-history-execution-audit="loaded"]');
+        return candidate?.getAttribute("data-history-execution-session") === sessionId ? candidate : null;
+      });
+      const historicalTurn = audit.querySelector(
+        '[data-history-execution-snapshot-count]:not([data-history-execution-snapshot-count="0"])[data-history-execution-published-count]:not([data-history-execution-published-count="0"])',
+      );
+      if (!historicalTurn) {
+        throw new Error("Historical execution receipt did not replay a peer-visible published turn.");
+      }
+      document.documentElement.dataset.chatchatExecutionHistoryReplayShowcase = "complete";
       document.documentElement.dataset.chatchatHistoryPersistenceShowcase = "complete";
     } catch {
       document.documentElement.dataset.chatchatExecutionHistoryPersistenceShowcase = "failed";
+      document.documentElement.dataset.chatchatExecutionHistoryReplayShowcase = "failed";
       document.documentElement.dataset.chatchatHistoryPersistenceShowcase = "failed";
     } finally {
       checking = false;
@@ -85,6 +100,20 @@
     return new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error ?? new Error("Consultation history read failed."));
+    });
+  }
+
+  function waitForElement(find) {
+    const current = find();
+    if (current) return Promise.resolve(current);
+    return new Promise((resolve) => {
+      const observer = new MutationObserver(() => {
+        const next = find();
+        if (!next) return;
+        observer.disconnect();
+        resolve(next);
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
     });
   }
 })();
