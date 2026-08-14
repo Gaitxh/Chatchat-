@@ -59,7 +59,7 @@ export function NextMoveBoard({
             staged={stagedId === move.id}
             onStage={() => {
               const copy = zh ? move.zhCN : move.en;
-              if (stageProposalInExistingComposer(copy.proposal)) setStagedId(move.id);
+              if (stageProposalInExistingComposer(copy.proposal, move.modeHint)) setStagedId(move.id);
             }}
           />
         ))}
