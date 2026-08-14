@@ -66,7 +66,13 @@
   background: rgba(255,255,255,.04);
   color: inherit;
   text-align: left;
-  cursor: default;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+
+.live-agenda__trigger:hover {
+  border-color: rgba(129, 178, 238, .28);
+  background: rgba(93, 143, 207, .10);
 }
 
 .live-agenda__trigger b {
