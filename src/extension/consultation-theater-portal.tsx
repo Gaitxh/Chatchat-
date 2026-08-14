@@ -55,7 +55,6 @@ function ConsultationTheaterPortal() {
   const [archiveMode, setArchiveMode] = useState(false);
   const [locale, setLocale] = useState<Locale>(() => normalizeLocale(document.documentElement.lang));
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [researchRosterRoot, setResearchRosterRoot] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     const onLive = (event: Event) => {
@@ -118,26 +117,9 @@ function ConsultationTheaterPortal() {
   }, []);
 
   useEffect(() => {
+    const researchRosterRoot = document.getElementById("research-roster-root");
     const app = document.querySelector(".consultation-app");
-    if (!(app instanceof HTMLElement)) return;
-    let rosterRoot = document.getElementById("research-roster-root");
-    if (!(rosterRoot instanceof HTMLElement)) {
-      rosterRoot = document.createElement("div");
-      rosterRoot.id = "research-roster-root";
-      rosterRoot.dataset.chatchatOwned = "true";
-      app.append(rosterRoot);
-    }
-    setResearchRosterRoot(rosterRoot);
-    return () => {
-      setResearchRosterRoot(null);
-      if (rosterRoot?.dataset.chatchatOwned === "true") rosterRoot.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!researchRosterRoot) return;
-    const app = document.querySelector(".consultation-app");
-    if (!(app instanceof HTMLElement)) return;
+    if (!(researchRosterRoot instanceof HTMLElement) || !(app instanceof HTMLElement)) return;
     const board = app.querySelector(".shared-board-card");
     const liveRoom = app.querySelector(".live-room-card");
     if (board?.parentElement === app) {
@@ -148,7 +130,7 @@ function ConsultationTheaterPortal() {
       app.append(researchRosterRoot);
     }
     researchRosterRoot.hidden = !completion?.report.researchLaneAssignments;
-  }, [researchRosterRoot, completion]);
+  }, [completion]);
 
   useEffect(() => {
     const theaterRoot = document.getElementById("consultation-theater-root");
@@ -210,6 +192,7 @@ function ConsultationTheaterPortal() {
 
   if (!completion) return null;
   const participants = completion.report.positions.map((position) => position.participant);
+  const researchRosterRoot = document.getElementById("research-roster-root");
   return (
     <div className="consultation-theater-portal">
       {researchRosterRoot && completion.report.researchLaneAssignments
