@@ -244,6 +244,73 @@ jobs:
           grep -q 'CONSULTATION THEATER' artifacts/chatchat-room-en.html
           grep -q 'RELATIONSHIP MAP' artifacts/chatchat-room-en.html
 
+      - name: Capture bilingual live meeting frame evidence
+        run: |
+          ZH_URL='http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=zh&live-proof=persuasion'
+          EN_URL='http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=en&live-proof=persuasion'
+
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=22000 \
+            --window-size=1440,2200 \
+            --screenshot=artifacts/chatchat-live-meeting-zh.png \
+            "$ZH_URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=22000 \
+            --window-size=1440,2200 \
+            --dump-dom \
+            "$ZH_URL" > artifacts/chatchat-live-meeting-zh.html
+
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=22000 \
+            --window-size=1440,2200 \
+            --screenshot=artifacts/chatchat-live-meeting-en.png \
+            "$EN_URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=22000 \
+            --window-size=1440,2200 \
+            --dump-dom \
+            "$EN_URL" > artifacts/chatchat-live-meeting-en.html
+
+          for image in artifacts/chatchat-live-meeting-zh.png artifacts/chatchat-live-meeting-en.png; do
+            test -s "$image"
+          done
+
+          grep -q 'data-chatchat-live-proof-showcase="complete"' artifacts/chatchat-live-meeting-zh.html
+          grep -q 'data-chatchat-live-proof-frame="persuasion"' artifacts/chatchat-live-meeting-zh.html
+          grep -q 'data-persuasion-strength="strong"' artifacts/chatchat-live-meeting-zh.html
+          grep -q 'data-persuasion-cause-event=' artifacts/chatchat-live-meeting-zh.html
+          grep -q 'data-persuasion-action-event=' artifacts/chatchat-live-meeting-zh.html
+          grep -q 'AI 大会正在发生' artifacts/chatchat-live-meeting-zh.html
+          grep -q '实时说服' artifacts/chatchat-live-meeting-zh.html
+          grep -q '观点正在移动' artifacts/chatchat-live-meeting-zh.html
+
+          grep -q 'data-chatchat-live-proof-showcase="complete"' artifacts/chatchat-live-meeting-en.html
+          grep -q 'data-chatchat-live-proof-frame="persuasion"' artifacts/chatchat-live-meeting-en.html
+          grep -q 'data-persuasion-strength="strong"' artifacts/chatchat-live-meeting-en.html
+          grep -q 'data-persuasion-cause-event=' artifacts/chatchat-live-meeting-en.html
+          grep -q 'data-persuasion-action-event=' artifacts/chatchat-live-meeting-en.html
+          grep -q 'The AI assembly is happening now' artifacts/chatchat-live-meeting-en.html
+          grep -q 'LIVE PERSUASION' artifacts/chatchat-live-meeting-en.html
+          grep -q 'Positions are moving' artifacts/chatchat-live-meeting-en.html
+
       - name: Enforce equal-consultation product language
         run: |
           for page in artifacts/chatchat-consultation-zh.html artifacts/chatchat-consultation-en.html artifacts/chatchat-room-zh.html artifacts/chatchat-room-en.html; do
