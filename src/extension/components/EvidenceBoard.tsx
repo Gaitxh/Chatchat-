@@ -16,6 +16,8 @@ interface EvidenceBoardProps {
   participants: readonly CouncilParticipant[];
   events: readonly CouncilEvent[];
   locale: Locale;
+  verificationSnapshot?: Readonly<Record<string, EvidenceVerificationSnapshot>>;
+  readOnly?: boolean;
 }
 
 const COPY = {
@@ -23,6 +25,7 @@ const COPY = {
     kicker: "EVIDENCE LEDGER",
     title: "Receipts, not vibes",
     body: "ChatChat separates three facts: a model supplied a source, the source was reachable when checked, and other AIs may still dispute what it proves.",
+    archive: "ARCHIVE SNAPSHOT",
     checkAll: "Check public sources",
     checking: "Checking…",
     none: "No structured evidence has been submitted yet.",
@@ -41,12 +44,14 @@ const COPY = {
     openSource: "Open source",
     checkSource: "Check source",
     note: "Reachable means the public URL answered ChatChat's bounded fetch. It does not mean the claim is true.",
+    archiveNote: "Archive replay uses the evidence state frozen with that consultation. It makes no source-check request.",
     permissionDenied: "Source access was not granted.",
   },
   "zh-CN": {
     kicker: "证据账本",
     title: "有票据，不靠气氛",
     body: "ChatChat 会严格分开三件事：模型给了一个来源、这个来源在检查时能访问、以及其他 AI 仍然可以质疑它到底证明了什么。",
+    archive: "历史快照",
     checkAll: "检查公开来源",
     checking: "检查中…",
     none: "目前还没有参与者提交结构化证据。",
@@ -65,18 +70,31 @@ const COPY = {
     openSource: "打开来源",
     checkSource: "检查来源",
     note: "“来源可达”只表示这个公开 URL 回应了 ChatChat 的有限检查，不代表主张已经被证明。",
+    archiveNote: "历史回放只读取这场协商当时冻结的证据状态，不会重新请求来源。",
     permissionDenied: "没有获得这个来源的网站访问权限。",
   },
 } as const;
 
-export function EvidenceBoard({ participants, events, locale }: EvidenceBoardProps) {
+export function EvidenceBoard({
+  participants,
+  events,
+  locale,
+  verificationSnapshot,
+  readOnly = false,
+}: EvidenceBoardProps) {
   const copy = COPY[locale];
   const records = useMemo(() => deriveEvidenceLedger(participants, events), [participants, events]);
-  const [verifications, setVerifications] = useState<Record<string, EvidenceVerificationSnapshot>>({});
+  const [verifications, setVerifications] = useState<Record<string, EvidenceVerificationSnapshot>>(
+    () => ({ ...(verificationSnapshot ?? {}) }),
+  );
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (verificationSnapshot) {
+      setVerifications({ ...verificationSnapshot });
+      return;
+    }
     const store = chrome.storage.session ?? chrome.storage.local;
     void store.get(EVIDENCE_VERIFICATIONS_STORAGE_KEY).then((value: Record<string, unknown>) => {
       setVerifications(normalizeVerifications(value[EVIDENCE_VERIFICATIONS_STORAGE_KEY]));
@@ -87,10 +105,10 @@ export function EvidenceBoard({ participants, events, locale }: EvidenceBoardPro
     };
     chrome.storage?.onChanged?.addListener(onStorage);
     return () => chrome.storage?.onChanged?.removeListener(onStorage);
-  }, []);
+  }, [verificationSnapshot]);
 
   async function checkRecord(record: EvidenceRecord) {
-    if (!record.sourceUrl || busyIds.has(record.evidenceEventId)) return;
+    if (readOnly || !record.sourceUrl || busyIds.has(record.evidenceEventId)) return;
     setError(null);
     setBusyIds((current) => new Set(current).add(record.evidenceEventId));
     try {
@@ -110,6 +128,7 @@ export function EvidenceBoard({ participants, events, locale }: EvidenceBoardPro
   }
 
   async function checkAll() {
+    if (readOnly) return;
     const checkable = records.filter((record) => record.sourceUrl && !busyIds.has(record.evidenceEventId));
     if (!checkable.length) return;
     setError(null);
@@ -141,10 +160,10 @@ export function EvidenceBoard({ participants, events, locale }: EvidenceBoardPro
   }
 
   return (
-    <section className="evidence-board">
+    <section className={`evidence-board ${readOnly ? "is-archive" : ""}`}>
       <div className="evidence-board__heading">
         <div><span>{copy.kicker}</span><h3>{copy.title}</h3><p>{copy.body}</p></div>
-        {records.some((record) => record.sourceUrl) ? (
+        {readOnly ? <b className="evidence-archive-badge">{copy.archive}</b> : records.some((record) => record.sourceUrl) ? (
           <button type="button" onClick={() => void checkAll()} disabled={busyIds.size > 0}>
             {busyIds.size ? copy.checking : copy.checkAll}
           </button>
@@ -176,17 +195,19 @@ export function EvidenceBoard({ participants, events, locale }: EvidenceBoardPro
                 </dl>
                 {verification?.title ? <div className="evidence-page-title">“{verification.title}”</div> : null}
                 {verification?.statusCode ? <small>HTTP {verification.statusCode} · {verification.contentType || "unknown content type"}{verification.truncated ? " · bounded" : ""}</small> : null}
-                <div className="evidence-actions">
-                  {record.sourceUrl ? <button type="button" onClick={() => void chrome.tabs.create({ url: record.sourceUrl, active: true })}>{copy.openSource}</button> : null}
-                  {record.sourceUrl ? <button type="button" className="primary" disabled={busy} onClick={() => void checkRecord(record)}>{busy ? copy.checking : copy.checkSource}</button> : null}
-                </div>
+                {!readOnly ? (
+                  <div className="evidence-actions">
+                    {record.sourceUrl ? <button type="button" onClick={() => void chrome.tabs.create({ url: record.sourceUrl, active: true })}>{copy.openSource}</button> : null}
+                    {record.sourceUrl ? <button type="button" className="primary" disabled={busy} onClick={() => void checkRecord(record)}>{busy ? copy.checking : copy.checkSource}</button> : null}
+                  </div>
+                ) : null}
               </article>
             );
           })}
         </div>
       ) : <div className="evidence-empty">{copy.none}</div>}
 
-      <p className="evidence-boundary">⚠ {copy.note}</p>
+      <p className="evidence-boundary">⚠ {readOnly ? copy.archiveNote : copy.note}</p>
       {error ? <p className="evidence-error">{error}</p> : null}
     </section>
   );
