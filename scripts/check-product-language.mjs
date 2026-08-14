@@ -40,6 +40,8 @@ for (const forbidden of [
 const webOnboarding = fs.readFileSync("src/extension/web-room-onboarding.tsx", "utf8");
 const automaticTeam = fs.readFileSync("src/extension/automatic-team.ts", "utf8");
 const webAppCss = fs.readFileSync("src/extension/web-app.css", "utf8");
+const serviceWorker = fs.readFileSync("extension-public/service-worker.js", "utf8");
+const sidePanelHtml = fs.readFileSync("extension/sidepanel.html", "utf8");
 
 for (const required of [
   "ZERO-CONFIG START",
@@ -82,5 +84,21 @@ if (!webAppCss.includes("display: none !important")) {
   throw new Error("Web Room manual setup controls are not explicitly hidden from the novice-first surface.");
 }
 
+for (const required of [
+  "openPanelOnActionClick: false",
+  "chrome.action.onClicked.addListener",
+  "chrome.runtime.getURL(\"app/app.html\")",
+  "chrome.tabs.create({ url: appUrl, active: true })",
+]) {
+  if (!serviceWorker.includes(required)) {
+    throw new Error(`Toolbar-to-Full-Room contract is missing: ${required}`);
+  }
+}
+
+if (sidePanelHtml.includes("open-web-room.js")) {
+  throw new Error("Side Panel must not be a mandatory trampoline into the Full Room.");
+}
+
 console.log("✓ ChatChat primary browser product language is equal-participant consultation");
 console.log("✓ ChatChat Web Room defaults to zero-config automatic setup");
+console.log("✓ ChatChat toolbar opens the Full Room directly");
