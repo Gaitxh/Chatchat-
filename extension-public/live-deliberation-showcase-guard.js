@@ -15,6 +15,9 @@
     sawPeerQueued ||= Boolean(document.querySelector('[data-peer-response-state="queued"]'));
     sawPeerResponding ||= Boolean(document.querySelector('[data-peer-response-state="responding"]'));
     sawPeerAnswered ||= Boolean(document.querySelector('[data-peer-response-state="answered"][data-peer-response-event]'));
+    if (sawPeerQueued) document.documentElement.setAttribute("data-chatchat-peer-exchange-saw-queued", "true");
+    if (sawPeerResponding) document.documentElement.setAttribute("data-chatchat-peer-exchange-saw-responding", "true");
+    if (sawPeerAnswered) document.documentElement.setAttribute("data-chatchat-peer-exchange-saw-answered", "true");
     if (sawPeerQueued && sawPeerResponding && sawPeerAnswered) {
       document.documentElement.setAttribute(EXCHANGE_ATTR, "complete");
     }
