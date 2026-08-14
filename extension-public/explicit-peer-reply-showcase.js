@@ -36,11 +36,11 @@
       );
       if (!directQuestion?.id) return response;
 
-      // Yield across real browser tasks rather than setTimeout. Chromium's CI
-      // virtual-time budget can pause timer-based mocked provider responses, while
-      // task boundaries still let React commit the visible "responding" lifecycle.
-      await nextBrowserTask();
-      await nextBrowserTask();
+      // Yield across two paint opportunities. This lets the real React surface
+      // commit the explicit "responding" lifecycle without timer or MessageChannel
+      // tasks that can stall Chromium's --virtual-time-budget test mode.
+      await nextPaint();
+      await nextPaint();
       envelope.contributions.push({
         kind: "argument",
         stance: "Web + Extension",
@@ -91,15 +91,7 @@
     return value.match(pattern)?.[1] ?? null;
   }
 
-  function nextBrowserTask() {
-    return new Promise((resolve) => {
-      const channel = new MessageChannel();
-      channel.port1.onmessage = () => {
-        channel.port1.close();
-        channel.port2.close();
-        resolve();
-      };
-      channel.port2.postMessage(null);
-    });
+  function nextPaint() {
+    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
   }
 })();
