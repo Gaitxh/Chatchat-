@@ -51,6 +51,7 @@ import {
   CONNECTION_RETRY_REQUESTED_EVENT,
   type ConnectionRetryRequestedDetail,
 } from "./connection-retry-wire.js";
+import { createSerializedRecordMutation } from "./serialized-record-mutation.js";
 import "./consultation-panel.css";
 import "./consultation-live.css";
 
@@ -114,6 +115,28 @@ interface ParticipantConnection {
   verifiedAt?: string;
   automatic?: boolean;
 }
+
+const recipeRecordMutation = createSerializedRecordMutation<AdapterRecipe>(
+  async () => {
+    const stored = await chrome.storage.local.get(RECIPES_KEY);
+    return (stored[RECIPES_KEY] ?? {}) as Record<string, AdapterRecipe>;
+  },
+  async (next) => {
+    await chrome.storage.local.set({ [RECIPES_KEY]: next });
+  },
+);
+
+const connectionRecordMutation = createSerializedRecordMutation<ParticipantConnection>(
+  async () => {
+    const store = chrome.storage.session ?? chrome.storage.local;
+    const stored = await store.get(CONNECTIONS_KEY);
+    return (stored[CONNECTIONS_KEY] ?? {}) as Record<string, ParticipantConnection>;
+  },
+  async (next) => {
+    const store = chrome.storage.session ?? chrome.storage.local;
+    await store.set({ [CONNECTIONS_KEY]: next });
+  },
+);
 
 function ConsultationApp() {
   const initialLocale = normalizeLocale(
@@ -213,12 +236,18 @@ function ConsultationApp() {
         ]),
       ) as Record<string, ParticipantConnection>;
       setParticipants(nextParticipants);
-      setConnections(nextConnections);
+      const persistedConnections = await connectionRecordMutation.defaults(nextConnections);
+      const hydratedConnections = Object.fromEntries(
+        nextParticipants.map((participant) => [
+          participant.seatId,
+          persistedConnections[participant.seatId] ?? nextConnections[participant.seatId] ?? { state: "idle" },
+        ]),
+      ) as Record<string, ParticipantConnection>;
+      setConnections(hydratedConnections);
       await persistParticipants(nextParticipants);
-      await persistConnections(nextConnections);
 
       for (const participant of nextParticipants) {
-        const connection = nextConnections[participant.seatId];
+        const connection = hydratedConnections[participant.seatId];
         const recipe = storedRecipes[participant.origin];
         if (connection?.state === "ready" && adapterRecipeComplete(recipe)) continue;
         void autoConnectParticipant(participant, recipe);
@@ -294,10 +323,10 @@ function ConsultationApp() {
 
       setParticipants(current);
       await persistParticipants(current);
-      const seededConnections = { ...connections };
-      for (const participant of added) seededConnections[participant.seatId] = { state: "connecting", automatic: true };
+      const seededConnections = await connectionRecordMutation.merge(Object.fromEntries(
+        added.map((participant) => [participant.seatId, { state: "connecting", automatic: true }]),
+      ) as Record<string, ParticipantConnection>);
       setConnections(seededConnections);
-      await persistConnections(seededConnections);
       await refreshCandidateTabs();
       for (const participant of added) void autoConnectParticipant(participant, recipes[participant.origin]);
     } catch (caught) {
@@ -382,11 +411,10 @@ function ConsultationApp() {
   async function removeParticipant(seatId: string) {
     const participant = participants.find((item) => item.seatId === seatId);
     const nextParticipants = participants.filter((item) => item.seatId !== seatId);
-    const nextConnections = withoutKey(connections, seatId);
     setParticipants(nextParticipants);
-    setConnections(nextConnections);
     await persistParticipants(nextParticipants);
-    await persistConnections(nextConnections);
+    const nextConnections = await connectionRecordMutation.remove(seatId);
+    setConnections(nextConnections);
     if (participant?.createdByChatChat) {
       try { await chrome.tabs.remove(participant.tabId); } catch { /* tab may already be closed */ }
     }
@@ -521,23 +549,12 @@ function ConsultationApp() {
   }
 
   async function saveRecipe(origin: string, recipe: AdapterRecipe) {
-    const stored = await chrome.storage.local.get(RECIPES_KEY);
-    const next = {
-      ...((stored[RECIPES_KEY] ?? {}) as Record<string, AdapterRecipe>),
-      [origin]: recipe,
-    };
-    await chrome.storage.local.set({ [RECIPES_KEY]: next });
+    const next = await recipeRecordMutation.upsert(origin, recipe);
     setRecipes(next);
   }
 
   async function setConnection(seatId: string, connection: ParticipantConnection) {
-    const store = chrome.storage.session ?? chrome.storage.local;
-    const stored = await store.get(CONNECTIONS_KEY);
-    const next = {
-      ...((stored[CONNECTIONS_KEY] ?? {}) as Record<string, ParticipantConnection>),
-      [seatId]: connection,
-    };
-    await store.set({ [CONNECTIONS_KEY]: next });
+    const next = await connectionRecordMutation.upsert(seatId, connection);
     setConnections(next);
   }
 
@@ -546,10 +563,6 @@ function ConsultationApp() {
     await store.set({ [PARTICIPANTS_KEY]: next });
   }
 
-  async function persistConnections(next: Record<string, ParticipantConnection>) {
-    const store = chrome.storage.session ?? chrome.storage.local;
-    await store.set({ [CONNECTIONS_KEY]: next });
-  }
 
   const stageText = stageLabel(stage, locale);
   const readyCount = readyParticipants.length;
