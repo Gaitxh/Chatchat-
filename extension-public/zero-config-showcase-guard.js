@@ -21,6 +21,7 @@
       ];
       const focusSelectors = [
         "#spectator-mode-root",
+        ".consultation-header",
         ".participants-card",
         "#consultation-history-root",
         ".setup-card",
@@ -29,6 +30,8 @@
       const firstRunNoiseHidden = focusSelectors.every(isHiddenOrMissing);
       const proposalIsWide = proposal instanceof HTMLElement
         && proposal.getBoundingClientRect().width >= window.innerWidth * 0.75;
+      const proposalIsHigh = proposal instanceof HTMLElement
+        && proposal.getBoundingClientRect().top <= window.innerHeight * 0.42;
 
       if (
         card &&
@@ -37,7 +40,8 @@
         teamVisible &&
         manualHidden &&
         firstRunNoiseHidden &&
-        proposalIsWide
+        proposalIsWide &&
+        proposalIsHigh
       ) {
         document.documentElement.dataset.chatchatZeroConfigShowcase = "complete";
         return;
@@ -72,17 +76,28 @@
         const readyRows = [...document.querySelectorAll(".participant-row.connection-ready.is-ready")];
         const currentTextarea = document.querySelector(".proposal-card textarea");
         const startButton = document.querySelector(".start-button");
+        const fullRoomHeader = document.querySelector(".consultation-header");
         const onboardingGone = !document.documentElement.dataset.chatchatOnboarding
           && Boolean(onboardingRoot?.hidden);
         const draftPreserved = currentTextarea instanceof HTMLTextAreaElement
           && currentTextarea.value === expectedDraft;
         const consultationReady = startButton instanceof HTMLButtonElement && !startButton.disabled;
         const legacyGuideAbsent = !document.querySelector(".first-run-guide");
+        const fullRoomHeaderVisible = fullRoomHeader instanceof HTMLElement
+          && getComputedStyle(fullRoomHeader).display !== "none";
 
-        if (onboardingGone && readyRows.length >= 2 && draftPreserved && consultationReady && legacyGuideAbsent) {
+        if (
+          onboardingGone &&
+          readyRows.length >= 2 &&
+          draftPreserved &&
+          consultationReady &&
+          legacyGuideAbsent &&
+          fullRoomHeaderVisible
+        ) {
           document.documentElement.dataset.chatchatZeroConfigAssembly = "complete";
           document.documentElement.dataset.chatchatZeroConfigDraftPreserved = "complete";
           document.documentElement.dataset.chatchatZeroConfigLegacyGuide = "suppressed";
+          document.documentElement.dataset.chatchatZeroConfigFullRoomRestored = "complete";
           return;
         }
       }
