@@ -150,7 +150,9 @@ await evidenceCouncil.run("majority must not end the meeting before peers see ne
   maxRounds: 3,
   minDebateRounds: 1,
   convergenceThreshold: 0.75,
-  onPhase: (update) => evidencePhaseUpdates.push(update),
+  onPhase: (update) => {
+    evidencePhaseUpdates.push(update);
+  },
 });
 
 assert(
@@ -173,7 +175,9 @@ await calmCouncil.run("stable alignment can still stop adaptively", {
   maxRounds: 3,
   minDebateRounds: 1,
   convergenceThreshold: 0.75,
-  onPhase: (update) => calmPhaseUpdates.push(update),
+  onPhase: (update) => {
+    calmPhaseUpdates.push(update);
+  },
 });
 assert(
   calmPhaseUpdates.map(({ phase, round }) => `${phase}:${round}`).join(",") ===

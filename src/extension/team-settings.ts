@@ -1,5 +1,3 @@
-import "./team-settings.css";
-
 type Locale = "en" | "zh-CN";
 
 const ROOT_ID = "team-settings-root";
