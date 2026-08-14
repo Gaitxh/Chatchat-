@@ -46,11 +46,15 @@ for (const claim of [
 }
 
 for (const claim of [
-  "providerVisibleConsultationContext(context).context",
+  "providerVisibleConsultationContext(context)",
+  "PINNED_OPEN_ISSUE_SOURCE_EVENT_IDS_JSON",
+  "CHATCHAT_PINNED_OPEN_ISSUES",
   "directPeerInboxPromptBlock(visibleContext)",
   "explicitReplyPromptBlock(visibleContext)",
+  "this block adds attention, not new evidence",
+  "no event extra authority, truth status, vote weight, speaking priority",
 ]) {
-  assert(modePrompt.includes(claim), `Mode-aware prompt block is not using the same visible context: ${claim}`);
+  assert(modePrompt.includes(claim), `Mode-aware prompt block lost pinned issue response semantics: ${claim}`);
 }
 
 for (const claim of [
@@ -74,7 +78,7 @@ for (const claim of [
   assert(attendance.includes(claim), `Attendance audit model drops context-selection provenance: ${claim}`);
 }
 
-console.log("✓ unresolved conflict memory, exact visible provenance and latest-round protection are mechanically enforced");
+console.log("✓ unresolved conflict memory, exact visible provenance, response opportunities and latest-round protection are mechanically enforced");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`Context selection check failed: ${message}`);
