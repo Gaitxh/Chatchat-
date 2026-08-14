@@ -8,6 +8,8 @@ import type {
 } from "../../core/types.js";
 import { researchLaneDefinition } from "../../consultation/research-lanes.js";
 import type { Locale } from "../../i18n/index.js";
+import { CONSULTATION_FOCUS_EVENT } from "../provenance-wire.js";
+import { PeerExchangeQueue } from "./PeerExchangeQueue.js";
 import "./live-participant-floor.css";
 
 interface LiveParticipantFloorProps {
@@ -157,6 +159,15 @@ export function LiveParticipantFloor({
           </div>
         ) : <p className="live-evidence-empty">{copy.noEvidence}</p>}
       </div>
+
+      <PeerExchangeQueue
+        participants={participants}
+        events={events}
+        activities={activities}
+        phase={phase}
+        locale={locale}
+        onFocusEvent={focusEvent}
+      />
     </section>
   );
 }
@@ -298,6 +309,10 @@ function sourceHost(value: string): string {
 function truncate(value: string, max: number): string {
   const compact = value.replace(/\s+/g, " ").trim();
   return compact.length <= max ? compact : `${compact.slice(0, max - 1)}…`;
+}
+
+function focusEvent(eventId: string): void {
+  window.dispatchEvent(new CustomEvent(CONSULTATION_FOCUS_EVENT, { detail: { eventId } }));
 }
 
 function monogram(name: string): string {
