@@ -1,0 +1,5 @@
+html[data-surface="web-app"] #chatchat-real-provider-proof {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+}

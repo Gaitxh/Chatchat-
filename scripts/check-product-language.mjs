@@ -45,6 +45,9 @@ const sidePanelHtml = fs.readFileSync("extension/sidepanel.html", "utf8");
 const appHtml = fs.readFileSync("app/app.html", "utf8");
 const loginConcierge = fs.readFileSync("src/extension/login-concierge.ts", "utf8");
 const loginState = fs.readFileSync("src/extension/login-state.ts", "utf8");
+const gateBProofUi = fs.readFileSync("src/extension/gate-b-proof-ui.ts", "utf8");
+const gateBObserver = fs.readFileSync("src/extension/gate-b-observer.ts", "utf8");
+const proofPack = fs.readFileSync("src/validation/proof-pack.ts", "utf8");
 const onboardingCopy = extractVisibleCopy(webOnboarding);
 
 for (const required of [
@@ -113,6 +116,9 @@ for (const surface of [appHtml, sidePanelHtml]) {
   if (!surface.includes("/src/extension/login-concierge.ts")) {
     throw new Error("Every browser consultation surface must mount the Login Concierge.");
   }
+  if (!surface.includes("/src/extension/gate-b-proof-ui.ts")) {
+    throw new Error("Every browser consultation surface must mount the Real Provider Proof observer/UI.");
+  }
 }
 
 for (const required of [
@@ -139,11 +145,54 @@ for (const required of [
   }
 }
 
+for (const required of [
+  "REAL PROVIDER PROOF",
+  "真实 PROVIDER 验收",
+  "demo-only",
+  "metadata-only",
+  "COPY GITHUB MARKDOWN",
+]) {
+  if (!gateBProofUi.includes(required)) {
+    throw new Error(`Real Provider Proof UI contract is missing: ${required}`);
+  }
+}
+
+for (const forbidden of ["ROYAL PROOF", "御前验收", "King's", "Browser House", "HOUSE VERDICT"]) {
+  if (gateBProofUi.includes(forbidden) || gateBObserver.includes(forbidden) || proofPack.includes(forbidden)) {
+    throw new Error(`Active Real Provider Proof path reintroduced legacy product language: ${forbidden}`);
+  }
+}
+
+for (const required of [
+  "chatchat.consultation.participants.v1",
+  "chatchat.consultation.connections.v1",
+  "captureReadyBrowserConsultationProviderProof",
+  'location.protocol === "chrome-extension:"',
+  'document.documentElement.dataset.surface === "web-app"',
+  '`Chromium ${surface} · ${coarsePlatformHint(navigator.userAgent)}`',
+]) {
+  if (!gateBObserver.includes(required)) {
+    throw new Error(`Current Gate B observer contract is missing: ${required}`);
+  }
+}
+
+for (const required of [
+  "ChatChat Real Provider Proof",
+  "distinctProviderHosts.size >= 2",
+  "user proposal",
+  "environment-specific evidence",
+]) {
+  if (!proofPack.includes(required)) {
+    throw new Error(`Real Provider Proof export contract is missing: ${required}`);
+  }
+}
+
 console.log("✓ ChatChat primary browser product language is equal-participant consultation");
 console.log("✓ ChatChat Web Room defaults to zero-config automatic setup");
 console.log("✓ ChatChat novice onboarding hides internal setup jargon");
 console.log("✓ ChatChat toolbar opens the Full Room directly");
 console.log("✓ ChatChat treats provider login as an automatic-resume state, not configuration failure");
+console.log("✓ ChatChat Real Provider Proof observes the current Browser Consultation and rejects synthetic live evidence");
 
 function extractVisibleCopy(sourceText) {
   const start = sourceText.indexOf("const COPY = {");

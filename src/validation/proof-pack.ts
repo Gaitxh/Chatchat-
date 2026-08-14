@@ -113,8 +113,12 @@ export function buildGateBProofPack(
   const council = input.report
     ? buildCouncilEvidence(input.report, input.events, input.mode)
     : null;
+  const distinctProviderHosts = new Set(
+    input.providers.map((provider) => provider.host).filter((host) => host && host !== "invalid-host"),
+  );
   const allProviderGates =
     input.providers.length >= 2 &&
+    distinctProviderHosts.size >= 2 &&
     input.providers.every(
       (provider) =>
         provider.recipeReady &&
@@ -166,10 +170,10 @@ export function buildGateBProofPack(
 export function gateBProofMarkdown(pack: GateBProofPack): string {
   const title =
     pack.verdict === "gate-b-candidate"
-      ? "✅ Gate B candidate evidence"
+      ? "✅ Real Provider Gate B candidate evidence"
       : pack.verdict === "demo-only"
-        ? "🎭 Demo-only evidence"
-        : "⚠️ Incomplete Gate B evidence";
+        ? "🎭 Demo-only proof preview"
+        : "⚠️ Incomplete Real Provider Gate B evidence";
 
   const providerRows = pack.providers.length
     ? pack.providers
@@ -186,7 +190,7 @@ export function gateBProofMarkdown(pack: GateBProofPack): string {
     : "none";
 
   return [
-    "## ChatChat Royal Proof Pack",
+    "## ChatChat Real Provider Proof",
     "",
     `**${title}**`,
     "",
@@ -196,13 +200,13 @@ export function gateBProofMarkdown(pack: GateBProofPack): string {
     `- Evidence captured: \`${pack.evidenceCapturedAt}\``,
     `- Exported: \`${pack.generatedAt}\``,
     "",
-    "### Provider gates",
+    "### Provider readiness",
     "",
-    "| Provider | Host | Recipe 3/3 | Test | Council Gate | Provider Host | Seated |",
+    "| Provider | Host | Page map | Connection | Protocol Gate | Provider Host | In Room |",
     "|---|---|:---:|:---:|:---:|:---:|:---:|",
     providerRows,
     "",
-    "### Council evidence",
+    "### Consultation evidence",
     "",
     council
       ? [
@@ -210,7 +214,7 @@ export function gateBProofMarkdown(pack: GateBProofPack): string {
           `- Session fingerprint: \`${council.sessionFingerprint}\``,
           `- Real participants: **${council.realParticipantCount}**`,
           `- Rounds: **${council.rounds}**`,
-          `- Events: **${council.eventCount}** total / **${council.realEventCount}** from real advisors`,
+          `- Events: **${council.eventCount}** total / **${council.realEventCount}** from real AI participants`,
           `- Final positions: **${council.finalPositionCount}**`,
           `- Zero-confidence finals: **${council.zeroConfidenceFinalCount}**`,
           `- Consensus ratio: **${Math.round(council.consensusRatio * 100)}%**`,
@@ -218,13 +222,13 @@ export function gateBProofMarkdown(pack: GateBProofPack): string {
           `- Event kinds: \`${eventSummary}\``,
           `- Duration: **${council.durationMs === null ? "unknown" : `${Math.round(council.durationMs / 100) / 10}s`}**`,
         ].join("\n")
-      : "- No completed Council attached.",
+      : "- No completed consultation attached.",
     "",
     "### Privacy declaration",
     "",
-    "This Proof Pack intentionally excludes the King's question, model response text, Blackboard message content, taught selectors, local profile keys, cookies, tokens and credentials.",
+    "This Proof Pack intentionally excludes the user proposal, model response text, structured event/message content, browser page mappings/selectors, local profile keys, account identifiers, cookies, tokens and credentials.",
     "",
-    "> This is environment-specific evidence, not a universal Provider support claim.",
+    "> This is environment-specific evidence from one real browser run, not a universal Provider support claim.",
   ].join("\n");
 }
 
