@@ -51,7 +51,7 @@ const verifyPrompt = buildProviderConsultationPrompt(context("verify", "a"));
 assert(verifyPrompt.includes("CONSULTATION_MODE: verify"), "Verify mode must be explicit in every participant prompt.");
 assert(verifyPrompt.includes("MODE_GOAL"), "Mode goal must be visible machine-readable consultation context.");
 assert(verifyPrompt.includes("source scope") && verifyPrompt.includes("dates"), "Verify mode should actually direct attention to evidence scope and dates.");
-assert(verifyPrompt.includes("not who has authority") || verifyPrompt.includes("not your authority"), "Mode must never create a privileged participant.");
+assert(verifyPrompt.includes("special authority"), "Mode must explicitly deny special authority to any participant.");
 
 const stressPrompt = buildProviderConsultationPrompt(context("stress_test", "a"));
 assert(stressPrompt.includes("CONSULTATION_MODE: stress_test"), "Stress Test mode must be explicit in the prompt.");
