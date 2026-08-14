@@ -42,6 +42,7 @@ const automaticTeam = fs.readFileSync("src/extension/automatic-team.ts", "utf8")
 const webAppCss = fs.readFileSync("src/extension/web-app.css", "utf8");
 const serviceWorker = fs.readFileSync("extension-public/service-worker.js", "utf8");
 const sidePanelHtml = fs.readFileSync("extension/sidepanel.html", "utf8");
+const onboardingCopy = extractVisibleCopy(webOnboarding);
 
 for (const required of [
   "ZERO-CONFIG START",
@@ -58,7 +59,7 @@ for (const required of [
 }
 
 for (const jargon of ["selector", "adapter", "recipe"]) {
-  if (webOnboarding.toLowerCase().includes(jargon)) {
+  if (onboardingCopy.toLowerCase().includes(jargon)) {
     throw new Error(`Novice Web Room onboarding leaked internal setup jargon: ${jargon}`);
   }
 }
@@ -109,3 +110,10 @@ console.log("✓ ChatChat primary browser product language is equal-participant 
 console.log("✓ ChatChat Web Room defaults to zero-config automatic setup");
 console.log("✓ ChatChat novice onboarding hides internal setup jargon");
 console.log("✓ ChatChat toolbar opens the Full Room directly");
+
+function extractVisibleCopy(sourceText) {
+  const start = sourceText.indexOf("const COPY = {");
+  const end = sourceText.indexOf("} as const;", start);
+  if (start < 0 || end < 0) throw new Error("Could not isolate Web Room onboarding copy.");
+  return sourceText.slice(start, end);
+}
