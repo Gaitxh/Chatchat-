@@ -1,4 +1,5 @@
 import {
+  MAX_INVESTIGATION_TRAIL_EDGES,
   pendingFollowUpIsFresh,
   removeInvestigationTrailSession,
   upsertInvestigationTrailEdge,
@@ -23,9 +24,16 @@ export class BrowserInvestigationTrailStore {
     return next;
   }
 
+  async replace(edges: readonly InvestigationTrailEdge[]): Promise<InvestigationTrailEdge[]> {
+    const next = normalizeEdges([...edges]).slice(0, MAX_INVESTIGATION_TRAIL_EDGES);
+    if (next.length) await chrome.storage.local.set({ [INVESTIGATION_TRAIL_STORAGE_KEY]: next });
+    else await chrome.storage.local.remove(INVESTIGATION_TRAIL_STORAGE_KEY);
+    return next;
+  }
+
   async removeSession(sessionId: string): Promise<InvestigationTrailEdge[]> {
     const next = removeInvestigationTrailSession(await this.list(), sessionId);
-    await chrome.storage.local.set({ [INVESTIGATION_TRAIL_STORAGE_KEY]: next });
+    await this.replace(next);
     return next;
   }
 
