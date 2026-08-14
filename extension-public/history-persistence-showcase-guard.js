@@ -7,7 +7,10 @@
   const ARCHIVES = "archives";
   const EXECUTION_DB_NAME = "chatchat-provider-execution-history-v1";
   const EXECUTION_STORE = "receipts";
-  const HAS_HISTORY_UI = Boolean(document.getElementById("consultation-history-root"));
+  // This script runs in <head>, before body roots exist. Full Room declares its
+  // product identity on <html data-surface="web-app">, which is already parsed
+  // here and therefore cannot be confused with the compact Side Panel.
+  const OWNS_HISTORY_UI = document.documentElement.dataset.surface === "web-app";
   let checking = false;
 
   window.addEventListener(HISTORY_UPDATED_EVENT, (event) => {
@@ -63,7 +66,7 @@
       // Side Panel intentionally has no Consultation History UI. It still has to
       // prove exact-session archive + execution receipt durability. Full Room
       // owns historical replay and therefore carries the stronger UI reopen gate.
-      if (!HAS_HISTORY_UI) {
+      if (!OWNS_HISTORY_UI) {
         document.documentElement.dataset.chatchatExecutionHistoryReplayShowcase = "not-applicable";
         document.documentElement.dataset.chatchatHistoryPersistenceShowcase = "complete";
         return;
