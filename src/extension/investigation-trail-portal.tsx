@@ -20,10 +20,11 @@ function InvestigationTrailPortal() {
   const [locale, setLocale] = useState<Locale>(() => normalizeLocale(document.documentElement.lang));
   const previouslyKnownRef = useRef<Set<string>>(new Set());
   const refreshQueuedRef = useRef(false);
+  const refreshTimersRef = useRef<number[]>([]);
 
   useEffect(() => {
-    void refresh();
-    const refreshSoon = () => queueRefresh();
+    queueRefreshBurst();
+    const refreshSoon = () => queueRefreshBurst();
     window.addEventListener(INVESTIGATION_TRAIL_UPDATED_EVENT, refreshSoon);
     window.addEventListener(COMPLETE_EVENT, refreshSoon);
 
@@ -43,6 +44,8 @@ function InvestigationTrailPortal() {
     }
 
     return () => {
+      for (const timer of refreshTimersRef.current) window.clearTimeout(timer);
+      refreshTimersRef.current = [];
       historyObserver.disconnect();
       window.removeEventListener(INVESTIGATION_TRAIL_UPDATED_EVENT, refreshSoon);
       window.removeEventListener(COMPLETE_EVENT, refreshSoon);
@@ -79,6 +82,16 @@ function InvestigationTrailPortal() {
       refreshQueuedRef.current = false;
       void refresh();
     }, 80);
+  }
+
+  function queueRefreshBurst() {
+    for (const delay of [0, 160, 480, 1_000, 1_800]) {
+      const timer = window.setTimeout(() => {
+        refreshTimersRef.current = refreshTimersRef.current.filter((item) => item !== timer);
+        queueRefresh();
+      }, delay);
+      refreshTimersRef.current.push(timer);
+    }
   }
 
   async function refresh() {
