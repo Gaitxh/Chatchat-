@@ -1,0 +1,120 @@
+name: Login Concierge UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: chatchat-login-concierge-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  login-concierge:
+    name: Login Concierge · provider waiting for sign-in
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install and build production extension
+        run: |
+          npm install
+          npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Locate Chromium browser
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_BIN"
+          echo "CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
+
+      - name: Start production preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4182 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-login-concierge-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4182/manifest.json >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4182/manifest.json >/dev/null
+
+      - name: Capture English Login Concierge
+        run: |
+          URL='http://127.0.0.1:4182/app/app.html?showcase=login-concierge&lang=en'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=10000 \
+            --window-size=1440,1800 \
+            --screenshot=artifacts/chatchat-login-concierge-en.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=10000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-login-concierge-en.html
+          test -s artifacts/chatchat-login-concierge-en.png
+          grep -q 'data-chatchat-login-concierge-showcase="complete"' artifacts/chatchat-login-concierge-en.html
+          grep -q 'Sign in to Claude' artifacts/chatchat-login-concierge-en.html
+          grep -q 'No retry needed' artifacts/chatchat-login-concierge-en.html
+          grep -q '>Sign in<' artifacts/chatchat-login-concierge-en.html
+
+      - name: Capture Chinese Login Concierge
+        run: |
+          URL='http://127.0.0.1:4182/app/app.html?showcase=login-concierge&lang=zh'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=10000 \
+            --window-size=1440,1800 \
+            --screenshot=artifacts/chatchat-login-concierge-zh.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=10000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-login-concierge-zh.html
+          test -s artifacts/chatchat-login-concierge-zh.png
+          grep -q 'data-chatchat-login-concierge-showcase="complete"' artifacts/chatchat-login-concierge-zh.html
+          grep -q '去 Claude 完成登录' artifacts/chatchat-login-concierge-zh.html
+          grep -q '不用回来点重试' artifacts/chatchat-login-concierge-zh.html
+          grep -q '>去登录<' artifacts/chatchat-login-concierge-zh.html
+
+      - name: Save preview log
+        if: always()
+        run: cp /tmp/chatchat-login-concierge-preview.log artifacts/preview.log 2>/dev/null || true
+
+      - name: Upload Login Concierge browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-login-concierge-ui
+          path: artifacts/**
+          if-no-files-found: warn
+          retention-days: 14
