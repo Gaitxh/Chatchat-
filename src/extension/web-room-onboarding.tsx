@@ -3,6 +3,7 @@ import { detectProviderUrl } from "../provider-sdk/catalog.js";
 import {
   automaticTeamPermissionDescriptor,
   buildAutomaticTeamPlan,
+  findReusableAutomaticTeamTab,
   type AutomaticTeamDetection,
 } from "./automatic-team.js";
 import "./web-room-onboarding.css";
@@ -32,30 +33,30 @@ const COPY = {
   en: {
     kicker: "ZERO-CONFIG START",
     title: "Open ChatChat. The room assembles itself.",
-    body: "ChatChat uses AI sites already open in your browser first. If there are not enough, one click opens a small starter team in clean conversation tabs. Page recognition, connection checks, and consultation readiness all continue automatically.",
-    button: "Start automatic setup",
-    none: "No AI tabs are open yet. ChatChat can open a starter team for you — no setup forms or technical configuration.",
+    body: "ChatChat reuses AI sites already open in your browser first. If anything is missing, one click opens only the missing starter tabs. Page recognition, connection checks, and consultation readiness continue automatically.",
+    button: "Assemble my AI room",
+    none: "No AI tabs are open yet. ChatChat can open a small starter team for you — no setup forms or technical configuration.",
     found: (count: number) => `${count} AI source${count === 1 ? "" : "s"} already found`,
     plan: (names: string) => `Automatic team: ${names}`,
-    working: "Preparing clean AI conversation tabs…",
+    working: "Reusing open AI tabs and preparing only what is missing…",
     done: "The room is assembled. Automatic connection is taking over…",
     privacy: "The only unavoidable first-run step is the browser's own site-permission confirmation. Provider login stays with each AI site.",
     denied: "Site access was not granted. ChatChat cannot connect those AI pages without the browser's permission.",
-    failed: "ChatChat could not create enough clean AI conversation tabs.",
+    failed: "ChatChat could not assemble at least two AI participants.",
   },
   "zh-CN": {
     kicker: "零配置开始",
     title: "打开 ChatChat，会议室自己组起来。",
-    body: "ChatChat 会优先使用浏览器里已经打开的 AI；数量不够时，只点一次就会自动打开一组干净的 AI 会话。页面识别、连接检查和协商就绪验证都会自动继续。",
-    button: "开始自动配置",
+    body: "ChatChat 会优先复用浏览器里已经打开的 AI；缺哪个才自动补开哪个。页面识别、连接检查和协商就绪验证都会自动继续。",
+    button: "组建我的 AI 会议室",
     none: "现在还没有打开 AI 标签页。ChatChat 可以直接替你打开一组起步 AI——不用填配置表，也不用理解任何技术设置。",
     found: (count: number) => `已经发现 ${count} 个 AI 来源`,
     plan: (names: string) => `自动团队：${names}`,
-    working: "正在准备干净的 AI 会话标签页……",
+    working: "正在复用已有 AI，并只补齐缺少的标签页……",
     done: "会议室已经组好，自动连接流程正在接管……",
     privacy: "第一次唯一无法省掉的是浏览器自己的站点权限确认；各 AI 的登录状态仍然只留在各自网站。",
     denied: "没有获得站点权限。浏览器不允许 ChatChat 在未授权时连接这些 AI 页面。",
-    failed: "ChatChat 没能创建足够的干净 AI 会话标签页。",
+    failed: "ChatChat 没能组建出至少两位 AI 参与者。",
   },
 } as const;
 
@@ -229,26 +230,43 @@ async function discover(): Promise<AutomaticTeamDetection[]> {
 async function assemble(plan: readonly AutomaticTeamDetection[], failureMessage: string) {
   const participants: ParticipantRecord[] = [];
   const connections: Record<string, { state: "idle"; automatic: true }> = {};
+  const openTabs = (await chrome.tabs.query({})) as BrowserTab[];
+  const usedTabIds = new Set<number>();
+
   for (const detection of plan) {
     const startUrl = detection.manifest?.defaultUrl ?? detection.normalizedUrl;
-    const fresh = await chrome.tabs.create({ url: startUrl, active: false });
-    if (!fresh?.id) continue;
-    const seatId = `extension:${detection.providerId}:${fresh.id}`;
+    const reusable = findReusableAutomaticTeamTab(detection, openTabs, usedTabIds);
+    const tab = reusable
+      ? { id: reusable.id, url: reusable.url, createdByChatChat: false }
+      : await createAutomaticTeamTab(startUrl);
+    if (!tab?.id) continue;
+
+    usedTabIds.add(tab.id);
+    const seatId = `extension:${detection.providerId}:${tab.id}`;
     participants.push({
       seatId,
       participantId: seatId,
-      tabId: fresh.id,
+      tabId: tab.id,
       providerId: detection.providerId,
       providerName: detection.displayName,
       origin: detection.origin,
-      url: startUrl,
+      url: tab.url ?? startUrl,
       hostname: detection.hostname,
       startUrl,
-      createdByChatChat: true,
+      createdByChatChat: tab.createdByChatChat,
     });
     connections[seatId] = { state: "idle", automatic: true };
   }
   if (participants.length < 2) throw new Error(failureMessage);
   const session = chrome.storage.session ?? chrome.storage.local;
   await session.set({ [PARTICIPANTS_KEY]: participants, [CONNECTIONS_KEY]: connections });
+}
+
+async function createAutomaticTeamTab(startUrl: string): Promise<{ id?: number; url?: string; createdByChatChat: true }> {
+  const fresh = await chrome.tabs.create({ url: startUrl, active: false });
+  return {
+    id: fresh?.id,
+    url: fresh?.url ?? startUrl,
+    createdByChatChat: true,
+  };
 }
