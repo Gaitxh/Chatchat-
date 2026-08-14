@@ -8,6 +8,25 @@ html[data-surface="web-app"]:not([data-chatchat-team-edit="open"]) .participant-
   display: none !important;
 }
 
+/* web-app.css intentionally keeps these controls out of the novice Full Room with
+ * its own !important rules. Team edit is the one explicit, user-controlled escape
+ * hatch, so it must deliberately override those older product defaults. */
+html[data-surface="web-app"][data-chatchat-team-edit="open"] .participants-card > .connect-all-button {
+  display: flex !important;
+}
+html[data-surface="web-app"][data-chatchat-team-edit="open"] .participants-card > .participant-actions {
+  display: grid !important;
+}
+html[data-surface="web-app"][data-chatchat-team-edit="open"] .participants-card > .url-opener {
+  display: block !important;
+}
+html[data-surface="web-app"][data-chatchat-team-edit="open"] .participants-card > .discovered-section {
+  display: grid !important;
+}
+html[data-surface="web-app"][data-chatchat-team-edit="open"] .participant-row-actions button:nth-child(n + 2) {
+  display: inline-block !important;
+}
+
 html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] #team-settings-root {
   display: none !important;
 }
@@ -17,8 +36,11 @@ html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] #team-setti
 }
 
 html[data-surface="web-app"] #team-settings-root {
+  grid-column: 1;
+  grid-row: 2;
   width: 100%;
   margin: -4px 0 14px;
+  align-self: start;
 }
 
 html[data-surface="web-app"] .team-settings-disclosure {
@@ -84,6 +106,13 @@ html[data-surface="web-app"] .team-settings-hint {
   color: #817a70;
   font-size: 6.5px;
   line-height: 1.5;
+}
+
+@media (max-width: 959px) {
+  html[data-surface="web-app"] #team-settings-root {
+    width: 100%;
+    margin: -3px 0 12px;
+  }
 }
 
 @media (max-width: 700px) {
