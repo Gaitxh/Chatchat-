@@ -1,4 +1,4 @@
-import type { CouncilEvent } from "../core/types.js";
+import type { CouncilContext, CouncilEvent } from "../core/types.js";
 import {
   deriveOpenMeetingIssueProvenance,
   type OpenMeetingIssueProvenance,
@@ -13,6 +13,7 @@ export interface ProviderContextSelection {
   pinnedEventIds: string[];
   pinnedIssueSourceEventIds: string[];
   recentEventIds: string[];
+  latestRoundEventIds: string[];
 }
 
 export interface ProviderContextSelectionOptions {
@@ -20,10 +21,16 @@ export interface ProviderContextSelectionOptions {
   maxPinnedIssueEvents?: number;
 }
 
+export interface ProviderVisibleConsultationContext {
+  context: CouncilContext;
+  selection: ProviderContextSelection;
+}
+
 /**
  * Keep structurally unresolved obligations visible without growing the Provider
- * prompt. Open-issue events may displace older generic recency events, but the
- * final selected slice is restored to Blackboard chronology.
+ * prompt. The newest published round is protected first; old unresolved issue
+ * events may then displace older generic recency events. The final selected
+ * slice is always restored to Blackboard chronology.
  *
  * This selector never scores prose, stance popularity, model identity or
  * confidence. Pinned events gain memory priority only — never authority.
@@ -37,18 +44,26 @@ export function selectProviderContextEvents(
     options.maxPinnedIssueEvents,
     DEFAULT_PROVIDER_PINNED_ISSUE_EVENTS,
   );
-  const maxPinnedIssueEvents = Math.min(requestedPinned, maxEvents);
   const indexById = new Map(publicEvents.map((event, index) => [event.id, index] as const));
   const eventById = new Map(publicEvents.map((event) => [event.id, event] as const));
 
   if (publicEvents.length <= maxEvents) {
+    const allIds = publicEvents.map((event) => event.id);
     return {
       events: publicEvents.map(cloneEvent),
       pinnedEventIds: [],
       pinnedIssueSourceEventIds: [],
-      recentEventIds: publicEvents.map((event) => event.id),
+      recentEventIds: allIds,
+      latestRoundEventIds: latestRoundIds(publicEvents, maxEvents),
     };
   }
+
+  const latestRoundEventIds = latestRoundIds(publicEvents, maxEvents);
+  const protectedLatest = new Set(latestRoundEventIds);
+  const maxPinnedIssueEvents = Math.min(
+    requestedPinned,
+    Math.max(0, maxEvents - protectedLatest.size),
+  );
 
   const issues = [...deriveOpenMeetingIssueProvenance(publicEvents)].sort((a, b) =>
     issueMemoryRank(a) - issueMemoryRank(b)
@@ -62,18 +77,20 @@ export function selectProviderContextEvents(
   for (const issue of issues) {
     if (pinned.size >= maxPinnedIssueEvents) break;
     const group = issueContextGroup(issue, eventById, indexById);
-    const additions = group.filter((eventId) => !pinned.has(eventId));
+    const additions = group.filter((eventId) => !pinned.has(eventId) && !protectedLatest.has(eventId));
     if (!additions.length) continue;
     if (pinned.size + additions.length > maxPinnedIssueEvents) continue;
     for (const eventId of additions) pinned.add(eventId);
     pinnedIssueSourceEventIds.push(issue.sourceEventId);
   }
 
-  const remaining = Math.max(0, maxEvents - pinned.size);
-  const recent = publicEvents
-    .filter((event) => !pinned.has(event.id))
+  const remaining = Math.max(0, maxEvents - protectedLatest.size - pinned.size);
+  const ordinaryRecent = publicEvents
+    .filter((event) => !pinned.has(event.id) && !protectedLatest.has(event.id))
     .slice(-remaining)
     .map((event) => event.id);
+  const recent = [...ordinaryRecent, ...latestRoundEventIds]
+    .sort((a, b) => (indexById.get(a) ?? 0) - (indexById.get(b) ?? 0));
   const selectedIds = new Set([...pinned, ...recent]);
   const selected = publicEvents.filter((event) => selectedIds.has(event.id)).map(cloneEvent);
 
@@ -82,6 +99,26 @@ export function selectProviderContextEvents(
     pinnedEventIds: [...pinned].sort((a, b) => (indexById.get(a) ?? 0) - (indexById.get(b) ?? 0)),
     pinnedIssueSourceEventIds: unique(pinnedIssueSourceEventIds),
     recentEventIds: recent,
+    latestRoundEventIds,
+  };
+}
+
+/**
+ * Reuses the exact selector for parser/reply/inbox visibility. This prevents a
+ * Provider response from successfully referencing an old public event that was
+ * not actually present in that turn's bounded prompt snapshot.
+ */
+export function providerVisibleConsultationContext(
+  context: CouncilContext,
+  options: ProviderContextSelectionOptions = {},
+): ProviderVisibleConsultationContext {
+  const selection = selectProviderContextEvents(context.publicEvents, options);
+  return {
+    selection,
+    context: {
+      ...context,
+      publicEvents: selection.events,
+    },
   };
 }
 
@@ -94,9 +131,9 @@ function issueContextGroup(
   addIfPresent(ids, issue.sourceEventId, eventById);
   for (const relatedEventId of issue.relatedEventIds) addIfPresent(ids, relatedEventId, eventById);
 
-  // Preserve a bounded structural parent when the open event itself is a reply
-  // or revision-like continuation. This keeps the pinned item intelligible
-  // without recursively pulling an unbounded thread into the prompt.
+  // Preserve one bounded structural parent when the open event itself is a
+  // reply/continuation. This keeps the pinned item intelligible without
+  // recursively pulling an unbounded thread into the prompt.
   const source = eventById.get(issue.sourceEventId);
   const parent = source ? structuralParent(source) : undefined;
   if (parent) addIfPresent(ids, parent, eventById);
@@ -124,6 +161,15 @@ function structuralParent(event: CouncilEvent): string | undefined {
     case "final_position":
       return undefined;
   }
+}
+
+function latestRoundIds(events: readonly CouncilEvent[], maxEvents: number): string[] {
+  if (!events.length) return [];
+  const latestRound = Math.max(...events.map((event) => event.round));
+  return events
+    .filter((event) => event.round === latestRound)
+    .slice(-maxEvents)
+    .map((event) => event.id);
 }
 
 function issueMemoryRank(issue: OpenMeetingIssueProvenance): number {
