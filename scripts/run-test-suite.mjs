@@ -31,6 +31,7 @@ const tests = [
   "dist/tests/consultation-receipt.test.js",
   "dist/tests/source-metadata.test.js",
   "tests/source-extract.test.mjs",
+  "tests/demo-output.test.mjs",
   "dist/tests/consultation-history.test.js",
   "dist/tests/extension-gate-b.test.js",
   "dist/tests/recipe-candidate.test.js",
