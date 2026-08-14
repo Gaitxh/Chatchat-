@@ -1,0 +1,43 @@
+name: Remove Legacy History
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  remove-legacy-history:
+    name: Delete unreferenced legacy History stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Prove legacy files exist before removal
+        run: |
+          test -f src/history/browser-store.ts
+          test -f src/extension/chronicle-store.ts
+          test -f tests/browser-chronicle.test.ts
+
+      - name: Remove legacy stack
+        run: |
+          git rm \
+            src/history/browser-store.ts \
+            src/extension/chronicle-store.ts \
+            tests/browser-chronicle.test.ts
+
+      - name: Commit removal to PR branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --cached --quiet; then
+            echo "legacy History files are already gone"
+          else
+            git commit -m "Remove legacy Browser Chronicle stores"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          fi
