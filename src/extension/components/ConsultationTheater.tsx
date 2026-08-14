@@ -13,6 +13,7 @@ import {
   type ConsultationReplayStage,
 } from "../../theater/consultation-theater.js";
 import type { AggregatedInfluenceEdge } from "../../theater/influence.js";
+import { ResearchRoster } from "./ResearchRoster.js";
 import "./consultation-theater.css";
 
 interface ConsultationTheaterProps {
@@ -160,6 +161,14 @@ export function ConsultationTheater({
           <span>{format(copy.changedCount, { count: fullModel.summary.changedMindCount })}</span>
         </div>
       </header>
+
+      {report.researchLaneAssignments ? (
+        <ResearchRoster
+          participants={participants}
+          assignments={report.researchLaneAssignments}
+          locale={locale}
+        />
+      ) : null}
 
       <TheaterBlock eyebrow={copy.changed} title={copy.changedTitle} count={fullModel.changedMinds.length}>
         {fullModel.changedMinds.length ? (

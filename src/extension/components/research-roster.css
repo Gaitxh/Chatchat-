@@ -1,0 +1,102 @@
+.research-roster {
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid rgba(102, 146, 203, .14);
+  border-radius: 13px;
+  background: linear-gradient(135deg, rgba(70, 108, 160, .09), rgba(255,255,255,.025));
+}
+
+.research-roster > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.research-roster > header > div { min-width: 0; }
+.research-roster > header span {
+  color: #efc776;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.research-roster > header h3 {
+  margin: 4px 0 4px;
+  color: #f2f4f8;
+  font-size: 13px;
+}
+.research-roster > header p {
+  max-width: 590px;
+  margin: 0;
+  color: #9fa9b7;
+  font-size: 7.5px;
+  line-height: 1.5;
+}
+.research-roster > header > b {
+  padding: 5px 7px;
+  border-radius: 999px;
+  background: rgba(87, 137, 205, .12);
+  color: #afcbee;
+  font-size: 6px;
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+
+.research-roster__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.research-roster__grid article {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 27px minmax(0, 1fr);
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid rgba(255,255,255,.055);
+  border-radius: 9px;
+  background: rgba(255,255,255,.035);
+}
+
+.research-roster__grid article > b {
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255,255,255,.06);
+  font-size: 12px;
+}
+
+.research-roster__grid article > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.research-roster__grid strong {
+  overflow: hidden;
+  color: #f0f3f7;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.research-roster__grid span {
+  color: #bad3f0;
+  font-size: 7px;
+}
+.research-roster__grid small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #8490a0;
+  font-size: 6.3px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@media (max-width: 760px) {
+  .research-roster__grid { grid-template-columns: 1fr; }
+}

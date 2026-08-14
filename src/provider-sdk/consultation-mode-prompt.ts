@@ -28,6 +28,7 @@ export function buildModeAwareProviderConsultationPrompt(context: CouncilContext
     `MODE_LABEL: ${mode.en.label}`,
     `MODE_GOAL: ${mode.en.goal}`,
     "The same meeting objective is given to every AI participant. It does not assign a side, hierarchy, preferred conclusion, or special authority to you or anyone else.",
+    "Write substantive consultation contributions in the same working language as USER_PROPOSAL_JSON unless a source name, short source quotation, or indispensable technical term requires another language.",
     context.mode === "stress_test"
       ? "Stress Test means seek serious counterexamples and failure conditions, not perform disagreement for entertainment. Explicitly acknowledge positions that survive strong testing."
       : "Follow the meeting objective while remaining willing to agree, revise, concede, or remain uncertain when warranted.",
