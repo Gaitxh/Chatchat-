@@ -1,7 +1,7 @@
 import {
+  automaticTeamLaunchUrl,
   automaticTeamPermissionDescriptor,
   buildAutomaticTeamPlan,
-  findReusableAutomaticTeamTab,
 } from "../src/extension/automatic-team.js";
 import { detectProviderUrl } from "../src/provider-sdk/catalog.js";
 
@@ -41,31 +41,23 @@ assert(descriptor.origins.length === 3, "Permission descriptor should contain on
 assert(descriptor.origins.every((origin) => origin.endsWith("/*")), "Permission origins must use host match patterns.");
 assert(new Set(descriptor.origins).size === descriptor.origins.length, "Permission origins must be de-duplicated.");
 
-const reusable = findReusableAutomaticTeamTab(
-  detectProviderUrl("https://chatgpt.com/"),
-  [
-    { id: 7, url: "https://example.com/" },
-    { id: 11, url: "https://chatgpt.com/c/abc123" },
-    { id: 12, url: "https://chatgpt.com/?temporary-chat=true" },
-  ],
+const privateThread = detectProviderUrl("https://chatgpt.com/c/private-conversation-123");
+assert(
+  automaticTeamLaunchUrl(privateThread) === "https://chatgpt.com/",
+  "Automatic assembly must launch ChatGPT from its clean start URL instead of reusing a discovered private thread.",
 );
-assert(reusable?.id === 11, "Zero-config assembly should reuse the first matching already-open Provider tab.");
-assert(reusable?.url.startsWith("https://chatgpt.com/"), "Reused AI tabs should preserve a safe normalized Provider URL.");
 
-const secondReusable = findReusableAutomaticTeamTab(
-  detectProviderUrl("https://chatgpt.com/"),
-  [
-    { id: 11, url: "https://chatgpt.com/c/abc123" },
-    { id: 12, url: "https://chatgpt.com/?temporary-chat=true" },
-  ],
-  new Set([11]),
+const claudeThread = detectProviderUrl("https://claude.ai/chat/private-conversation-456");
+assert(
+  automaticTeamLaunchUrl(claudeThread) === "https://claude.ai/",
+  "Automatic assembly must launch Claude from its clean start URL instead of writing into an existing conversation.",
 );
-assert(secondReusable?.id === 12, "Automatic tab reuse must respect tabs already assigned to another seat.");
 
-const wrongProvider = findReusableAutomaticTeamTab(
-  detectProviderUrl("https://claude.ai/"),
-  [{ id: 11, url: "https://chatgpt.com/c/abc123" }],
+const geminiThread = detectProviderUrl("https://gemini.google.com/app/1234567890");
+assert(
+  automaticTeamLaunchUrl(geminiThread) === "https://gemini.google.com/app",
+  "Automatic assembly must launch Gemini from its clean start URL instead of writing into an existing conversation.",
 );
-assert(wrongProvider === null, "A tab from a different Provider origin must never be reused for the wrong participant.");
 
 console.log("✓ ChatChat zero-config automatic team planning tests passed");
+console.log("✓ ChatChat automatic team never hijacks an existing AI conversation");
