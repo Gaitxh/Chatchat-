@@ -2,12 +2,21 @@ import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { CouncilEvent, CouncilReport } from "../core/types.js";
 import {
+  legacyConsultationReceiptExecutionIntegrity,
+  type ConsultationReceiptExecutionIntegrity,
+} from "../consultation/receipt-integrity.js";
+import {
   EVIDENCE_VERIFICATIONS_STORAGE_KEY,
   type EvidenceVerificationSnapshot,
 } from "../evidence/evidence-ledger.js";
 import type { ConsultationArchive } from "../history/consultation-history.js";
 import { EvidenceHistoryStore } from "../history/evidence-history.js";
+import { ExecutionAuditHistoryStore } from "../history/execution-audit-history.js";
 import { normalizeLocale, type Locale } from "../i18n/index.js";
+import { providerExecutionAuditSnapshot } from "../provider-sdk/execution-audit.js";
+import { providerTransportAuditSnapshot } from "../provider-sdk/transport-audit.js";
+import { deriveMeetingExecutionIntegrity } from "../theater/meeting-integrity.js";
+import { buildProviderAttendanceAudit } from "../theater/provider-attendance.js";
 import { ConsultationReceiptCard } from "./components/ConsultationReceipt.js";
 
 declare const chrome: any;
@@ -16,6 +25,7 @@ const LIVE_EVENT = "chatchat:consultation-live";
 const COMPLETE_EVENT = "chatchat:consultation-complete";
 const OPEN_ARCHIVE_EVENT = "chatchat:consultation-open-archive";
 const evidenceHistory = new EvidenceHistoryStore();
+const executionHistory = new ExecutionAuditHistoryStore();
 
 interface CompletionDetail {
   report: CouncilReport;
@@ -30,33 +40,68 @@ function ConsultationReceiptPortal() {
   const [completion, setCompletion] = useState<CompletionDetail | null>(null);
   const [archiveMode, setArchiveMode] = useState(false);
   const [verifications, setVerifications] = useState<Record<string, EvidenceVerificationSnapshot>>({});
+  const [executionIntegrity, setExecutionIntegrity] = useState<ConsultationReceiptExecutionIntegrity | undefined>();
   const [locale, setLocale] = useState<Locale>(() => normalizeLocale(document.documentElement.lang));
   const archiveModeRef = useRef(false);
+  const openSessionRef = useRef<string | null>(null);
 
   useEffect(() => {
     const onLive = () => {
       archiveModeRef.current = false;
+      openSessionRef.current = null;
       setArchiveMode(false);
       setCompletion(null);
       setVerifications({});
+      setExecutionIntegrity(undefined);
     };
     const onComplete = (event: Event) => {
       const detail = (event as CustomEvent<CompletionDetail>).detail;
       if (!detail?.report || !Array.isArray(detail.events)) return;
       archiveModeRef.current = false;
+      openSessionRef.current = detail.report.sessionId;
       setArchiveMode(false);
       setCompletion({ report: detail.report, events: [...detail.events] });
-      void readCurrentVerifications().then(setVerifications).catch(() => setVerifications({}));
+      setExecutionIntegrity(deriveLiveExecutionIntegrity(detail.report, detail.events));
+      void readCurrentVerifications().then((next) => {
+        if (archiveModeRef.current || openSessionRef.current !== detail.report.sessionId) return;
+        setVerifications(next);
+      }).catch(() => {
+        if (!archiveModeRef.current && openSessionRef.current === detail.report.sessionId) setVerifications({});
+      });
     };
     const onArchive = (event: Event) => {
       const archive = (event as CustomEvent<ArchiveDetail>).detail?.archive;
       if (!archive?.report || !Array.isArray(archive.events)) return;
       archiveModeRef.current = true;
+      openSessionRef.current = archive.sessionId;
       setArchiveMode(true);
       setCompletion({ report: archive.report, events: [...archive.events] });
-      void evidenceHistory.load(archive.sessionId)
-        .then((saved) => setVerifications(saved?.verifications ?? {}))
-        .catch(() => setVerifications({}));
+      setExecutionIntegrity(undefined);
+      void Promise.all([
+        evidenceHistory.load(archive.sessionId),
+        executionHistory.load(archive.sessionId),
+      ]).then(([evidenceArchive, auditArchive]) => {
+        if (!archiveModeRef.current || openSessionRef.current !== archive.sessionId) return;
+        setVerifications(evidenceArchive?.verifications ?? {});
+        if (!auditArchive) {
+          setExecutionIntegrity(legacyConsultationReceiptExecutionIntegrity());
+          return;
+        }
+        const attendance = buildProviderAttendanceAudit(
+          archive.report.positions.map((position) => position.participant),
+          auditArchive.transports,
+          auditArchive.execution,
+          archive.events,
+        );
+        setExecutionIntegrity({
+          mode: auditArchive.mode,
+          integrity: deriveMeetingExecutionIntegrity(attendance),
+        });
+      }).catch(() => {
+        if (!archiveModeRef.current || openSessionRef.current !== archive.sessionId) return;
+        setVerifications({});
+        setExecutionIntegrity(undefined);
+      });
     };
     const onStorage = (changes: Record<string, { newValue?: unknown }>) => {
       if (archiveModeRef.current) return;
@@ -104,7 +149,7 @@ function ConsultationReceiptPortal() {
     } else {
       app.append(root);
     }
-  }, [completion, verifications]);
+  }, [completion, verifications, executionIntegrity]);
 
   if (!completion) return null;
   return (
@@ -112,16 +157,37 @@ function ConsultationReceiptPortal() {
       report={completion.report}
       events={completion.events}
       verifications={verifications}
+      {...(executionIntegrity ? { executionIntegrity } : {})}
       locale={locale}
       archive={archiveMode}
     />
   );
 }
 
+function deriveLiveExecutionIntegrity(
+  report: CouncilReport,
+  events: readonly CouncilEvent[],
+): ConsultationReceiptExecutionIntegrity | undefined {
+  const transports = providerTransportAuditSnapshot(report.sessionId);
+  const execution = providerExecutionAuditSnapshot(report.sessionId);
+  if (!transports.length && !execution.length) return undefined;
+  const attendance = buildProviderAttendanceAudit(
+    report.positions.map((position) => position.participant),
+    transports,
+    execution,
+    events,
+  );
+  return {
+    mode: transports[0]?.mode ?? "unknown",
+    integrity: deriveMeetingExecutionIntegrity(attendance),
+  };
+}
+
 async function readCurrentVerifications(): Promise<Record<string, EvidenceVerificationSnapshot>> {
-  const store = chrome.storage.session ?? chrome.storage.local;
-  const value = await store.get(EVIDENCE_VERIFICATIONS_STORAGE_KEY);
-  return normalizeVerifications(value[EVIDENCE_VERIFICATIONS_STORAGE_KEY]);
+  if (typeof chrome === "undefined" || !chrome.storage) return {};
+  const storeArea = chrome.storage.session ?? chrome.storage.local;
+  const stored = await storeArea.get(EVIDENCE_VERIFICATIONS_STORAGE_KEY);
+  return normalizeVerifications(stored[EVIDENCE_VERIFICATIONS_STORAGE_KEY]);
 }
 
 function normalizeVerifications(value: unknown): Record<string, EvidenceVerificationSnapshot> {

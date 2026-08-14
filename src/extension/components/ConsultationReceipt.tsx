@@ -3,6 +3,11 @@ import type { CouncilEvent, CouncilReport } from "../../core/types.js";
 import type { EvidenceVerificationSnapshot } from "../../evidence/evidence-ledger.js";
 import type { Locale } from "../../i18n/index.js";
 import {
+  consultationReceiptSvgWithIntegrity,
+  integrityLabel,
+  type ConsultationReceiptExecutionIntegrity,
+} from "../../consultation/receipt-integrity.js";
+import {
   consultationReceiptSvg,
   deriveConsultationReceipt,
 } from "../../consultation/receipt.js";
@@ -13,6 +18,7 @@ interface ConsultationReceiptProps {
   report: CouncilReport;
   events: readonly CouncilEvent[];
   verifications?: Readonly<Record<string, EvidenceVerificationSnapshot>>;
+  executionIntegrity?: ConsultationReceiptExecutionIntegrity;
   locale: Locale;
   archive?: boolean;
 }
@@ -21,6 +27,7 @@ export function ConsultationReceiptCard({
   report,
   events,
   verifications = {},
+  executionIntegrity,
   locale,
   archive = false,
 }: ConsultationReceiptProps) {
@@ -33,7 +40,7 @@ export function ConsultationReceiptCard({
   const modeLabel = zh ? receipt.modeLabelZhCN : receipt.modeLabelEn;
 
   async function copyMarkdown() {
-    const markdown = safeConsultationReceiptMarkdown(receipt, locale);
+    const markdown = safeConsultationReceiptMarkdown(receipt, locale, executionIntegrity);
     const ok = await copyText(markdown);
     if (!ok) return;
     setCopied(true);
@@ -41,7 +48,10 @@ export function ConsultationReceiptCard({
   }
 
   function exportSvg() {
-    const svg = consultationReceiptSvg(receipt, locale);
+    const baseSvg = consultationReceiptSvg(receipt, locale);
+    const svg = executionIntegrity
+      ? consultationReceiptSvgWithIntegrity(baseSvg, executionIntegrity, locale)
+      : baseSvg;
     const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -61,8 +71,8 @@ export function ConsultationReceiptCard({
           <span>{zh ? "协商收据" : "CONSULTATION RECEIPT"}</span>
           <h3>{zh ? "把这场会，压成一张能分享的卡。" : "Turn the meeting into one shareable receipt."}</h3>
           <p>{zh
-            ? "只使用本地结构化事件与证据快照生成。分享前请检查提案摘要；不会自动上传任何内容。"
-            : "Generated only from local structured events and evidence snapshots. Review the proposal preview before sharing; nothing is uploaded automatically."}</p>
+            ? "只使用本地结构化事件、证据快照和可用的执行审计生成。分享前请检查提案摘要；不会自动上传任何内容。"
+            : "Generated only from local structured events, evidence snapshots, and available execution audit data. Review the proposal preview before sharing; nothing is uploaded automatically."}</p>
         </div>
         <b>{archive ? (zh ? "历史快照" : "ARCHIVE") : `${receipt.modeIcon} ${modeLabel}`}</b>
       </header>
@@ -82,6 +92,27 @@ export function ConsultationReceiptCard({
           <span><b>📎 {receipt.evidenceCount}</b>{zh ? "证据" : "evidence"}</span>
           <span><b>↻ {receipt.revisionCount}</b>{zh ? "改口" : "revisions"}</span>
         </div>
+
+        {executionIntegrity ? (
+          <div
+            className={`receipt-integrity state-${executionIntegrity.integrity.state}`}
+            data-receipt-execution-integrity={executionIntegrity.integrity.state}
+            data-receipt-execution-mode={executionIntegrity.mode}
+          >
+            <span>{zh ? "会议执行完整性" : "MEETING EXECUTION INTEGRITY"}</span>
+            <strong>
+              <b>{executionIntegrity.integrity.verifiedTurns}/{executionIntegrity.integrity.totalTurns}</b>
+              <span>{zh ? "轮已验证" : "turns verified"} · {integrityLabel(executionIntegrity.integrity.state, zh)}</span>
+            </strong>
+            <small>
+              {executionIntegrity.integrity.fullyVerifiedSeats}/{executionIntegrity.integrity.totalSeats} {zh ? "席位完整" : "seats complete"}
+              {` · ↺ ${executionIntegrity.integrity.repairedTurns}`}
+              {` · fallback ${executionIntegrity.integrity.fallbackTurns}`}
+              {` · failed ${executionIntegrity.integrity.failedTurns}`}
+            </small>
+            <em>{receiptIntegrityNote(executionIntegrity, zh)}</em>
+          </div>
+        ) : null}
 
         {receipt.stopReason ? (
           <div className="receipt-turn receipt-stop-reason">
@@ -115,8 +146,8 @@ export function ConsultationReceiptCard({
         ) : null}
 
         <footer>{zh
-          ? "没有议长 AI · 多数不是权威 · 来源可达不等于主张为真 · 本地回放"
-          : "No chair AI · Majority is not authority · Reachable is not proof · Local replay"}</footer>
+          ? "没有议长 AI · 多数不是权威 · 对齐度不是正确率 · 本地回放"
+          : "No chair AI · Majority is not authority · Alignment is not correctness · Local replay"}</footer>
       </article>
 
       <div className="receipt-actions">
@@ -127,6 +158,19 @@ export function ConsultationReceiptCard({
       </div>
     </section>
   );
+}
+
+function receiptIntegrityNote(summary: ConsultationReceiptExecutionIntegrity, zh: boolean): string {
+  if (summary.mode === "synthetic-showcase") {
+    return zh ? "DEMO · SYNTHETIC；不是第三方 AI 真实出席证明。" : "DEMO · SYNTHETIC; not proof of live third-party attendance.";
+  }
+  if (summary.mode === "unknown") {
+    return zh ? "旧记录没有 durable execution receipt；不会事后补写执行完整性。" : "Legacy archive has no durable execution receipt; no post-hoc integrity claim.";
+  }
+  if (summary.integrity.state === "degraded" || summary.integrity.state === "incomplete") {
+    return zh ? "对齐度必须和执行缺口一起阅读。" : "Read alignment together with the execution gap.";
+  }
+  return zh ? "执行 provenance，不是答案正确率。" : "Execution provenance, not answer correctness.";
 }
 
 async function copyText(value: string): Promise<boolean> {

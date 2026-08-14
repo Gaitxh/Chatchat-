@@ -1,23 +1,24 @@
 (() => {
   const params = new URLSearchParams(location.search);
   if (params.get("showcase") !== "consultation") return;
-
-  function check() {
-    const root = document.documentElement;
+  function inspect() {
     const receipt = document.querySelector(".consultation-receipt");
-    const preview = receipt?.querySelector(".receipt-card-preview");
-    const actions = receipt ? [...receipt.querySelectorAll(".receipt-actions button")] : [];
-    if (!receipt || !preview || actions.length < 2) return;
-    root.dataset.chatchatConsultationReceiptShowcase = "complete";
-    observer.disconnect();
+    if (!receipt) return false;
+    const integrity = receipt.querySelector(
+      '.receipt-integrity[data-receipt-execution-mode="synthetic-showcase"][data-receipt-execution-integrity="verified"]',
+    );
+    const preview = receipt.querySelector(".receipt-card-preview");
+    const primary = receipt.querySelector(".receipt-primary");
+    const svgButton = [...receipt.querySelectorAll("button")].find((button) => /SVG/i.test(button.textContent || ""));
+    if (!integrity || !preview || !primary || !svgButton) return false;
+    document.documentElement.dataset.chatchatReceiptIntegrityShowcase = "complete";
+    document.documentElement.dataset.chatchatConsultationReceiptShowcase = "complete";
+    return true;
   }
-
-  const observer = new MutationObserver(check);
-  observer.observe(document.documentElement, {
-    attributes: true,
-    childList: true,
-    subtree: true,
+  if (inspect()) return;
+  const observer = new MutationObserver(() => {
+    if (!inspect()) return;
+    observer.disconnect();
   });
-  window.addEventListener("DOMContentLoaded", check, { once: true });
-  check();
+  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
 })();
