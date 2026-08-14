@@ -77,7 +77,9 @@ jobs:
           grep -q 'data-chatchat-zero-config-showcase="complete"' artifacts/chatchat-zero-config-en.html
           grep -q 'ZERO-CONFIG START' artifacts/chatchat-zero-config-en.html
           grep -q 'Automatic team: ChatGPT · Claude · Gemini' artifacts/chatchat-zero-config-en.html
-          grep -q 'Start automatic setup' artifacts/chatchat-zero-config-en.html
+          grep -q 'Assemble my AI room' artifacts/chatchat-zero-config-en.html
+          grep -q 'reuses AI sites already open' artifacts/chatchat-zero-config-en.html
+          ! grep -q 'Start automatic setup' artifacts/chatchat-zero-config-en.html
 
       - name: Capture fresh Chinese Full Room
         run: |
@@ -104,7 +106,9 @@ jobs:
           grep -q 'data-chatchat-zero-config-showcase="complete"' artifacts/chatchat-zero-config-zh.html
           grep -q '零配置开始' artifacts/chatchat-zero-config-zh.html
           grep -q '自动团队：ChatGPT · Claude · Gemini' artifacts/chatchat-zero-config-zh.html
-          grep -q '开始自动配置' artifacts/chatchat-zero-config-zh.html
+          grep -q '组建我的 AI 会议室' artifacts/chatchat-zero-config-zh.html
+          grep -q '优先复用浏览器里已经打开的 AI' artifacts/chatchat-zero-config-zh.html
+          ! grep -q '开始自动配置' artifacts/chatchat-zero-config-zh.html
 
       - name: Save preview log
         if: always()

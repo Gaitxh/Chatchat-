@@ -2,6 +2,16 @@ import { BUILT_IN_PROVIDER_MANIFESTS, detectProviderUrl } from "../provider-sdk/
 
 export type AutomaticTeamDetection = ReturnType<typeof detectProviderUrl>;
 
+export interface AutomaticTeamBrowserTab {
+  id?: number;
+  url?: string;
+}
+
+export interface ReusableAutomaticTeamTab {
+  id: number;
+  url: string;
+}
+
 export const DEFAULT_AUTOMATIC_PROVIDER_IDS = [
   "openai-chatgpt",
   "anthropic-claude",
@@ -39,6 +49,29 @@ export function buildAutomaticTeamPlan(
   }
 
   return [...byOrigin.values()].slice(0, safeMax);
+}
+
+/**
+ * Zero-config onboarding should reuse a user's already-open AI tab whenever the
+ * tab belongs to the planned Provider origin. This keeps existing login/session
+ * state, avoids duplicate tabs, and lets ChatChat close only tabs it created.
+ */
+export function findReusableAutomaticTeamTab(
+  detection: AutomaticTeamDetection,
+  tabs: readonly AutomaticTeamBrowserTab[],
+  usedTabIds: ReadonlySet<number> = new Set<number>(),
+): ReusableAutomaticTeamTab | null {
+  for (const tab of tabs) {
+    if (!tab.id || !tab.url || usedTabIds.has(tab.id) || !/^https?:/i.test(tab.url)) continue;
+    try {
+      const current = detectProviderUrl(tab.url);
+      if (current.kind !== "known" || current.origin !== detection.origin) continue;
+      return { id: tab.id, url: current.normalizedUrl };
+    } catch {
+      // Ordinary non-provider tabs are irrelevant to automatic team assembly.
+    }
+  }
+  return null;
 }
 
 export function automaticTeamPermissionDescriptor(
