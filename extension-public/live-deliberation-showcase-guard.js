@@ -4,7 +4,6 @@
 
   const COMPLETE_ATTR = "data-chatchat-live-deliberation-showcase";
   const EXCHANGE_ATTR = "data-chatchat-peer-exchange-showcase";
-  const FRESH_PHASE_ATTR = "data-chatchat-fresh-phase-showcase";
   const AGENDA_ATTR = "data-chatchat-agenda-showcase";
   const OPEN_ISSUES_ATTR = "data-chatchat-open-issues-showcase";
   const SECRETARIAT_ATTR = "data-chatchat-meeting-secretariat-showcase";
@@ -15,17 +14,6 @@
     if (document.documentElement.getAttribute(attribute) === "complete") return;
     document.documentElement.setAttribute(attribute, "complete");
   }
-
-  window.addEventListener("chatchat:consultation-live", (event) => {
-    const phase = event.detail?.phase;
-    if (
-      phase?.reason === "fresh_signal_follow_up"
-      && Array.isArray(phase.triggerEventIds)
-      && phase.triggerEventIds.length > 0
-    ) {
-      markComplete(FRESH_PHASE_ATTR);
-    }
-  });
 
   function inspect() {
     // Agenda and Open Issues are phase-transition UI. Observe them before any
