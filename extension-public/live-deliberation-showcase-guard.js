@@ -3,10 +3,21 @@
   if (params.get("showcase") !== "consultation") return;
 
   const COMPLETE_ATTR = "data-chatchat-live-deliberation-showcase";
+  const EXCHANGE_ATTR = "data-chatchat-peer-exchange-showcase";
+  let sawPeerQueued = false;
+  let sawPeerResponding = false;
+  let sawPeerAnswered = false;
 
   function inspect() {
     const stream = document.querySelector(".live-discussion-stream");
     if (!(stream instanceof HTMLElement)) return false;
+
+    sawPeerQueued ||= Boolean(document.querySelector('[data-peer-response-state="queued"]'));
+    sawPeerResponding ||= Boolean(document.querySelector('[data-peer-response-state="responding"]'));
+    sawPeerAnswered ||= Boolean(document.querySelector('[data-peer-response-state="answered"][data-peer-response-event]'));
+    if (sawPeerQueued && sawPeerResponding && sawPeerAnswered) {
+      document.documentElement.setAttribute(EXCHANGE_ATTR, "complete");
+    }
 
     const sealedRound = stream.querySelector(".discussion-round--sealed");
     const debateRound = stream.querySelector(".discussion-round--debate");
@@ -30,6 +41,9 @@
       && evidence
       && revision
       && directReply
+      && sawPeerQueued
+      && sawPeerResponding
+      && sawPeerAnswered
       && researchDesk
       && researchLane
       && researchEvidenceCount
