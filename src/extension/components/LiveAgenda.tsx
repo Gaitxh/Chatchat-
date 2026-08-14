@@ -5,6 +5,7 @@ import type {
   CouncilPhaseUpdate,
 } from "../../core/types.js";
 import type { Locale } from "../../i18n/index.js";
+import { focusConsultationEvent } from "../provenance-wire.js";
 import "./live-agenda.css";
 
 interface LiveAgendaProps {
@@ -53,7 +54,8 @@ export function LiveAgenda({ phase, events, participants, locale }: LiveAgendaPr
                   type="button"
                   key={event.id}
                   className={`live-agenda__trigger trigger-${event.kind}`}
-                  title={event.id}
+                  title={zh ? `查看原始事件 ${event.id}` : `Inspect source event ${event.id}`}
+                  onClick={() => focusConsultationEvent(event.id)}
                 >
                   <b>{meta.icon}</b>
                   <span>{participantName(participants, event.actorId)}</span>
