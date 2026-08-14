@@ -1,7 +1,6 @@
 import type { CouncilEvent, CouncilParticipant } from "../core/types.js";
 import {
   deriveEvidenceLedger,
-  safeEvidenceSource,
   type EvidenceVerificationSnapshot,
 } from "./evidence-ledger.js";
 
@@ -77,7 +76,7 @@ export function deriveEvidenceGapRadar(
   }
 
   for (const record of evidenceRecords) {
-    const sourceUrl = safeEvidenceSource(record.source);
+    const sourceUrl = record.sourceUrl;
     const verification = verifications[record.evidenceEventId];
 
     if (!sourceUrl) {
