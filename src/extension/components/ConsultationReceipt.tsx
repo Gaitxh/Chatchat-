@@ -3,10 +3,10 @@ import type { CouncilEvent, CouncilReport } from "../../core/types.js";
 import type { EvidenceVerificationSnapshot } from "../../evidence/evidence-ledger.js";
 import type { Locale } from "../../i18n/index.js";
 import {
-  consultationReceiptMarkdown,
   consultationReceiptSvg,
   deriveConsultationReceipt,
 } from "../../consultation/receipt.js";
+import { safeConsultationReceiptMarkdown } from "../../consultation/receipt-share.js";
 import "./consultation-receipt.css";
 
 interface ConsultationReceiptProps {
@@ -33,7 +33,7 @@ export function ConsultationReceiptCard({
   const modeLabel = zh ? receipt.modeLabelZhCN : receipt.modeLabelEn;
 
   async function copyMarkdown() {
-    const markdown = consultationReceiptMarkdown(receipt, locale);
+    const markdown = safeConsultationReceiptMarkdown(receipt, locale);
     const ok = await copyText(markdown);
     if (!ok) return;
     setCopied(true);
