@@ -16,6 +16,7 @@ import { ConsultationTheater } from "./components/ConsultationTheater.js";
 import { LiveDiscussionStream } from "./components/LiveDiscussionStream.js";
 import { LiveMoments } from "./components/LiveMoments.js";
 import { LiveParticipantFloor } from "./components/LiveParticipantFloor.js";
+import { LiveResearchDesk } from "./components/LiveResearchDesk.js";
 import { RelationshipMap } from "./components/RelationshipMap.js";
 import { ResearchRoster } from "./components/ResearchRoster.js";
 import {
@@ -173,6 +174,13 @@ function ConsultationTheaterPortal() {
           phase={live.phase}
           activities={live.activities}
           locale={locale}
+        />
+        <LiveResearchDesk
+          participants={live.participants}
+          events={live.events}
+          activities={live.activities}
+          locale={locale}
+          onFocusEvent={setSelectedEventId}
         />
         <LiveDiscussionStream
           participants={live.participants}
