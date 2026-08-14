@@ -2,21 +2,16 @@
   const params = new URLSearchParams(location.search);
   if (params.get("showcase") !== "consultation") return;
 
-  const COMPLETE_EVENT = "chatchat:consultation-complete";
   const HISTORY_UPDATED_EVENT = "chatchat:consultation-history-updated";
   const DB_NAME = "chatchat-consultation-history-v1";
   const ARCHIVES = "archives";
-  let latestSessionId = "";
   let checking = false;
 
-  window.addEventListener(COMPLETE_EVENT, (event) => {
-    latestSessionId = event.detail?.report?.sessionId ?? "";
-  });
-
-  window.addEventListener(HISTORY_UPDATED_EVENT, () => {
-    if (!latestSessionId || checking) return;
+  window.addEventListener(HISTORY_UPDATED_EVENT, (event) => {
+    const sessionId = event.detail?.sessionId ?? "";
+    if (!sessionId || checking) return;
     checking = true;
-    void verifyArchive(latestSessionId);
+    void verifyArchive(sessionId);
   });
 
   async function verifyArchive(sessionId) {
