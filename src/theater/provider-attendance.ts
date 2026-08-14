@@ -43,8 +43,8 @@ export interface ProviderTurnAttendanceAudit {
   round: number;
   state: ProviderTurnAuditState;
   snapshotEventIds: string[];
-  pinnedOpenIssueEventIds: string[];
-  latestRoundEventIds: string[];
+  pinnedOpenIssueEventIds?: string[];
+  latestRoundEventIds?: string[];
   publishedEventIds: string[];
   contributionKinds: string[];
   repairRequested: boolean;
@@ -206,6 +206,8 @@ function buildTurn(
   const elapsedMs = received?.elapsedMs;
   const responseChars = received?.responseChars;
   const selectionAudit = parsed ?? started;
+  const pinnedOpenIssueEventIds = [...(initial?.pinnedOpenIssueEventIds ?? selectionAudit?.pinnedOpenIssueEventIds ?? [])];
+  const latestRoundEventIds = [...(initial?.latestRoundEventIds ?? selectionAudit?.latestRoundEventIds ?? [])];
 
   return {
     key: `${sessionId}|${key}`,
@@ -217,8 +219,8 @@ function buildTurn(
     round,
     state,
     snapshotEventIds: [...(initial?.snapshotEventIds ?? selectionAudit?.snapshotEventIds ?? [])],
-    pinnedOpenIssueEventIds: [...(initial?.pinnedOpenIssueEventIds ?? selectionAudit?.pinnedOpenIssueEventIds ?? [])],
-    latestRoundEventIds: [...(initial?.latestRoundEventIds ?? selectionAudit?.latestRoundEventIds ?? [])],
+    ...(pinnedOpenIssueEventIds.length ? { pinnedOpenIssueEventIds } : {}),
+    ...(latestRoundEventIds.length ? { latestRoundEventIds } : {}),
     publishedEventIds: published.map((event) => event.id),
     contributionKinds: [...(parsed?.contributionKinds ?? fallback?.contributionKinds ?? [])],
     repairRequested,
