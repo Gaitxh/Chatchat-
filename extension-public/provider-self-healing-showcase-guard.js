@@ -12,13 +12,28 @@
     for (let attempt = 0; attempt < (journey === "resume" ? 360 : 200); attempt += 1) {
       const row = document.querySelector(".participant-row");
       const note = row?.querySelector(".self-healing-note");
+      const chip = row?.querySelector(".connection-chip");
       const text = note?.textContent ?? "";
+      const rowText = row?.textContent ?? "";
       const zh = params.get("lang") === "zh";
       const healingCopy = zh
         ? text.includes("正在自动修复连接") && text.includes("你不需要操作")
         : text.includes("is self-healing") && text.includes("No action needed");
+      const expectedChip = zh ? "自动修复中" : "SELF-HEALING";
+      const failedCopyHidden = zh
+        ? !rowText.includes("自动识别没有完全成功") && !rowText.includes("需要帮助")
+        : !rowText.includes("Automatic setup needs help") && !rowText.includes("NEEDS HELP");
+      const healingStateVisible = Boolean(
+        row?.classList.contains("connection-self-healing") &&
+        row?.getAttribute("aria-busy") === "true" &&
+        note &&
+        healingCopy &&
+        chip?.textContent?.trim() === expectedChip &&
+        chip?.getAttribute("data-chatchat-self-healing") === "true" &&
+        failedCopyHidden
+      );
 
-      if (row?.classList.contains("connection-self-healing") && note && healingCopy) {
+      if (healingStateVisible) {
         sawHealing = true;
         document.documentElement.dataset.chatchatProviderSelfHealingVisible = "complete";
         if (journey === "static" && document.documentElement.dataset.chatchatSelfHealingNavigationCount === "1") {
@@ -39,7 +54,9 @@
         row?.classList.contains("connection-ready") &&
         row.classList.contains("is-ready") &&
         !row.classList.contains("connection-self-healing") &&
+        row.getAttribute("aria-busy") !== "true" &&
         !document.querySelector(".self-healing-note") &&
+        !document.querySelector('[data-chatchat-self-healing="true"]') &&
         document.documentElement.dataset.chatchatSelfHealingNavigationCount === "1"
       ) {
         const store = window.chrome?.storage?.local;
