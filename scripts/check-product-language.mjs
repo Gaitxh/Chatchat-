@@ -38,6 +38,7 @@ for (const forbidden of [
 }
 
 const webOnboarding = fs.readFileSync("src/extension/web-room-onboarding.tsx", "utf8");
+const webOnboardingCss = fs.readFileSync("src/extension/web-room-onboarding.css", "utf8");
 const automaticTeam = fs.readFileSync("src/extension/automatic-team.ts", "utf8");
 const webAppCss = fs.readFileSync("src/extension/web-app.css", "utf8");
 const serviceWorker = fs.readFileSync("extension-public/service-worker.js", "utf8");
@@ -64,6 +65,29 @@ for (const required of [
 for (const jargon of ["selector", "adapter", "recipe"]) {
   if (onboardingCopy.toLowerCase().includes(jargon)) {
     throw new Error(`Novice Web Room onboarding leaked internal setup jargon: ${jargon}`);
+  }
+}
+
+for (const required of [
+  "ROOM KEEPER",
+  "会议室管家",
+  "installRoomKeeper",
+  "onRemoved",
+  "readLiveRoomState",
+  "mergeRetainedDetections",
+  "room-recovery",
+]) {
+  if (!webOnboarding.includes(required)) {
+    throw new Error(`Room Keeper contract is missing: ${required}`);
+  }
+}
+
+for (const required of [
+  "room-keeper-card",
+  'data-chatchat-onboarding="room-recovery"',
+]) {
+  if (!webOnboardingCss.includes(required)) {
+    throw new Error(`Room Keeper recovery surface is missing: ${required}`);
   }
 }
 
@@ -141,6 +165,7 @@ for (const required of [
 
 console.log("✓ ChatChat primary browser product language is equal-participant consultation");
 console.log("✓ ChatChat Web Room defaults to zero-config automatic setup");
+console.log("✓ ChatChat Room Keeper restores stale participant rooms without manual setup");
 console.log("✓ ChatChat novice onboarding hides internal setup jargon");
 console.log("✓ ChatChat toolbar opens the Full Room directly");
 console.log("✓ ChatChat treats provider login as an automatic-resume state, not configuration failure");
