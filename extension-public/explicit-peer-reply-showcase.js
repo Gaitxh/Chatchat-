@@ -36,11 +36,6 @@
       );
       if (!directQuestion?.id) return response;
 
-      // Yield across two paint opportunities. This lets the real React surface
-      // commit the explicit "responding" lifecycle without timer or MessageChannel
-      // tasks that can stall Chromium's --virtual-time-budget test mode.
-      await nextPaint();
-      await nextPaint();
       envelope.contributions.push({
         kind: "argument",
         stance: "Web + Extension",
@@ -89,9 +84,5 @@
 
   function match(value, pattern) {
     return value.match(pattern)?.[1] ?? null;
-  }
-
-  function nextPaint() {
-    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
   }
 })();
