@@ -83,6 +83,13 @@ export function ConsultationReceiptCard({
           <span><b>↻ {receipt.revisionCount}</b>{zh ? "改口" : "revisions"}</span>
         </div>
 
+        {receipt.stopReason ? (
+          <div className="receipt-turn receipt-stop-reason">
+            <span>{zh ? "为什么停止" : "WHY IT STOPPED"}</span>
+            <strong>{stopReasonLabel(receipt.stopReason, zh)}</strong>
+          </div>
+        ) : null}
+
         {receipt.keyTurn ? (
           <div className="receipt-turn">
             <span>{zh ? "关键转折" : "KEY TURN"}</span>
@@ -138,6 +145,17 @@ async function copyText(value: string): Promise<boolean> {
     textarea.remove();
     return ok;
   }
+}
+
+function stopReasonLabel(reason: NonNullable<CouncilReport["stopReason"]>, zh: boolean): string {
+  if (reason === "round_budget") {
+    return zh
+      ? "达到本模式轮次预算；仍可能保留未决分歧。"
+      : "Round budget reached; unresolved disagreement may remain.";
+  }
+  return zh
+    ? "立场已稳定，上一批没有新的待回应信号。"
+    : "Alignment stabilized with no new signal requiring peer follow-up.";
 }
 
 function evidenceState(state: string, zh: boolean): string {

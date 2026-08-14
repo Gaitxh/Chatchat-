@@ -34,6 +34,7 @@ export interface ConsultationReceipt {
   sessionId: string;
   createdAt: string;
   mode: NonNullable<CouncilReport["mode"]>;
+  stopReason?: CouncilReport["stopReason"];
   modeIcon: string;
   modeLabelEn: string;
   modeLabelZhCN: string;
@@ -84,6 +85,7 @@ export function deriveConsultationReceipt(
     sessionId: report.sessionId,
     createdAt: events.at(-1)?.createdAt ?? events[0]?.createdAt ?? "",
     mode,
+    ...(report.stopReason ? { stopReason: report.stopReason } : {}),
     modeIcon: modeDefinition.icon,
     modeLabelEn: modeDefinition.en.label,
     modeLabelZhCN: modeDefinition.zhCN.label,
@@ -131,6 +133,13 @@ export function consultationReceiptMarkdown(
     "",
     `${receipt.participantNames.length} ${zh ? "位 AI" : "AIs"} · ${receipt.rounds} ${zh ? "轮" : "rounds"} · ⚔ ${receipt.challengeCount} · 📎 ${receipt.evidenceCount} · ↻ ${receipt.revisionCount}${receipt.concessionCount ? ` · 🏳 ${receipt.concessionCount}` : ""}`,
   ];
+
+  if (receipt.stopReason) {
+    lines.push(
+      "",
+      `**${zh ? "收束原因" : "Why it stopped"}:** ${stopReasonText(receipt.stopReason, zh)}`,
+    );
+  }
 
   if (receipt.keyTurn) {
     lines.push(
@@ -181,6 +190,9 @@ export function consultationReceiptSvg(
     ? `${receipt.evidence.sourceHost ?? receipt.evidence.actor} · ${receipt.evidence.sourceState.toUpperCase()}${receipt.evidence.disputed ? " · DISPUTED" : ""}${receipt.evidence.changedMind ? " · ↻" : ""}`
     : (zh ? "本场没有结构化证据" : "No structured evidence in this meeting");
   const evidenceLines = wrap(evidence, zh ? 34 : 52, 2);
+  const stopBadge = receipt.stopReason
+    ? (receipt.stopReason === "round_budget" ? (zh ? "轮次预算" : "ROUND BUDGET") : (zh ? "稳定收束" : "STABLE STOP"))
+    : "";
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="ChatChat Consultation Receipt">
 <rect width="1200" height="630" rx="32" fill="#f7f5ef"/>
@@ -194,7 +206,7 @@ export function consultationReceiptSvg(
 ${svgLines(proposalLines, 74, 188, 25, 28, "#292723", 650)}
 <text x="50" y="286" fill="#8f887e" font-size="11" font-weight="750" letter-spacing="1.2">${zh ? "协商结果" : "OUTCOME"}</text>
 ${svgLines(outcomeLines, 50, 324, 35, 40, "#1f201d", 760)}
-<text x="50" y="400" fill="#736d64" font-size="15">${escapeXml(`${receipt.participantNames.length} ${zh ? "位 AI" : "AIs"} · ${receipt.rounds} ${zh ? "轮" : "rounds"} · ⚔ ${receipt.challengeCount} · 📎 ${receipt.evidenceCount} · ↻ ${receipt.revisionCount}${receipt.minorityCount ? ` · 🧍 ${receipt.minorityCount}` : ""}`)}</text>
+<text x="50" y="400" fill="#736d64" font-size="15">${escapeXml(`${receipt.participantNames.length} ${zh ? "位 AI" : "AIs"} · ${receipt.rounds} ${zh ? "轮" : "rounds"} · ⚔ ${receipt.challengeCount} · 📎 ${receipt.evidenceCount} · ↻ ${receipt.revisionCount}${receipt.minorityCount ? ` · 🧍 ${receipt.minorityCount}` : ""}${stopBadge ? ` · ${stopBadge}` : ""}`)}</text>
 <rect x="50" y="430" width="530" height="122" rx="20" fill="#fffdf9" stroke="#e1dcd3"/>
 <text x="72" y="460" fill="#8b8378" font-size="10" font-weight="760" letter-spacing="1">${zh ? "关键转折" : "KEY TURN"}</text>
 ${svgLines(keyLines, 72, 492, 17, 23, "#3b3833", 650)}
@@ -243,6 +255,17 @@ function causeRank(kind: CouncilEvent["kind"]): number {
 function receiptCauseKind(kind: CouncilEvent["kind"]): ConsultationReceiptKeyTurn["causeKind"] {
   if (kind === "evidence" || kind === "challenge" || kind === "support" || kind === "argument") return kind;
   return "other";
+}
+
+function stopReasonText(reason: NonNullable<CouncilReport["stopReason"]>, zh: boolean): string {
+  if (reason === "round_budget") {
+    return zh
+      ? "达到当前模式的轮次预算；这不代表分歧已经解决。"
+      : "The current mode reached its round budget; this does not mean every disagreement was resolved.";
+  }
+  return zh
+    ? "立场达到稳定门槛，而且上一批没有产生新的待回应信号。"
+    : "Alignment reached the mode threshold and the previous batch introduced no new signal requiring peer follow-up.";
 }
 
 function compact(value: string, max: number): string {

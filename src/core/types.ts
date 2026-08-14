@@ -1,5 +1,6 @@
 export type CouncilPhase = "sealed" | "debate" | "final";
 export type CouncilConsultationMode = "balanced" | "explore" | "decide" | "verify" | "stress_test";
+export type CouncilStopReason = "stable_alignment_no_new_signal" | "round_budget";
 
 export type CouncilEventKind =
   | "argument"
@@ -123,6 +124,8 @@ export interface CouncilReport {
   question: string;
   /** Optional for backward compatibility with archives created before proposal modes. */
   mode?: CouncilConsultationMode;
+  /** Optional for old archives. New runs explain why deliberation stopped. */
+  stopReason?: CouncilStopReason;
   consensusStance: string | null;
   consensusRatio: number;
   confidence: number;

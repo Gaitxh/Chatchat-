@@ -50,31 +50,13 @@ function agent(
 ): CouncilAgent {
   return {
     participant: { id, name: id, provider: "test" },
-    async respond(
-      context: CouncilContext,
-    ): Promise<readonly CouncilContribution[]> {
+    async respond(context: CouncilContext): Promise<readonly CouncilContribution[]> {
       if (context.phase === "sealed") {
         sealedViews.push(context.publicEvents.length);
-        return [
-          {
-            kind: "argument",
-            stance: initialStance,
-            content: initialStance,
-            confidence: 0.7,
-          },
-        ];
+        return [{ kind: "argument", stance: initialStance, content: initialStance, confidence: 0.7 }];
       }
-
       if (context.phase === "debate") return [];
-
-      return [
-        {
-          kind: "final_position",
-          stance: finalStance,
-          content: finalStance,
-          confidence: 0.8,
-        },
-      ];
+      return [{ kind: "final_position", stance: finalStance, content: finalStance, confidence: 0.8 }];
     },
   };
 }
@@ -89,23 +71,15 @@ const phaseUpdates: CouncilPhaseUpdate[] = [];
 const { report } = await council.run("test", {
   maxRounds: 2,
   minDebateRounds: 1,
-  onPhase: (update) => {
-    phaseUpdates.push(update);
-  },
+  onPhase: (update) => { phaseUpdates.push(update); },
 });
 
-assert(
-  sealedViews.every((count) => count === 0),
-  "Round 1 must be sealed from peer outputs.",
-);
+assert(sealedViews.every((count) => count === 0), "Round 1 must be sealed from peer outputs.");
 assert(report.consensusStance === "A", "Final consensus should be A.");
+assert(Math.abs(report.consensusRatio - 1) < Number.EPSILON, "All three final positions should converge on A.");
+assert(report.stopReason === "stable_alignment_no_new_signal", "Stable adaptive convergence must be recorded in the report.");
 assert(
-  Math.abs(report.consensusRatio - 1) < Number.EPSILON,
-  "All three final positions should converge on A.",
-);
-assert(
-  phaseUpdates.map(({ phase, round }) => `${phase}:${round}`).join(",") ===
-    "sealed:1,debate:2,final:3",
+  phaseUpdates.map(({ phase, round }) => `${phase}:${round}`).join(",") === "sealed:1,debate:2,final:3",
   "Orchestrator should expose deterministic phase lifecycle updates.",
 );
 
@@ -146,43 +120,50 @@ const evidenceCouncil = new CouncilOrchestrator([
   evidenceFollowUpAgent("e4", false),
 ]);
 
-await evidenceCouncil.run("majority must not end the meeting before peers see new evidence", {
-  maxRounds: 3,
-  minDebateRounds: 1,
-  convergenceThreshold: 0.75,
-  onPhase: (update) => {
-    evidencePhaseUpdates.push(update);
+const { report: evidenceReport } = await evidenceCouncil.run(
+  "majority must not end the meeting before peers see new evidence",
+  {
+    maxRounds: 3,
+    minDebateRounds: 1,
+    convergenceThreshold: 0.75,
+    onPhase: (update) => { evidencePhaseUpdates.push(update); },
   },
-});
+);
 
 assert(
-  evidencePhaseUpdates.map(({ phase, round }) => `${phase}:${round}`).join(",") ===
-    "sealed:1,debate:2,debate:3,final:4",
+  evidencePhaseUpdates.map(({ phase, round }) => `${phase}:${round}`).join(",") === "sealed:1,debate:2,debate:3,final:4",
   "Fresh evidence in a converged batch must receive one peer-visible follow-up round before Final.",
 );
-assert(
-  roundThreeSawNewEvidence,
-  "The follow-up round must actually receive the evidence published by the previous immutable batch.",
-);
+assert(roundThreeSawNewEvidence, "The follow-up round must receive evidence published by the previous immutable batch.");
+assert(evidenceReport.stopReason === "stable_alignment_no_new_signal", "After peers inspect new evidence and the next batch is calm, stable stop provenance should be recorded.");
 
-const calmPhaseUpdates: CouncilPhaseUpdate[] = [];
-const calmCouncil = new CouncilOrchestrator([
-  agent("c1", "A", "A"),
-  agent("c2", "A", "A"),
-  agent("c3", "A", "A"),
+function budgetAgent(id: string): CouncilAgent {
+  return {
+    participant: { id, name: id, provider: "test" },
+    async respond(context: CouncilContext): Promise<readonly CouncilContribution[]> {
+      if (context.phase === "sealed") {
+        return [{ kind: "argument", stance: "A", content: "Initial A", confidence: 0.8 }];
+      }
+      if (context.phase === "debate") {
+        return [{ kind: "question", content: `Round ${context.round} still has an unresolved question from ${id}.` }];
+      }
+      return [{ kind: "final_position", stance: "A", content: "Budget-limited final A", confidence: 0.8 }];
+    },
+  };
+}
+
+const budgetCouncil = new CouncilOrchestrator([
+  budgetAgent("b1"),
+  budgetAgent("b2"),
+  budgetAgent("b3"),
 ]);
-await calmCouncil.run("stable alignment can still stop adaptively", {
-  maxRounds: 3,
-  minDebateRounds: 1,
-  convergenceThreshold: 0.75,
-  onPhase: (update) => {
-    calmPhaseUpdates.push(update);
-  },
-});
+const { report: budgetReport } = await budgetCouncil.run(
+  "the current mode eventually has to stop even with fresh signals",
+  { maxRounds: 3, minDebateRounds: 1, convergenceThreshold: 0.75 },
+);
 assert(
-  calmPhaseUpdates.map(({ phase, round }) => `${phase}:${round}`).join(",") ===
-    "sealed:1,debate:2,final:3",
-  "A converged round with no fresh peer-relevant signal should still stop adaptively.",
+  budgetReport.stopReason === "round_budget",
+  "Exhausting the mode round ceiling while fresh signals remain must be distinguished from stable convergence.",
 );
 
 console.log("✓ ChatChat council-core tests passed");

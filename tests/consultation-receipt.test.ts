@@ -34,6 +34,7 @@ const report: CouncilReport = {
   sessionId: base.sessionId,
   question: "Should <script>alert('x')</script> ChatChat ship extension first?",
   mode: "stress_test",
+  stopReason: "round_budget",
   consensusStance: "Extension",
   consensusRatio: 2 / 3,
   confidence: .86,
@@ -60,6 +61,7 @@ const verifications: Record<string, EvidenceVerificationSnapshot> = {
 
 const receipt = deriveConsultationReceipt(report, events, verifications);
 assert(receipt.mode === "stress_test" && receipt.modeIcon === "🧨", "Receipt should preserve the meeting mode.");
+assert(receipt.stopReason === "round_budget", "Receipt should preserve the machine-readable deliberation stop reason.");
 assert(receipt.challengeCount === 2 && receipt.evidenceCount === 1 && receipt.revisionCount === 1, "Receipt stats must derive from explicit events.");
 assert(receipt.minorityCount === 1 && receipt.minorityStances[0] === "Web + Extension", "Receipt should preserve surviving minority views.");
 assert(receipt.keyTurn?.causeEventId === "ev1" && receipt.keyTurn.revisionEventId === "c2", "Key turn must come from revision.causedBy provenance.");
@@ -70,22 +72,27 @@ assert(receipt.evidence?.disputed && receipt.evidence?.changedMind, "Reachable e
 
 const markdown = consultationReceiptMarkdown(receipt, "en");
 assert(markdown.includes("STRESS TEST") || markdown.includes("Stress Test"), "Markdown receipt should identify the meeting mode.");
+assert(markdown.includes("Why it stopped") && markdown.includes("round budget"), "Markdown should distinguish round-budget exhaustion from epistemic convergence.");
+assert(markdown.includes("does not mean every disagreement was resolved"), "Round-budget copy must explicitly avoid claiming that disagreement was resolved.");
 assert(markdown.includes("DISPUTED") && markdown.includes("CHANGED A VIEW"), "Markdown should preserve evidence nuance rather than flattening it to verified/unverified.");
 assert(markdown.includes("No chair AI") && markdown.includes("Reachable is not proof"), "Share output must preserve epistemic boundaries.");
 
 const safeMarkdown = safeConsultationReceiptMarkdown(receipt, "en");
 assert(!safeMarkdown.includes("<script>"), "Copied Markdown must not preserve raw HTML/script tags from user-controlled text.");
 assert(safeMarkdown.includes("&lt;script&gt;"), "Copied Markdown should preserve user text visibly through escaped HTML entities.");
+assert(safeMarkdown.includes("round budget"), "Markdown sanitization must preserve stop provenance.");
 assert(safeMarkdown.includes("DISPUTED") && safeMarkdown.includes("Reachable is not proof"), "Markdown sanitization must not strip evidence nuance or epistemic boundaries.");
 
 const zhMarkdown = safeConsultationReceiptMarkdown(receipt, "zh-CN");
 assert(zhMarkdown.includes("压力测试") && zhMarkdown.includes("少数意见保留"), "Chinese receipt should be a first-class share format.");
+assert(zhMarkdown.includes("收束原因") && zhMarkdown.includes("轮次预算"), "Chinese receipt should expose the same stop provenance.");
 assert(!zhMarkdown.includes("<script>"), "Chinese share output must receive the same HTML-safety treatment.");
 
 const svg = consultationReceiptSvg(receipt, "en");
 assert(svg.startsWith("<svg") && svg.includes("CONSULTATION RECEIPT"), "Receipt should export as a standalone local SVG.");
 assert(!svg.includes("<script>"), "User-controlled proposal/evidence text must never become executable SVG markup.");
 assert(svg.includes("&lt;script&gt;"), "User-controlled angle brackets should be escaped in SVG output.");
+assert(svg.includes("ROUND BUDGET"), "SVG share card should preserve compact stop provenance.");
 assert(svg.includes("Reachable is not proof"), "SVG share card must keep the no-truth-verdict boundary visible.");
 
 console.log("✓ ChatChat Consultation Receipt derivation/export tests passed");

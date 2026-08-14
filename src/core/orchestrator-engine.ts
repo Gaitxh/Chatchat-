@@ -9,6 +9,7 @@ import type {
   CouncilParticipant,
   CouncilReport,
   CouncilRunOptions,
+  CouncilStopReason,
   CouncilToolFact,
 } from "./types.js";
 
@@ -51,6 +52,7 @@ export class CouncilOrchestrator {
       contributions.map((item) => this.#materialize(sessionId, 1, agent.participant.id, item))), options);
 
     let lastRound = 1;
+    let stopReason: CouncilStopReason = "round_budget";
     for (let round = 2; round <= maxRounds; round += 1) {
       await options.onPhase?.({ phase: "debate", round });
       const snapshot = [...blackboard.events];
@@ -72,7 +74,10 @@ export class CouncilOrchestrator {
       // A numerical majority must not gain the power to end deliberation before one
       // follow-up batch can inspect the new signal.
       const needsPeerFollowUp = this.#roundNeedsPeerFollowUp(roundEvents);
-      if (minimumReached && convergenceReached && !needsPeerFollowUp) break;
+      if (minimumReached && convergenceReached && !needsPeerFollowUp) {
+        stopReason = "stable_alignment_no_new_signal";
+        break;
+      }
     }
 
     const finalRound = lastRound + 1;
@@ -86,7 +91,7 @@ export class CouncilOrchestrator {
     await this.#publish(blackboard, finalTurns.flatMap(({ agent, contributions }) =>
       contributions.map((item) => this.#materialize(sessionId, finalRound, agent.participant.id, item))), options);
 
-    return { report: this.#report(sessionId, question, mode, finalRound, blackboard), blackboard };
+    return { report: this.#report(sessionId, question, mode, stopReason, finalRound, blackboard), blackboard };
   }
 
   #context(
@@ -172,6 +177,7 @@ export class CouncilOrchestrator {
     sessionId: string,
     question: string,
     mode: CouncilConsultationMode,
+    stopReason: CouncilStopReason,
     rounds: number,
     blackboard: Blackboard,
   ): CouncilReport {
@@ -185,13 +191,14 @@ export class CouncilOrchestrator {
     }
     const winner = [...groups.entries()].sort((a, b) => b[1].length - a[1].length)[0];
     if (!winner) {
-      return { sessionId, question, mode, consensusStance: null, consensusRatio: 0, confidence: 0, rounds, positions, disagreements: [], eventCount: blackboard.events.length };
+      return { sessionId, question, mode, stopReason, consensusStance: null, consensusRatio: 0, confidence: 0, rounds, positions, disagreements: [], eventCount: blackboard.events.length };
     }
     const [winnerKey, winnerPositions] = winner;
     return {
       sessionId,
       question,
       mode,
+      stopReason,
       consensusStance: winnerPositions[0]?.stance ?? null,
       consensusRatio: winnerPositions.length / this.#agents.length,
       confidence: winnerPositions.reduce((sum, position) => sum + position.confidence, 0) / winnerPositions.length,
