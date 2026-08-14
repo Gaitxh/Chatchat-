@@ -37,4 +37,39 @@ for (const forbidden of [
   }
 }
 
+const webOnboarding = fs.readFileSync("src/extension/web-room-onboarding.tsx", "utf8");
+const webAppCss = fs.readFileSync("src/extension/web-app.css", "utf8");
+
+for (const required of [
+  "ZERO-CONFIG START",
+  "零配置开始",
+  "STARTER_PROVIDER_IDS",
+  "buildAssemblyPlan",
+  "chrome.permissions.request",
+  "permissionReady",
+  "Automatic team:",
+  "不用填 URL",
+]) {
+  if (!webOnboarding.includes(required)) {
+    throw new Error(`Zero-config Web Room contract is missing: ${required}`);
+  }
+}
+
+for (const manualControl of [
+  ".participants-card > .connect-all-button",
+  ".participants-card > .participant-actions",
+  ".participants-card > .url-opener",
+  ".participants-card > .discovered-section",
+  ".quick-open",
+]) {
+  if (!webAppCss.includes(manualControl)) {
+    throw new Error(`Web Room must hide manual setup control by default: ${manualControl}`);
+  }
+}
+
+if (!webAppCss.includes("display: none !important")) {
+  throw new Error("Web Room manual setup controls are not explicitly hidden from the novice-first surface.");
+}
+
 console.log("✓ ChatChat primary browser product language is equal-participant consultation");
+console.log("✓ ChatChat Web Room defaults to zero-config automatic setup");
