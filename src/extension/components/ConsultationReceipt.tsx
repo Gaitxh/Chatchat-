@@ -101,8 +101,8 @@ export function ConsultationReceiptCard({
           >
             <span>{zh ? "会议执行完整性" : "MEETING EXECUTION INTEGRITY"}</span>
             <strong>
-              {executionIntegrity.integrity.verifiedTurns}/{executionIntegrity.integrity.totalTurns} {zh ? "轮已验证" : "turns verified"}
-              {` · ${integrityLabel(executionIntegrity.integrity.state, zh)}`}
+              <b>{executionIntegrity.integrity.verifiedTurns}/{executionIntegrity.integrity.totalTurns}</b>
+              <span>{zh ? "轮已验证" : "turns verified"} · {integrityLabel(executionIntegrity.integrity.state, zh)}</span>
             </strong>
             <small>
               {executionIntegrity.integrity.fullyVerifiedSeats}/{executionIntegrity.integrity.totalSeats} {zh ? "席位完整" : "seats complete"}
@@ -110,11 +110,7 @@ export function ConsultationReceiptCard({
               {` · fallback ${executionIntegrity.integrity.fallbackTurns}`}
               {` · failed ${executionIntegrity.integrity.failedTurns}`}
             </small>
-            <em>{executionIntegrity.mode === "synthetic-showcase"
-              ? (zh ? "DEMO · SYNTHETIC；不是第三方 AI 真实出席证明。" : "DEMO · SYNTHETIC; not proof of live third-party attendance.")
-              : executionIntegrity.integrity.state === "degraded" || executionIntegrity.integrity.state === "incomplete"
-                ? (zh ? "对齐度必须和执行缺口一起阅读。" : "Read alignment together with the execution gap.")
-                : (zh ? "执行 provenance，不是答案正确率。" : "Execution provenance, not answer correctness.")}</em>
+            <em>{receiptIntegrityNote(executionIntegrity, zh)}</em>
           </div>
         ) : null}
 
@@ -162,6 +158,19 @@ export function ConsultationReceiptCard({
       </div>
     </section>
   );
+}
+
+function receiptIntegrityNote(summary: ConsultationReceiptExecutionIntegrity, zh: boolean): string {
+  if (summary.mode === "synthetic-showcase") {
+    return zh ? "DEMO · SYNTHETIC；不是第三方 AI 真实出席证明。" : "DEMO · SYNTHETIC; not proof of live third-party attendance.";
+  }
+  if (summary.mode === "unknown") {
+    return zh ? "旧记录没有 durable execution receipt；不会事后补写执行完整性。" : "Legacy archive has no durable execution receipt; no post-hoc integrity claim.";
+  }
+  if (summary.integrity.state === "degraded" || summary.integrity.state === "incomplete") {
+    return zh ? "对齐度必须和执行缺口一起阅读。" : "Read alignment together with the execution gap.";
+  }
+  return zh ? "执行 provenance，不是答案正确率。" : "Execution provenance, not answer correctness.";
 }
 
 async function copyText(value: string): Promise<boolean> {
