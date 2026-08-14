@@ -6,7 +6,11 @@
   const RECIPES_KEY = "chatchat.extension.recipes.v1";
   const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
   const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
+  const PROPOSAL_DRAFT_KEY = "chatchat.consultation.proposal-draft.v1";
   const LOCALE_KEY = "chatchat.locale.v1";
+  const showcaseProposal = locale === "en"
+    ? "For an open-source, local-first multi-AI browser project, what should we prioritize first to maximize usefulness and adoption? Examine the trade-offs and challenge unsupported assumptions."
+    : "对于一个开源、本地优先的多 AI 浏览器项目，我们现在最应该优先做什么，才能同时提高实用性和传播力？请比较不同路线，并主动质疑缺少依据的假设。";
 
   const participantRows = [
     {
@@ -80,6 +84,7 @@
   const memorySession = {
     [PARTICIPANTS_KEY]: participantRows,
     [CONNECTIONS_KEY]: connections,
+    [PROPOSAL_DRAFT_KEY]: showcaseProposal,
   };
 
   function area(memory) {
