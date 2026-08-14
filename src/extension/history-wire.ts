@@ -6,6 +6,10 @@ export interface RequestOpenConsultationArchiveDetail {
   sessionId: string;
 }
 
+export interface ConsultationHistoryUpdatedDetail {
+  sessionId?: string;
+}
+
 export function requestOpenConsultationArchive(sessionId: string): void {
   if (!sessionId) return;
   window.dispatchEvent(new CustomEvent<RequestOpenConsultationArchiveDetail>(REQUEST_OPEN_CONSULTATION_ARCHIVE_EVENT, {
@@ -13,6 +17,8 @@ export function requestOpenConsultationArchive(sessionId: string): void {
   }));
 }
 
-export function announceConsultationHistoryUpdated(): void {
-  window.dispatchEvent(new Event(CONSULTATION_HISTORY_UPDATED_EVENT));
+export function announceConsultationHistoryUpdated(sessionId?: string): void {
+  window.dispatchEvent(new CustomEvent<ConsultationHistoryUpdatedDetail>(CONSULTATION_HISTORY_UPDATED_EVENT, {
+    detail: sessionId ? { sessionId } : {},
+  }));
 }
