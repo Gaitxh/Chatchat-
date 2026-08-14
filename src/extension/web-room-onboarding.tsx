@@ -77,11 +77,13 @@ async function mount() {
   const stored = await session.get(PARTICIPANTS_KEY);
   const hasParticipants = Array.isArray(stored[PARTICIPANTS_KEY]) && stored[PARTICIPANTS_KEY].length > 0;
   if (hasParticipants) {
+    delete document.documentElement.dataset.chatchatOnboarding;
     root.hidden = true;
     if (guideRoot) guideRoot.hidden = false;
     return;
   }
 
+  document.documentElement.dataset.chatchatOnboarding = "zero-config";
   if (guideRoot) guideRoot.hidden = true;
   const card = document.createElement("section");
   card.className = "zero-touch-card";
