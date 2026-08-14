@@ -49,6 +49,7 @@
 
   const storageListeners = new Set();
   const tabUpdatedListeners = new Set();
+  const recoveryClaims = new Set();
   const tab = {
     id: 801,
     url: participant.url,
@@ -188,7 +189,19 @@
     },
     runtime: {
       getURL(path) { return new URL(path, location.href).toString(); },
-      async sendMessage() { return { ok: false, error: "No runtime tool call is expected in self-healing showcase." }; },
+      async sendMessage(message) {
+        if (message?.type === "CLAIM_PROVIDER_SELF_HEALING") {
+          const seatId = String(message.seatId ?? "");
+          const claimed = Boolean(seatId) && !recoveryClaims.has(seatId);
+          if (claimed) recoveryClaims.add(seatId);
+          return { ok: true, result: { claimed } };
+        }
+        if (message?.type === "RELEASE_PROVIDER_SELF_HEALING") {
+          const seatId = String(message.seatId ?? "");
+          return { ok: true, result: { released: recoveryClaims.delete(seatId) } };
+        }
+        return { ok: false, error: "No other runtime tool call is expected in self-healing showcase." };
+      },
     },
   };
 
