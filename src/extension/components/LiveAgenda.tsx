@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type {
   CouncilEvent,
   CouncilEventKind,
@@ -7,6 +8,13 @@ import type {
 import type { Locale } from "../../i18n/index.js";
 import { focusConsultationEvent } from "../provenance-wire.js";
 import "./live-agenda.css";
+
+const LIVE_EVENT = "chatchat:consultation-live";
+const MAX_AGENDA_TRAIL = 6;
+
+interface ConsultationLivePhaseDetail {
+  phase?: CouncilPhaseUpdate | null;
+}
 
 interface LiveAgendaProps {
   phase: CouncilPhaseUpdate | null;
@@ -29,54 +37,139 @@ const EVENT_META: Record<CouncilEventKind, { icon: string; en: string; zh: strin
 };
 
 export function LiveAgenda({ phase, events, participants, locale }: LiveAgendaProps) {
-  if (!phase?.reason) return null;
+  const [trail, setTrail] = useState<CouncilPhaseUpdate[]>(() => phase?.reason ? [clonePhase(phase)] : []);
+
+  useEffect(() => {
+    if (!phase?.reason) return;
+    setTrail((current) => rememberPhase(current, phase));
+  }, [phase]);
+
+  useEffect(() => {
+    const onLive = (event: Event) => {
+      const update = (event as CustomEvent<ConsultationLivePhaseDetail>).detail?.phase;
+      if (!update?.reason) return;
+      setTrail((current) => rememberPhase(current, update));
+    };
+    window.addEventListener(LIVE_EVENT, onLive);
+    return () => window.removeEventListener(LIVE_EVENT, onLive);
+  }, []);
+
+  const current = phase?.reason ? phase : trail.at(-1) ?? null;
+  if (!current?.reason) return null;
+
   const zh = locale === "zh-CN";
-  const triggers = (phase.triggerEventIds ?? [])
-    .map((eventId) => events.find((event) => event.id === eventId))
-    .filter((event): event is CouncilEvent => Boolean(event));
-  const reason = reasonCopy(phase, triggers, zh);
-  const alignment = phase.alignmentRatio == null ? null : Math.round(phase.alignmentRatio * 100);
-  const threshold = phase.convergenceThreshold == null ? null : Math.round(phase.convergenceThreshold * 100);
+  const triggers = triggerEvents(current, events);
+  const reason = reasonCopy(current, triggers, zh);
+  const alignment = current.alignmentRatio == null ? null : Math.round(current.alignmentRatio * 100);
+  const threshold = current.convergenceThreshold == null ? null : Math.round(current.convergenceThreshold * 100);
+  const currentKey = phaseKey(current);
+  const previous = trail.filter((item) => item.reason && phaseKey(item) !== currentKey).slice(-4);
 
   return (
-    <section className="live-agenda" data-phase-reason={phase.reason} data-trigger-count={triggers.length}>
+    <section className="live-agenda" data-phase-reason={current.reason} data-trigger-count={triggers.length}>
       <div className="live-agenda__icon">{reason.icon}</div>
       <div className="live-agenda__main">
         <span>{zh ? "大会为什么还在继续" : "WHY THIS ROUND EXISTS"}</span>
         <strong>{reason.title}</strong>
         <p>{reason.body}</p>
-        {triggers.length ? (
-          <div className="live-agenda__triggers">
-            {triggers.map((event) => {
-              const meta = EVENT_META[event.kind];
-              return (
-                <button
-                  type="button"
-                  key={event.id}
-                  className={`live-agenda__trigger trigger-${event.kind}`}
-                  data-agenda-trigger-event={event.id}
-                  title={zh ? `查看原始事件 ${event.id}` : `Inspect source event ${event.id}`}
-                  onClick={() => focusConsultationEvent(event.id)}
-                >
-                  <b>{meta.icon}</b>
-                  <span>{participantName(participants, event.actorId)}</span>
-                  <small>{zh ? meta.zh : meta.en}</small>
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
+        <AgendaTriggers triggers={triggers} participants={participants} zh={zh} />
       </div>
       <div className="live-agenda__metrics">
         {alignment != null && threshold != null ? (
           <div><small>{zh ? "当前对齐" : "alignment"}</small><b>{alignment}%</b><i>/ {threshold}%</i></div>
         ) : null}
-        {phase.minimumDebateRounds != null ? (
-          <div><small>{zh ? "公开讨论" : "open debate"}</small><b>{phase.debateRoundsCompleted ?? 0}</b><i>/ {phase.minimumDebateRounds}</i></div>
+        {current.minimumDebateRounds != null ? (
+          <div><small>{zh ? "公开讨论" : "open debate"}</small><b>{current.debateRoundsCompleted ?? 0}</b><i>/ {current.minimumDebateRounds}</i></div>
         ) : null}
       </div>
+
+      {previous.length ? (
+        <div className="live-agenda__trail" data-agenda-trail-count={previous.length}>
+          <span>{zh ? "程序轨迹" : "ROUND TRAIL"}</span>
+          <div>
+            {previous.map((item) => {
+              const itemTriggers = triggerEvents(item, events);
+              const copy = reasonCopy(item, itemTriggers, zh);
+              return (
+                <article
+                  key={phaseKey(item)}
+                  className={`live-agenda__trail-item reason-${item.reason}`}
+                  data-phase-reason={item.reason}
+                  data-agenda-trail-round={item.round}
+                >
+                  <b>{copy.icon}</b>
+                  <div>
+                    <small>{item.phase === "final" ? (zh ? "最终阶段" : "FINAL") : `R${item.round}`}</small>
+                    <strong>{copy.title}</strong>
+                    <AgendaTriggers triggers={itemTriggers} participants={participants} zh={zh} compact />
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
+}
+
+function AgendaTriggers({
+  triggers,
+  participants,
+  zh,
+  compact = false,
+}: {
+  triggers: readonly CouncilEvent[];
+  participants: readonly CouncilParticipant[];
+  zh: boolean;
+  compact?: boolean;
+}) {
+  if (!triggers.length) return null;
+  return (
+    <div className={`live-agenda__triggers ${compact ? "is-compact" : ""}`}>
+      {triggers.map((event) => {
+        const meta = EVENT_META[event.kind];
+        return (
+          <button
+            type="button"
+            key={event.id}
+            className={`live-agenda__trigger trigger-${event.kind}`}
+            data-agenda-trigger-event={event.id}
+            title={zh ? `查看原始事件 ${event.id}` : `Inspect source event ${event.id}`}
+            onClick={() => focusConsultationEvent(event.id)}
+          >
+            <b>{meta.icon}</b>
+            <span>{participantName(participants, event.actorId)}</span>
+            <small>{zh ? meta.zh : meta.en}</small>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function rememberPhase(current: readonly CouncilPhaseUpdate[], update: CouncilPhaseUpdate): CouncilPhaseUpdate[] {
+  const key = phaseKey(update);
+  if (current.some((item) => phaseKey(item) === key)) return current as CouncilPhaseUpdate[];
+  return [...current, clonePhase(update)].slice(-MAX_AGENDA_TRAIL);
+}
+
+function clonePhase(update: CouncilPhaseUpdate): CouncilPhaseUpdate {
+  return {
+    ...update,
+    ...(update.triggerEventIds ? { triggerEventIds: [...update.triggerEventIds] } : {}),
+  };
+}
+
+function phaseKey(update: CouncilPhaseUpdate): string {
+  return `${update.phase}:${update.round}:${update.reason ?? "unknown"}`;
+}
+
+function triggerEvents(update: CouncilPhaseUpdate, events: readonly CouncilEvent[]): CouncilEvent[] {
+  const eventById = new Map(events.map((event) => [event.id, event] as const));
+  return (update.triggerEventIds ?? [])
+    .map((eventId) => eventById.get(eventId))
+    .filter((event): event is CouncilEvent => Boolean(event));
 }
 
 function reasonCopy(
