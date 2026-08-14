@@ -71,6 +71,9 @@ const phaseUpdates: CouncilPhaseUpdate[] = [];
 const { report } = await council.run("test", {
   maxRounds: 2,
   minDebateRounds: 1,
+  // The sealed distribution is A/B/A, so this test intentionally sets the
+  // adaptive threshold to the exact 2/3 alignment it is asserting against.
+  convergenceThreshold: 2 / 3,
   onPhase: (update) => { phaseUpdates.push(update); },
 });
 

@@ -4,6 +4,8 @@ import { CouncilOrchestrator } from "../core/orchestrator.js";
 import type {
   CouncilEvent,
   CouncilParticipant,
+  CouncilParticipantTurnUpdate,
+  CouncilPhaseUpdate,
   CouncilReport,
   CouncilRunOptions,
 } from "../core/types.js";
@@ -11,6 +13,7 @@ import type { ConsultationArchive } from "../history/consultation-history.js";
 import { normalizeLocale, type Locale } from "../i18n/index.js";
 import { ConsultationTheater } from "./components/ConsultationTheater.js";
 import { LiveMoments } from "./components/LiveMoments.js";
+import { LiveParticipantFloor } from "./components/LiveParticipantFloor.js";
 import {
   CONSULTATION_FOCUS_EVENT,
   type ConsultationFocusDetail,
@@ -20,11 +23,13 @@ import "./consultation-theater-portal.css";
 const LIVE_EVENT = "chatchat:consultation-live";
 const COMPLETE_EVENT = "chatchat:consultation-complete";
 const OPEN_ARCHIVE_EVENT = "chatchat:consultation-open-archive";
-const PATCH_MARKER = "__chatchatConsultationTheaterObserverV3" as const;
+const PATCH_MARKER = "__chatchatConsultationTheaterObserverV4" as const;
 
 interface ConsultationLiveDetail {
   participants: CouncilParticipant[];
   events: CouncilEvent[];
+  phase: CouncilPhaseUpdate | null;
+  activities: Record<string, CouncilParticipantTurnUpdate>;
 }
 
 interface ConsultationCompletionDetail {
@@ -53,10 +58,14 @@ function ConsultationTheaterPortal() {
     const onLive = (event: Event) => {
       const detail = (event as CustomEvent<ConsultationLiveDetail>).detail;
       if (!Array.isArray(detail?.participants) || !Array.isArray(detail?.events)) return;
-      setLive({ participants: [...detail.participants], events: [...detail.events] });
+      setLive({
+        participants: [...detail.participants],
+        events: [...detail.events],
+        phase: detail.phase ? { ...detail.phase } : null,
+        activities: cloneActivities(detail.activities),
+      });
       setCompletion(null);
       setArchiveMode(false);
-      setSelectedEventId(null);
     };
     const onComplete = (event: Event) => {
       const detail = (event as CustomEvent<ConsultationCompletionDetail>).detail;
@@ -118,30 +127,39 @@ function ConsultationTheaterPortal() {
       return;
     }
 
-    if (live?.events.length) {
+    if (live) {
       const liveRoom = document.querySelector(".consultation-app .live-room-card");
       if (liveRoom && theaterRoot.parentElement !== liveRoom) liveRoom.append(theaterRoot);
     }
-  }, [completion, live?.events.length]);
+  }, [completion, live]);
 
   const selectedEvent = useMemo(() => {
     const availableEvents = completion?.events ?? live?.events ?? [];
     return availableEvents.find((event) => event.id === selectedEventId) ?? null;
   }, [completion, live, selectedEventId]);
 
-  if (!completion && !live?.events.length) return null;
+  if (!completion && !live) return null;
 
   if (!completion && live) {
     return (
       <div className="consultation-theater-portal">
-        <LiveMoments
-          participants={live.participants.map((participant) => ({
-            id: participant.id,
-            name: participant.name,
-          }))}
+        <LiveParticipantFloor
+          participants={live.participants}
           events={live.events}
+          phase={live.phase}
+          activities={live.activities}
           locale={locale}
         />
+        {live.events.length ? (
+          <LiveMoments
+            participants={live.participants.map((participant) => ({
+              id: participant.id,
+              name: participant.name,
+            }))}
+            events={live.events}
+            locale={locale}
+          />
+        ) : null}
         {selectedEvent ? (
           <EventProvenanceDetail
             event={selectedEvent}
@@ -257,17 +275,42 @@ function installReadOnlyObserver() {
   ) {
     const liveEvents: CouncilEvent[] = [];
     const participants = [...this.participants];
+    const activities = new Map<string, CouncilParticipantTurnUpdate>();
+    let phase: CouncilPhaseUpdate | null = null;
+
+    const dispatchLive = () => {
+      window.dispatchEvent(new CustomEvent<ConsultationLiveDetail>(LIVE_EVENT, {
+        detail: {
+          participants,
+          events: [...liveEvents],
+          phase: phase ? { ...phase } : null,
+          activities: Object.fromEntries(
+            [...activities.entries()].map(([participantId, update]) => [
+              participantId,
+              cloneActivity(update),
+            ]),
+          ),
+        },
+      }));
+    };
+
     const observedOptions: CouncilRunOptions = {
       ...options,
+      onPhase: async (update) => {
+        await options.onPhase?.(update);
+        phase = { ...update };
+        activities.clear();
+        dispatchLive();
+      },
+      onParticipantTurn: async (update) => {
+        await options.onParticipantTurn?.(update);
+        activities.set(update.participant.id, cloneActivity(update));
+        dispatchLive();
+      },
       onEvent: async (event) => {
         await options.onEvent?.(event);
         liveEvents.push(event);
-        window.dispatchEvent(new CustomEvent<ConsultationLiveDetail>(LIVE_EVENT, {
-          detail: {
-            participants,
-            events: [...liveEvents],
-          },
-        }));
+        dispatchLive();
       },
     };
 
@@ -280,6 +323,22 @@ function installReadOnlyObserver() {
     }));
     return result;
   }) as typeof originalRun;
+}
+
+function cloneActivities(
+  activities: Readonly<Record<string, CouncilParticipantTurnUpdate>> | undefined,
+): Record<string, CouncilParticipantTurnUpdate> {
+  return Object.fromEntries(
+    Object.entries(activities ?? {}).map(([participantId, update]) => [participantId, cloneActivity(update)]),
+  );
+}
+
+function cloneActivity(update: CouncilParticipantTurnUpdate): CouncilParticipantTurnUpdate {
+  return {
+    ...update,
+    participant: { ...update.participant },
+    ...(update.contributionKinds ? { contributionKinds: [...update.contributionKinds] } : {}),
+  };
 }
 
 function eventReferences(event: CouncilEvent): string[] {

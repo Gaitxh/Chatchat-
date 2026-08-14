@@ -136,6 +136,15 @@ export interface CouncilReport {
 }
 
 export interface CouncilPhaseUpdate { phase: CouncilPhase; round: number; }
+export type CouncilParticipantTurnState = "working" | "completed" | "failed";
+export interface CouncilParticipantTurnUpdate {
+  phase: CouncilPhase;
+  round: number;
+  participant: CouncilParticipant;
+  state: CouncilParticipantTurnState;
+  /** Present when a participant completed a turn. These are declared structured actions, not inferred prose. */
+  contributionKinds?: readonly CouncilEventKind[];
+}
 export interface CouncilToolFactsRequest { phase: CouncilPhase; round: number; publicEvents: readonly CouncilEvent[]; }
 
 export interface CouncilRunOptions {
@@ -144,6 +153,8 @@ export interface CouncilRunOptions {
   minDebateRounds?: number;
   convergenceThreshold?: number;
   onPhase?: (update: CouncilPhaseUpdate) => void | Promise<void>;
+  /** Runtime-only participant lifecycle used by live meeting surfaces. It does not affect deliberation order or authority. */
+  onParticipantTurn?: (update: CouncilParticipantTurnUpdate) => void | Promise<void>;
   onEvent?: (event: CouncilEvent) => void | Promise<void>;
   /** Called once per round so every participant receives the same bounded tool snapshot. */
   toolFactsProvider?: (
