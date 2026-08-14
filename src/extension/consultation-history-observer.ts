@@ -37,11 +37,10 @@ function install(): void {
 
 async function saveCompleted(report: CouncilReport, events: readonly CouncilEvent[]): Promise<void> {
   try {
-    const evidenceSnapshot = await currentEvidenceSnapshot(events);
-    await Promise.all([
-      historyStore.save(createConsultationArchive(report, events)),
-      evidenceHistory.save(report.sessionId, evidenceSnapshot),
-    ]);
+    const archiveSave = historyStore.save(createConsultationArchive(report, events));
+    const evidenceSave = currentEvidenceSnapshot(events)
+      .then((evidenceSnapshot) => evidenceHistory.save(report.sessionId, evidenceSnapshot));
+    await Promise.all([archiveSave, evidenceSave]);
     announceConsultationHistoryUpdated(report.sessionId);
   } catch (caught) {
     // History is a local durability feature. A persistence failure must never
