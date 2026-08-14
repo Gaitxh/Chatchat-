@@ -28,6 +28,19 @@ interface ParticipantRecord {
   createdByChatChat: boolean;
 }
 
+interface ParticipantConnection {
+  state: string;
+  detail?: string;
+  verifiedAt?: string;
+  automatic?: boolean;
+}
+
+interface LiveRoomState {
+  participants: ParticipantRecord[];
+  connections: Record<string, ParticipantConnection>;
+  hadStoredParticipants: boolean;
+}
+
 const COPY = {
   en: {
     kicker: "ZERO-CONFIG START",
@@ -42,6 +55,13 @@ const COPY = {
     privacy: "The only unavoidable first-run step is the browser's own site-permission confirmation. Provider login stays with each AI site.",
     denied: "Site access was not granted. ChatChat cannot connect those AI pages without the browser's permission.",
     failed: "ChatChat could not create enough clean AI conversation tabs.",
+    keeperKicker: "ROOM KEEPER",
+    keeperTitle: "An AI wandered off. ChatChat can restore the room.",
+    keeperBody: "A participant tab disappeared or became stale. ChatChat keeps every participant that is still alive and reopens only what is missing — no manual reconfiguration.",
+    keeperButton: "Restore the room",
+    keeperFound: (count: number) => `${count} live participant${count === 1 ? "" : "s"} preserved`,
+    keeperWorking: "Restoring the missing AI participant…",
+    keeperDone: "Room restored. Automatic connection is resuming…",
   },
   "zh-CN": {
     kicker: "零配置开始",
@@ -56,11 +76,19 @@ const COPY = {
     privacy: "第一次唯一无法省掉的是浏览器自己的站点权限确认；各 AI 的登录状态仍然只留在各自网站。",
     denied: "没有获得站点权限。浏览器不允许 ChatChat 在未授权时连接这些 AI 页面。",
     failed: "ChatChat 没能创建足够的干净 AI 会话标签页。",
+    keeperKicker: "会议室管家",
+    keeperTitle: "有 AI 掉队了，ChatChat 会把会议室补回来。",
+    keeperBody: "某个参与者标签页被关闭或已经失效。ChatChat 会保留仍然在线的参与者，只补回缺少的 AI，不让你重新配置。",
+    keeperButton: "自动恢复会议室",
+    keeperFound: (count: number) => `保留 ${count} 位仍在线的参与者`,
+    keeperWorking: "正在补回缺少的 AI 参与者……",
+    keeperDone: "会议室已恢复，自动连接正在继续……",
   },
 } as const;
 
 if (document.documentElement.dataset.surface === "web-app") {
   installLoginResume();
+  installRoomKeeper();
   void mount();
 }
 
@@ -74,29 +102,32 @@ async function mount() {
     : "en";
   const strings = COPY[locale];
   const session = chrome.storage.session ?? chrome.storage.local;
-  const stored = await session.get(PARTICIPANTS_KEY);
-  const hasParticipants = Array.isArray(stored[PARTICIPANTS_KEY]) && stored[PARTICIPANTS_KEY].length > 0;
-  if (hasParticipants) {
+  const room = await readLiveRoomState(session);
+  const recovering = room.hadStoredParticipants && room.participants.length < 2;
+
+  if (room.participants.length >= 2) {
     delete document.documentElement.dataset.chatchatOnboarding;
     root.hidden = true;
     if (guideRoot) guideRoot.hidden = false;
     return;
   }
 
-  document.documentElement.dataset.chatchatOnboarding = "zero-config";
+  document.documentElement.dataset.chatchatOnboarding = recovering ? "room-recovery" : "zero-config";
   if (guideRoot) guideRoot.hidden = true;
+  root.replaceChildren();
+
   const card = document.createElement("section");
-  card.className = "zero-touch-card";
+  card.className = `zero-touch-card${recovering ? " room-keeper-card" : ""}`;
   card.setAttribute("aria-live", "polite");
   const copy = document.createElement("div");
   copy.className = "zero-touch-copy";
   const kicker = document.createElement("span");
   kicker.className = "zero-touch-kicker";
-  kicker.textContent = strings.kicker;
+  kicker.textContent = recovering ? strings.keeperKicker : strings.kicker;
   const title = document.createElement("h2");
-  title.textContent = strings.title;
+  title.textContent = recovering ? strings.keeperTitle : strings.title;
   const body = document.createElement("p");
-  body.textContent = strings.body;
+  body.textContent = recovering ? strings.keeperBody : strings.body;
   const privacy = document.createElement("small");
   privacy.textContent = strings.privacy;
   copy.append(kicker, title, body, privacy);
@@ -106,7 +137,7 @@ async function mount() {
   const found = document.createElement("strong");
   const button = document.createElement("button");
   button.type = "button";
-  button.textContent = strings.button;
+  button.textContent = recovering ? strings.keeperButton : strings.button;
   const arrow = document.createElement("span");
   arrow.textContent = " →";
   button.append(arrow);
@@ -133,16 +164,16 @@ async function mount() {
     if (starting || !plan.length) return;
     starting = true;
     button.disabled = true;
-    status.textContent = strings.working;
+    status.textContent = recovering ? strings.keeperWorking : strings.working;
     try {
       let granted = permissionReady;
       if (!granted) {
         granted = await chrome.permissions.request(automaticTeamPermissionDescriptor(plan));
       }
       if (!granted) throw new Error(strings.denied);
-      await assemble(plan, strings.failed);
+      await assemble(plan, strings.failed, room.participants, room.connections);
       clearScan();
-      status.textContent = strings.done;
+      status.textContent = recovering ? strings.keeperDone : strings.done;
       window.setTimeout(() => window.location.reload(), 650);
     } catch (error) {
       starting = false;
@@ -153,21 +184,26 @@ async function mount() {
 
   async function refreshPlan() {
     discovered = await discover();
-    plan = buildAutomaticTeamPlan(discovered, MAX_CONSULTATION_PARTICIPANTS);
+    const known = mergeRetainedDetections(discovered, room.participants);
+    plan = buildAutomaticTeamPlan(known, MAX_CONSULTATION_PARTICIPANTS);
     permissionReady = plan.length > 0
       && await chrome.permissions.contains(automaticTeamPermissionDescriptor(plan));
-    found.textContent = discovered.length ? strings.found(discovered.length) : strings.none;
+    found.textContent = recovering
+      ? strings.keeperFound(room.participants.length)
+      : discovered.length
+        ? strings.found(discovered.length)
+        : strings.none;
     status.textContent = plan.length ? strings.plan(plan.map((item) => item.displayName).join(" · ")) : "";
     button.disabled = starting || plan.length < 2;
 
     if (permissionReady && plan.length >= 2 && !starting) {
       starting = true;
       button.disabled = true;
-      status.textContent = strings.working;
+      status.textContent = recovering ? strings.keeperWorking : strings.working;
       try {
-        await assemble(plan, strings.failed);
+        await assemble(plan, strings.failed, room.participants, room.connections);
         clearScan();
-        status.textContent = strings.done;
+        status.textContent = recovering ? strings.keeperDone : strings.done;
         window.setTimeout(() => window.location.reload(), 650);
       } catch (error) {
         starting = false;
@@ -192,6 +228,39 @@ function installLoginResume() {
   });
 }
 
+function installRoomKeeper() {
+  if (!chrome.tabs?.onRemoved?.addListener) return;
+  chrome.tabs.onRemoved.addListener((tabId: number) => {
+    void recoverAfterUnexpectedTabClose(tabId);
+  });
+}
+
+async function recoverAfterUnexpectedTabClose(tabId: number) {
+  const session = chrome.storage.session ?? chrome.storage.local;
+  const stored = await session.get([PARTICIPANTS_KEY, CONNECTIONS_KEY]);
+  const participants = Array.isArray(stored[PARTICIPANTS_KEY])
+    ? stored[PARTICIPANTS_KEY] as ParticipantRecord[]
+    : [];
+  if (!participants.some((participant) => participant.tabId === tabId)) return;
+
+  const nextParticipants = participants.filter((participant) => participant.tabId !== tabId);
+  const currentConnections = (stored[CONNECTIONS_KEY] ?? {}) as Record<string, ParticipantConnection>;
+  const nextConnections = Object.fromEntries(
+    nextParticipants.map((participant) => [
+      participant.seatId,
+      currentConnections[participant.seatId] ?? { state: "idle", automatic: true },
+    ]),
+  );
+  await session.set({
+    [PARTICIPANTS_KEY]: nextParticipants,
+    [CONNECTIONS_KEY]: nextConnections,
+  });
+
+  if (nextParticipants.length < 2) {
+    window.setTimeout(() => window.location.reload(), 180);
+  }
+}
+
 async function retryAfterLogin(tabId: number) {
   const session = chrome.storage.session ?? chrome.storage.local;
   const stored = await session.get(PARTICIPANTS_KEY);
@@ -211,6 +280,44 @@ async function retryAfterLogin(tabId: number) {
   retry.click();
 }
 
+async function readLiveRoomState(session: any): Promise<LiveRoomState> {
+  const stored = await session.get([PARTICIPANTS_KEY, CONNECTIONS_KEY]);
+  const restored = Array.isArray(stored[PARTICIPANTS_KEY])
+    ? stored[PARTICIPANTS_KEY] as ParticipantRecord[]
+    : [];
+  const storedConnections = (stored[CONNECTIONS_KEY] ?? {}) as Record<string, ParticipantConnection>;
+  const alive: ParticipantRecord[] = [];
+
+  for (const participant of restored) {
+    try {
+      const tab = await chrome.tabs.get(participant.tabId);
+      if (tab?.id && tab?.url) alive.push({ ...participant, url: tab.url });
+    } catch {
+      // Stale browser tab ids are removed before deciding whether onboarding is complete.
+    }
+  }
+
+  const connections = Object.fromEntries(
+    alive.map((participant) => [
+      participant.seatId,
+      storedConnections[participant.seatId] ?? { state: "idle", automatic: true },
+    ]),
+  ) as Record<string, ParticipantConnection>;
+
+  if (alive.length !== restored.length) {
+    await session.set({
+      [PARTICIPANTS_KEY]: alive,
+      [CONNECTIONS_KEY]: connections,
+    });
+  }
+
+  return {
+    participants: alive,
+    connections,
+    hadStoredParticipants: restored.length > 0,
+  };
+}
+
 async function discover(): Promise<AutomaticTeamDetection[]> {
   const tabs = (await chrome.tabs.query({})) as BrowserTab[];
   const byOrigin = new Map<string, AutomaticTeamDetection>();
@@ -226,10 +333,40 @@ async function discover(): Promise<AutomaticTeamDetection[]> {
   return [...byOrigin.values()].slice(0, MAX_CONSULTATION_PARTICIPANTS);
 }
 
-async function assemble(plan: readonly AutomaticTeamDetection[], failureMessage: string) {
-  const participants: ParticipantRecord[] = [];
-  const connections: Record<string, { state: "idle"; automatic: true }> = {};
+function mergeRetainedDetections(
+  discovered: readonly AutomaticTeamDetection[],
+  retained: readonly ParticipantRecord[],
+): AutomaticTeamDetection[] {
+  const byOrigin = new Map(discovered.map((item) => [item.origin, item]));
+  for (const participant of retained) {
+    if (byOrigin.has(participant.origin)) continue;
+    try {
+      const detection = detectProviderUrl(participant.startUrl || participant.origin);
+      if (detection.kind === "known") byOrigin.set(detection.origin, detection);
+    } catch {
+      // A retained custom participant stays in storage even if it cannot seed a built-in plan.
+    }
+  }
+  return [...byOrigin.values()];
+}
+
+async function assemble(
+  plan: readonly AutomaticTeamDetection[],
+  failureMessage: string,
+  retained: readonly ParticipantRecord[] = [],
+  retainedConnections: Readonly<Record<string, ParticipantConnection>> = {},
+) {
+  const participants: ParticipantRecord[] = [...retained];
+  const connections: Record<string, ParticipantConnection> = Object.fromEntries(
+    retained.map((participant) => [
+      participant.seatId,
+      retainedConnections[participant.seatId] ?? { state: "idle", automatic: true },
+    ]),
+  );
+  const origins = new Set(participants.map((participant) => participant.origin));
+
   for (const detection of plan) {
+    if (origins.has(detection.origin)) continue;
     const startUrl = detection.manifest?.defaultUrl ?? detection.normalizedUrl;
     const fresh = await chrome.tabs.create({ url: startUrl, active: false });
     if (!fresh?.id) continue;
@@ -247,8 +384,14 @@ async function assemble(plan: readonly AutomaticTeamDetection[], failureMessage:
       createdByChatChat: true,
     });
     connections[seatId] = { state: "idle", automatic: true };
+    origins.add(detection.origin);
+    if (participants.length >= MAX_CONSULTATION_PARTICIPANTS) break;
   }
+
   if (participants.length < 2) throw new Error(failureMessage);
   const session = chrome.storage.session ?? chrome.storage.local;
-  await session.set({ [PARTICIPANTS_KEY]: participants, [CONNECTIONS_KEY]: connections });
+  await session.set({
+    [PARTICIPANTS_KEY]: participants,
+    [CONNECTIONS_KEY]: connections,
+  });
 }
