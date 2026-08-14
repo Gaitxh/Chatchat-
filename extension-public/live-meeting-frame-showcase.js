@@ -7,7 +7,7 @@
   const FRAME_ATTR = "data-chatchat-live-proof-frame";
   const STRONG_SELECTOR = '[data-persuasion-strength="strong"][data-persuasion-cause-event][data-persuasion-action-event]';
 
-  function capture(): boolean {
+  function capture() {
     if (document.querySelector(`[${FRAME_ATTR}="persuasion"]`)) return true;
 
     const strong = document.querySelector(STRONG_SELECTOR);
@@ -47,7 +47,7 @@
     return true;
   }
 
-  function installStyle(): void {
+  function installStyle() {
     if (document.getElementById("chatchat-live-proof-frame-style")) return;
     const style = document.createElement("style");
     style.id = "chatchat-live-proof-frame-style";
@@ -145,7 +145,7 @@
     document.head.append(style);
   }
 
-  function escapeHtml(value: string): string {
+  function escapeHtml(value) {
     return String(value)
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
@@ -154,7 +154,7 @@
       .replaceAll("'", "&#039;");
   }
 
-  function start(): void {
+  function start() {
     if (capture()) return;
     const observer = new MutationObserver(() => {
       if (!capture()) return;
