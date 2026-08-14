@@ -186,6 +186,11 @@ const preparedAgent = new BrowserCouncilAgent(
     prepareCalls += 1;
   },
 );
+await preparedAgent.respond(context("sealed", "extension-consultation-gate:provider-live-1"));
+assert(
+  prepareCallCount() === 0,
+  "Protocol verification must stay in its validation conversation and must not consume the real consultation clean-session prepare step.",
+);
 await preparedAgent.respond(context("sealed", "fresh-session-a"));
 await preparedAgent.respond(context("sealed", "fresh-session-a"));
 assert(prepareCallCount() === 1, "A Provider page should be prepared once per Council session, not once per turn.");
@@ -209,3 +214,4 @@ assert(
 );
 
 console.log("✓ ChatChat real Council Bridge tests passed");
+console.log("✓ ChatChat validation handshake stays isolated from real consultation sessions");
