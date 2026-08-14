@@ -4,11 +4,13 @@
 
   const COMPLETE_ATTR = "data-chatchat-live-deliberation-showcase";
   const EXCHANGE_ATTR = "data-chatchat-peer-exchange-showcase";
+  const PERSUASION_ATTR = "data-chatchat-live-persuasion-showcase";
   const AGENDA_ATTR = "data-chatchat-agenda-showcase";
   const OPEN_ISSUES_ATTR = "data-chatchat-open-issues-showcase";
   const SECRETARIAT_ATTR = "data-chatchat-meeting-secretariat-showcase";
   let sawFreshSignalAgenda = false;
   let sawOpenIssue = false;
+  let sawStrongPersuasion = false;
 
   function markComplete(attribute) {
     if (document.documentElement.getAttribute(attribute) === "complete") return;
@@ -16,9 +18,9 @@
   }
 
   function inspect() {
-    // Agenda and Open Issues are phase-transition UI. Observe them before any
-    // unrelated live-surface requirement so a real transient render is not
-    // discarded merely because another React subtree commits one tick later.
+    // Agenda, Open Issues and persuasion are transient live UI. Observe them
+    // before unrelated surface requirements so a genuine render is retained
+    // even when another React subtree commits one tick later.
     const agenda = document.querySelector('[data-phase-reason="fresh_signal_follow_up"]');
     const agendaTrigger = agenda?.querySelector("[data-agenda-trigger-event]");
     if (agenda && agendaTrigger) {
@@ -31,6 +33,14 @@
     if (openIssues && openIssue) {
       sawOpenIssue = true;
       markComplete(OPEN_ISSUES_ATTR);
+    }
+
+    const persuasion = document.querySelector(
+      '[data-persuasion-strength="strong"][data-persuasion-cause-event][data-persuasion-action-event]',
+    );
+    if (persuasion) {
+      sawStrongPersuasion = true;
+      markComplete(PERSUASION_ATTR);
     }
 
     const secretariatComplete = sawFreshSignalAgenda && sawOpenIssue;
@@ -70,6 +80,7 @@
       && directReply
       && peerLifecycleComplete
       && secretariatComplete
+      && sawStrongPersuasion
       && researchDesk
       && researchLane
       && researchEvidenceCount
