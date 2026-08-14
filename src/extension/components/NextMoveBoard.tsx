@@ -6,6 +6,8 @@ import {
   deriveConsultationNextMoves,
   type ConsultationNextMove,
 } from "../../consultation/next-moves.js";
+import { createPendingInvestigationFollowUp } from "../../history/investigation-trail.js";
+import { stageInvestigationFollowUp } from "../investigation-trail-wire.js";
 import { focusConsultationEvent } from "../provenance-wire.js";
 import { stageProposalInExistingComposer } from "../proposal-seed.js";
 import "./next-move-board.css";
@@ -59,7 +61,17 @@ export function NextMoveBoard({
             staged={stagedId === move.id}
             onStage={() => {
               const copy = zh ? move.zhCN : move.en;
-              if (stageProposalInExistingComposer(copy.proposal, move.modeHint)) setStagedId(move.id);
+              if (!stageProposalInExistingComposer(copy.proposal, move.modeHint)) return;
+              stageInvestigationFollowUp(createPendingInvestigationFollowUp({
+                parentReport: report,
+                moveId: move.id,
+                moveKind: move.kind,
+                modeHint: move.modeHint,
+                labelEn: move.en.label,
+                labelZhCN: move.zhCN.label,
+                stagedProposal: copy.proposal,
+              }));
+              setStagedId(move.id);
             }}
           />
         ))}
@@ -99,7 +111,7 @@ function NextMoveCard({
         <div className="next-move-actions">
           <button type="button" className="next-move-primary" onClick={onStage}>
             {staged
-              ? (zh ? "✓ 已放入提案框，请先审阅" : "✓ Staged — review before sending")
+              ? (zh ? "✓ 已放入提案框，并建立 follow-up 关联" : "✓ Staged with follow-up link")
               : (zh ? "作为下一轮提案" : "Use as next proposal")}
           </button>
           {traceId ? (
