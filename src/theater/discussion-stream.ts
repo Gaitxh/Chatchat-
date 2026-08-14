@@ -62,6 +62,9 @@ export function buildDiscussionStream(
       ? participantById.get(targetActorId)?.name ?? targetActorId
       : undefined;
     const previousEvent = event.kind === "revision" ? eventById.get(event.previousEventId) : undefined;
+    const sourceHost = event.kind === "evidence" && event.source
+      ? safeSourceHost(event.source)
+      : undefined;
     const causes = event.kind === "revision"
       ? (event.causedBy ?? []).flatMap((eventId): DiscussionCause[] => {
           const cause = eventById.get(eventId);
@@ -85,7 +88,7 @@ export function buildDiscussionStream(
       ...(targetEventId ? { targetEventId } : {}),
       ...(targetEvent ? { targetExcerpt: compactExcerpt(eventText(targetEvent), 150) } : {}),
       ...(previousEvent && hasStance(previousEvent) ? { previousStance: previousEvent.stance } : {}),
-      ...(event.kind === "evidence" && event.source ? { sourceHost: safeSourceHost(event.source) } : {}),
+      ...(sourceHost ? { sourceHost } : {}),
     };
 
     const phase: CouncilPhase = event.round === 1
