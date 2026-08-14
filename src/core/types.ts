@@ -1,6 +1,12 @@
 export type CouncilPhase = "sealed" | "debate" | "final";
 export type CouncilConsultationMode = "balanced" | "explore" | "decide" | "verify" | "stress_test";
 export type CouncilStopReason = "stable_alignment_no_new_signal" | "round_budget";
+export type CouncilResearchLane =
+  | "primary_sources"
+  | "strongest_counterexample"
+  | "implementation_constraints"
+  | "historical_base_rate"
+  | "user_failure_modes";
 
 export type CouncilEventKind =
   | "argument"
@@ -100,6 +106,8 @@ export interface CouncilContext {
   round: number;
   /** Older gate/test contexts may omit this; real runs are filled by the orchestrator. */
   mode?: CouncilConsultationMode;
+  /** Optional equal-authority research focus. It changes what to investigate, never voting weight or speaking priority. */
+  researchLane?: CouncilResearchLane;
   participant: CouncilParticipant;
   publicEvents: readonly CouncilEvent[];
   ownEvents: readonly CouncilEvent[];
@@ -126,6 +134,8 @@ export interface CouncilReport {
   mode?: CouncilConsultationMode;
   /** Optional for old archives. New runs explain why deliberation stopped. */
   stopReason?: CouncilStopReason;
+  /** Optional for old archives. Research lanes are equal-status investigation assignments, not roles of authority. */
+  researchLaneAssignments?: Record<string, CouncilResearchLane>;
   consensusStance: string | null;
   consensusRatio: number;
   confidence: number;
@@ -142,6 +152,7 @@ export interface CouncilParticipantTurnUpdate {
   round: number;
   participant: CouncilParticipant;
   state: CouncilParticipantTurnState;
+  researchLane?: CouncilResearchLane;
   /** Present when a participant completed a turn. These are declared structured actions, not inferred prose. */
   contributionKinds?: readonly CouncilEventKind[];
 }
@@ -152,6 +163,8 @@ export interface CouncilRunOptions {
   maxRounds?: number;
   minDebateRounds?: number;
   convergenceThreshold?: number;
+  /** Equal-authority per-participant research focus. Omitted in ordinary modes. */
+  researchLaneAssignments?: Readonly<Record<string, CouncilResearchLane>>;
   onPhase?: (update: CouncilPhaseUpdate) => void | Promise<void>;
   /** Runtime-only participant lifecycle used by live meeting surfaces. It does not affect deliberation order or authority. */
   onParticipantTurn?: (update: CouncilParticipantTurnUpdate) => void | Promise<void>;
