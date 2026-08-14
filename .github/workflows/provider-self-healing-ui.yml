@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   self-healing:
-    name: Provider self-healing · one safe reset to READY
+    name: Provider self-healing · bounded recovery semantics
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -91,6 +91,32 @@ jobs:
             grep -q 'data-chatchat-self-healing-navigation-count="1"' "artifacts/chatchat-self-healed-$LANG.html"
             grep -q 'participant-row connection-ready is-ready' "artifacts/chatchat-self-healed-$LANG.html"
             ! grep -q 'data-chatchat-self-healing="true"' "artifacts/chatchat-self-healed-$LANG.html"
+          done
+
+      - name: Prove exhausted recovery reveals the real failure without looping
+        run: |
+          for LANG in en zh; do
+            URL="http://127.0.0.1:4184/app/app.html?showcase=provider-self-healing&journey=exhausted&lang=$LANG"
+            "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --run-all-compositor-stages-before-draw --virtual-time-budget=16000 --dump-dom "$URL" > "artifacts/chatchat-self-healing-exhausted-$LANG.html"
+            grep -q 'data-chatchat-provider-self-healing-visible="complete"' "artifacts/chatchat-self-healing-exhausted-$LANG.html"
+            grep -q 'data-chatchat-provider-self-healing-connecting="complete"' "artifacts/chatchat-self-healing-exhausted-$LANG.html"
+            grep -q 'data-chatchat-provider-self-healing-exhausted="complete"' "artifacts/chatchat-self-healing-exhausted-$LANG.html"
+            grep -q 'data-chatchat-provider-self-healing-showcase="complete"' "artifacts/chatchat-self-healing-exhausted-$LANG.html"
+            grep -q 'data-chatchat-self-healing-navigation-count="1"' "artifacts/chatchat-self-healing-exhausted-$LANG.html"
+            grep -q 'participant-row connection-failed' "artifacts/chatchat-self-healing-exhausted-$LANG.html"
+            ! grep -q 'data-chatchat-self-healing="true"' "artifacts/chatchat-self-healing-exhausted-$LANG.html"
+          done
+
+      - name: Prove user-owned Provider tabs are never auto-navigated
+        run: |
+          for LANG in en zh; do
+            URL="http://127.0.0.1:4184/app/app.html?showcase=provider-self-healing&journey=owned&lang=$LANG"
+            "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --run-all-compositor-stages-before-draw --virtual-time-budget=9000 --dump-dom "$URL" > "artifacts/chatchat-self-healing-owned-$LANG.html"
+            grep -q 'data-chatchat-provider-self-healing-owned-tab-safe="complete"' "artifacts/chatchat-self-healing-owned-$LANG.html"
+            grep -q 'data-chatchat-provider-self-healing-showcase="complete"' "artifacts/chatchat-self-healing-owned-$LANG.html"
+            grep -q 'data-chatchat-self-healing-navigation-count="0"' "artifacts/chatchat-self-healing-owned-$LANG.html"
+            grep -q 'participant-row connection-failed' "artifacts/chatchat-self-healing-owned-$LANG.html"
+            ! grep -q 'connection-self-healing' "artifacts/chatchat-self-healing-owned-$LANG.html"
           done
 
       - name: Save preview log
