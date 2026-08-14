@@ -5,6 +5,7 @@ import {
   consultationReceiptSvg,
   deriveConsultationReceipt,
 } from "../src/consultation/receipt.js";
+import { safeConsultationReceiptMarkdown } from "../src/consultation/receipt-share.js";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Assertion failed: ${message}`);
@@ -72,8 +73,14 @@ assert(markdown.includes("STRESS TEST") || markdown.includes("Stress Test"), "Ma
 assert(markdown.includes("DISPUTED") && markdown.includes("CHANGED A VIEW"), "Markdown should preserve evidence nuance rather than flattening it to verified/unverified.");
 assert(markdown.includes("No chair AI") && markdown.includes("Reachable is not proof"), "Share output must preserve epistemic boundaries.");
 
-const zhMarkdown = consultationReceiptMarkdown(receipt, "zh-CN");
+const safeMarkdown = safeConsultationReceiptMarkdown(receipt, "en");
+assert(!safeMarkdown.includes("<script>"), "Copied Markdown must not preserve raw HTML/script tags from user-controlled text.");
+assert(safeMarkdown.includes("&lt;script&gt;"), "Copied Markdown should preserve user text visibly through escaped HTML entities.");
+assert(safeMarkdown.includes("DISPUTED") && safeMarkdown.includes("Reachable is not proof"), "Markdown sanitization must not strip evidence nuance or epistemic boundaries.");
+
+const zhMarkdown = safeConsultationReceiptMarkdown(receipt, "zh-CN");
 assert(zhMarkdown.includes("压力测试") && zhMarkdown.includes("少数意见保留"), "Chinese receipt should be a first-class share format.");
+assert(!zhMarkdown.includes("<script>"), "Chinese share output must receive the same HTML-safety treatment.");
 
 const svg = consultationReceiptSvg(receipt, "en");
 assert(svg.startsWith("<svg") && svg.includes("CONSULTATION RECEIPT"), "Receipt should export as a standalone local SVG.");
