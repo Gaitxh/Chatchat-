@@ -49,11 +49,17 @@ for (const required of [
   "chrome.permissions.request",
   "permissionReady",
   "Automatic team:",
-  "不用填 URL",
+  "不用填配置表",
   "buildAutomaticTeamPlan",
 ]) {
   if (!webOnboarding.includes(required)) {
     throw new Error(`Zero-config Web Room contract is missing: ${required}`);
+  }
+}
+
+for (const jargon of ["selector", "adapter", "recipe"]) {
+  if (webOnboarding.toLowerCase().includes(jargon)) {
+    throw new Error(`Novice Web Room onboarding leaked internal setup jargon: ${jargon}`);
   }
 }
 
@@ -101,4 +107,5 @@ if (sidePanelHtml.includes("open-web-room.js")) {
 
 console.log("✓ ChatChat primary browser product language is equal-participant consultation");
 console.log("✓ ChatChat Web Room defaults to zero-config automatic setup");
+console.log("✓ ChatChat novice onboarding hides internal setup jargon");
 console.log("✓ ChatChat toolbar opens the Full Room directly");
