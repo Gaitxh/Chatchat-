@@ -31,7 +31,7 @@ const COPY = {
   en: {
     kicker: "AUTOMATIC AI ROOM",
     title: "Choose the AIs. ChatChat handles the wiring.",
-    body: "Pick at least two AI providers. ChatChat requests the site permissions once, opens clean conversation tabs, finds the composer and replies, performs the handshake, verifies the consultation protocol, and keeps retrying after login — automatically.",
+    body: "Pick at least two AI providers. ChatChat requests site access once, opens clean conversations, figures out how to talk to each AI, performs a quick connection check, verifies that each one can join the meeting, and keeps retrying after login — automatically.",
     detected: (count: number) => count ? `${count} provider${count === 1 ? " is" : "s are"} already open in this browser` : "No AI tab needs to be open first",
     selected: (count: number) => `${count} AI${count === 1 ? "" : "s"} selected`,
     open: "OPEN",
@@ -40,12 +40,12 @@ const COPY = {
     working: "Opening clean AI conversations and handing setup to the automatic connector…",
     done: "Room created. ChatChat is connecting and verifying every AI now…",
     hint: "If a provider asks you to sign in, sign in normally in that tab. ChatChat resumes by itself after the page loads.",
-    privacy: "No API keys. No selector setup. Login stays with each provider.",
+    privacy: "No API keys. No technical setup. Login stays with each provider.",
   },
   "zh-CN": {
     kicker: "自动 AI 会议室",
     title: "你只选 AI，剩下的交给 ChatChat。",
-    body: "选择至少两个 AI。ChatChat 会一次请求必要的站点权限、打开干净的新会话、自动识别输入框与回复区域、完成握手、验证协商协议，并在登录完成后自动继续。",
+    body: "选择至少两个 AI。ChatChat 会一次请求必要的网站权限、打开干净的新会话、自己找到如何与每个 AI 对话、完成快速连通检查、确认它能参加会议，并在登录完成后自动继续。",
     detected: (count: number) => count ? `这个浏览器里已经打开了 ${count} 个 AI 来源` : "不需要提前打开任何 AI 标签页",
     selected: (count: number) => `已选择 ${count} 个 AI`,
     open: "已打开",
@@ -54,7 +54,7 @@ const COPY = {
     working: "正在打开干净的 AI 会话，并把后续配置交给自动连接器……",
     done: "会议室已创建，ChatChat 正在自动连接并验证每个 AI……",
     hint: "如果某个 Provider 要求登录，只需在它的标签页里正常登录。页面加载后 ChatChat 会自己接着做。",
-    privacy: "不需要 API Key，不需要配置 selector，登录仍由各个 Provider 自己管理。",
+    privacy: "不需要 API Key，不需要技术配置，登录仍由各个 Provider 自己管理。",
   },
 } as const;
 
