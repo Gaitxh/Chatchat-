@@ -85,6 +85,58 @@ function ProposalModePortal() {
   const copy = locale === "zh-CN" ? definition.zhCN : definition.en;
   const policy = consultationModeRunPolicy(mode);
   const zh = locale === "zh-CN";
+  const fullRoom = document.documentElement.dataset.surface === "web-app";
+
+  const options = (
+    <div className="proposal-mode-options" role="radiogroup">
+      {CONSULTATION_MODES.map((item) => {
+        const label = locale === "zh-CN" ? item.zhCN.label : item.en.label;
+        return (
+          <button
+            type="button"
+            role="radio"
+            aria-checked={item.id === mode}
+            className={item.id === mode ? "is-active" : ""}
+            key={item.id}
+            onClick={() => void choose(item.id, "user")}
+            title={locale === "zh-CN" ? item.zhCN.short : item.en.short}
+          >
+            <b>{item.icon}</b><span>{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const description = (
+    <div className="proposal-mode-description">
+      <div><strong>{definition.icon} {copy.label}</strong><span>{copy.short}</span></div>
+      <p>{copy.goal}</p>
+      {!fullRoom ? <small>{zh
+        ? `公开节奏：最多 ${policy.maxRounds} 个协商轮次 · 至少 ${policy.minDebateRounds} 轮公开讨论 · 收敛阈值 ${Math.round(policy.convergenceThreshold * 100)}%`
+        : `Visible pacing: up to ${policy.maxRounds} consultation rounds · at least ${policy.minDebateRounds} open debate round${policy.minDebateRounds === 1 ? "" : "s"} · convergence ${Math.round(policy.convergenceThreshold * 100)}%`}</small> : null}
+    </div>
+  );
+
+  if (fullRoom) {
+    return (
+      <details className="proposal-mode-selector proposal-mode-disclosure">
+        <summary>
+          <span><small>{zh ? "会议方式" : "MEETING STYLE"}</small><strong>{definition.icon} {copy.label}</strong></span>
+          <em>{source === "next-move"
+            ? (zh ? "已按下一步建议预选 · 可调整" : "Suggested by Next Move · adjustable")
+            : (zh ? "已自动选择 · 可选调整" : "Selected automatically · optional")}</em>
+        </summary>
+        <div className="proposal-mode-disclosure-body">
+          <p className="proposal-mode-disclosure-hint">{zh
+            ? "默认用平衡模式即可开始。只有当你想让这场会议更偏探索、决策、核验或压力测试时，才需要改这里。"
+            : "Balanced works as the default. Change this only when you want the meeting to emphasize exploration, decision-making, verification, or stress testing."}</p>
+          {options}
+          {description}
+        </div>
+      </details>
+    );
+  }
 
   return (
     <section className="proposal-mode-selector" aria-label={zh ? "协商模式" : "Consultation mode"}>
@@ -92,31 +144,8 @@ function ProposalModePortal() {
         <span>{zh ? "这场会议怎么开？" : "HOW SHOULD THIS MEETING THINK?"}</span>
         <small>{source === "next-move" ? (zh ? "由下一步建议预选 · 你仍可修改" : "Preselected by Next Move · you can change it") : (zh ? "所有 AI 使用同一模式" : "Same mode for every AI")}</small>
       </div>
-      <div className="proposal-mode-options" role="radiogroup">
-        {CONSULTATION_MODES.map((item) => {
-          const label = locale === "zh-CN" ? item.zhCN.label : item.en.label;
-          return (
-            <button
-              type="button"
-              role="radio"
-              aria-checked={item.id === mode}
-              className={item.id === mode ? "is-active" : ""}
-              key={item.id}
-              onClick={() => void choose(item.id, "user")}
-              title={locale === "zh-CN" ? item.zhCN.short : item.en.short}
-            >
-              <b>{item.icon}</b><span>{label}</span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="proposal-mode-description">
-        <div><strong>{definition.icon} {copy.label}</strong><span>{copy.short}</span></div>
-        <p>{copy.goal}</p>
-        <small>{zh
-          ? `公开节奏：最多 ${policy.maxRounds} 个协商轮次 · 至少 ${policy.minDebateRounds} 轮公开讨论 · 收敛阈值 ${Math.round(policy.convergenceThreshold * 100)}%`
-          : `Visible pacing: up to ${policy.maxRounds} consultation rounds · at least ${policy.minDebateRounds} open debate round${policy.minDebateRounds === 1 ? "" : "s"} · convergence ${Math.round(policy.convergenceThreshold * 100)}%`}</small>
-      </div>
+      {options}
+      {description}
     </section>
   );
 }
