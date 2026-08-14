@@ -41,6 +41,7 @@ const webOnboarding = fs.readFileSync("src/extension/web-room-onboarding.tsx", "
 const automaticTeam = fs.readFileSync("src/extension/automatic-team.ts", "utf8");
 const webAppCss = fs.readFileSync("src/extension/web-app.css", "utf8");
 const serviceWorker = fs.readFileSync("extension-public/service-worker.js", "utf8");
+const recoveryClaims = fs.readFileSync("extension-public/recovery-claims.js", "utf8");
 const sidePanelHtml = fs.readFileSync("extension/sidepanel.html", "utf8");
 const appHtml = fs.readFileSync("app/app.html", "utf8");
 const loginConcierge = fs.readFileSync("src/extension/login-concierge.ts", "utf8");
@@ -105,9 +106,19 @@ for (const required of [
   "chrome.action.onClicked.addListener",
   "chrome.runtime.getURL(\"app/app.html\")",
   "chrome.tabs.create({ url: appUrl, active: true })",
+  "CLAIM_PROVIDER_SELF_HEALING",
+  "RELEASE_PROVIDER_SELF_HEALING",
+  "providerRecoveryClaims.claim",
+  "providerRecoveryClaims.release",
 ]) {
   if (!serviceWorker.includes(required)) {
-    throw new Error(`Toolbar-to-Full-Room contract is missing: ${required}`);
+    throw new Error(`Primary browser service-worker contract is missing: ${required}`);
+  }
+}
+
+for (const required of ["createRecoveryClaimRegistry", "claims.has", "claims.add", "claims.delete"]) {
+  if (!recoveryClaims.includes(required)) {
+    throw new Error(`Cross-surface recovery claim registry contract is missing: ${required}`);
   }
 }
 
@@ -170,6 +181,11 @@ for (const required of [
   "freshSessionAlreadyTried",
   "wait_for_login",
   "advanced_repair",
+  "advanceProviderRecoveryAttempt",
+  '"resetting"',
+  '"reconnecting"',
+  '"exhausted"',
+  "resetWaitExpired",
 ]) {
   if (!recovery.includes(required)) {
     throw new Error(`Provider recovery ladder contract is missing: ${required}`);
@@ -180,8 +196,16 @@ for (const required of [
   "inspectProviderPage",
   "createdByChatChat",
   'step !== "fresh_session_rediscovery"',
+  "claimProviderRecovery",
+  "CLAIM_PROVIDER_SELF_HEALING",
+  "RELEASE_PROVIDER_SELF_HEALING",
+  "advanceProviderRecoveryAttempt",
+  "RESET_WAIT_MS",
+  'phase: "exhausted"',
   "chrome.tabs.update(participant.tabId, { url: participant.startUrl })",
   "connection-self-healing",
+  "SELF-HEALING",
+  "自动修复中",
   "你不需要操作",
   "No action needed",
 ]) {
@@ -237,7 +261,7 @@ console.log("✓ ChatChat Web Room defaults to zero-config automatic setup");
 console.log("✓ ChatChat novice onboarding hides internal setup jargon");
 console.log("✓ ChatChat toolbar opens the Full Room directly");
 console.log("✓ ChatChat Login Concierge and recovery share privacy-safe Provider page inspection");
-console.log("✓ ChatChat Provider self-healing is bounded to one safe ChatChat-owned fresh-session recovery");
+console.log("✓ ChatChat Provider self-healing is one-shot, exhaustible, and coordinated across browser surfaces");
 console.log("✓ ChatChat Real Provider Proof observes the current Browser Consultation and rejects synthetic live evidence");
 
 function extractVisibleCopy(sourceText) {
