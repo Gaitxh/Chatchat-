@@ -2,11 +2,10 @@ import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./execution-provenance.css";
 
-declare const chrome: any;
-
 const PROPOSAL_DRAFT_KEY = "chatchat.consultation.proposal-draft.v1";
 const TRANSPORT_EVENT = "chatchat:provider-transport";
 const SYNTHETIC_SHOWCASE = new URLSearchParams(location.search).get("showcase") === "consultation";
+const browserChrome = (globalThis as typeof globalThis & { chrome?: any }).chrome;
 
 type ReceiptState = "sending" | "received" | "failed";
 type ExecutionMode = "synthetic-showcase" | "live-provider-tabs";
@@ -153,7 +152,7 @@ function ReceiptRow({ receipt }: { receipt: TransportReceipt }) {
 }
 
 function installTransportObserver() {
-  const tabs = chrome?.tabs;
+  const tabs = browserChrome?.tabs;
   if (!tabs || typeof tabs.sendMessage !== "function") return;
   const existing = tabs.sendMessage as typeof tabs.sendMessage & { __chatchatExecutionProvenance?: boolean };
   if (existing.__chatchatExecutionProvenance) return;
@@ -161,7 +160,7 @@ function installTransportObserver() {
   const original = tabs.sendMessage.bind(tabs);
   let syntheticProposal: Promise<string | null> | null = null;
 
-  const wrapped = async (tabId: number, payload: any, ...rest: any[]) => {
+  const wrapped = (async (tabId: number, payload: any, ...rest: any[]) => {
     if (!payload?.__chatchat || payload.type !== "RUN_SPEECH" || typeof payload.prompt !== "string") {
       return original(tabId, payload, ...rest);
     }
@@ -221,10 +220,15 @@ function installTransportObserver() {
       });
       throw caught;
     }
-  };
+  }) as typeof existing;
 
   wrapped.__chatchatExecutionProvenance = true;
-  tabs.sendMessage = wrapped;
+  try {
+    tabs.sendMessage = wrapped;
+  } catch {
+    // If a browser ever exposes a non-writable API method, keep the product
+    // functional even though transport receipts cannot be observed there.
+  }
 }
 
 function promptMeta(prompt: string): { phase: string; round: number } {
@@ -239,7 +243,7 @@ function isHandshakePrompt(prompt: string): boolean {
 
 async function readSyntheticProposal(): Promise<string | null> {
   try {
-    const store = chrome.storage?.session ?? chrome.storage?.local;
+    const store = browserChrome?.storage?.session ?? browserChrome?.storage?.local;
     const stored = await store?.get?.(PROPOSAL_DRAFT_KEY);
     const value = stored?.[PROPOSAL_DRAFT_KEY];
     return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -254,7 +258,7 @@ function dispatchReceipt(detail: TransportReceiptDetail) {
 
 async function resolveTab(tabId: number): Promise<{ host: string; title: string }> {
   try {
-    const tab = await chrome.tabs.get(tabId);
+    const tab = await browserChrome?.tabs?.get?.(tabId);
     const url = typeof tab?.url === "string" ? tab.url : "";
     const host = url ? new URL(url).hostname : "";
     return { host, title: String(tab?.title ?? "") };
