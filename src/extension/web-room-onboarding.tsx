@@ -75,6 +75,7 @@ async function mount() {
   const root = document.getElementById("web-onboarding-root");
   const guideRoot = document.getElementById("first-run-guide-root");
   if (!root) return;
+  const onboardingRoot = root;
   const locale: Locale = document.documentElement.lang.toLowerCase().startsWith("zh")
     || navigator.language?.toLowerCase().startsWith("zh")
     ? "zh-CN"
@@ -118,7 +119,7 @@ async function mount() {
   const status = document.createElement("em");
   action.append(found, button, status);
   card.append(copy, action);
-  root.append(card);
+  onboardingRoot.append(card);
 
   let discovered: AutomaticTeamDetection[] = [];
   let plan: AutomaticTeamDetection[] = [];
@@ -193,7 +194,7 @@ async function mount() {
 
   function finishOnboarding() {
     delete document.documentElement.dataset.chatchatOnboarding;
-    root.hidden = true;
+    onboardingRoot.hidden = true;
     if (guideRoot) guideRoot.hidden = false;
   }
 }
