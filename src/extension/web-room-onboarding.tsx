@@ -6,6 +6,7 @@ import {
   findReusableAutomaticTeamTab,
   type AutomaticTeamDetection,
 } from "./automatic-team.js";
+import { requestConnectionRetry } from "./connection-retry-wire.js";
 import "./web-room-onboarding.css";
 
 declare const chrome: any;
@@ -27,6 +28,10 @@ interface ParticipantRecord {
   hostname: string;
   startUrl: string;
   createdByChatChat: boolean;
+}
+
+interface ParticipantConnectionSnapshot {
+  state?: "idle" | "connecting" | "ready" | "failed";
 }
 
 const COPY = {
@@ -195,21 +200,21 @@ function installLoginResume() {
 
 async function retryAfterLogin(tabId: number) {
   const session = chrome.storage.session ?? chrome.storage.local;
-  const stored = await session.get(PARTICIPANTS_KEY);
+  const stored = await session.get([PARTICIPANTS_KEY, CONNECTIONS_KEY]);
   const participants = Array.isArray(stored[PARTICIPANTS_KEY])
     ? (stored[PARTICIPANTS_KEY] as ParticipantRecord[])
     : [];
-  const index = participants.findIndex((participant) => participant.tabId === tabId);
-  if (index < 0) return;
-  const seatId = participants[index]!.seatId;
-  const last = resumeCooldown.get(seatId) ?? 0;
+  const participant = participants.find((item) => item.tabId === tabId);
+  if (!participant) return;
+
+  const connections = (stored[CONNECTIONS_KEY] ?? {}) as Record<string, ParticipantConnectionSnapshot>;
+  const connection = connections[participant.seatId];
+  if (connection?.state === "ready" || connection?.state === "connecting") return;
+
+  const last = resumeCooldown.get(participant.seatId) ?? 0;
   if (Date.now() - last < 8000) return;
-  const row = [...document.querySelectorAll<HTMLElement>(".participant-row")][index];
-  if (!row || row.classList.contains("connection-ready") || row.classList.contains("connection-connecting")) return;
-  const retry = [...document.querySelectorAll<HTMLButtonElement>(".setup-participant .verify-button")][index];
-  if (!retry || retry.disabled || retry.classList.contains("is-ready")) return;
-  resumeCooldown.set(seatId, Date.now());
-  retry.click();
+  resumeCooldown.set(participant.seatId, Date.now());
+  requestConnectionRetry(participant.seatId, "provider-tab-loaded");
 }
 
 async function discover(): Promise<AutomaticTeamDetection[]> {
