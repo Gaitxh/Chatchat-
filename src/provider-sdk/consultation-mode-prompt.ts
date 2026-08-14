@@ -1,6 +1,7 @@
 import type { CouncilContext } from "../core/types.js";
 import { consultationModeDefinition } from "../consultation/modes.js";
 import { directPeerInboxPromptBlock } from "../consultation/peer-inbox.js";
+import { explicitReplyPromptBlock } from "../consultation/reply-provenance.js";
 import { researchLaneDefinition } from "../consultation/research-lanes.js";
 import { buildProviderConsultationPrompt } from "./consultation-protocol.js";
 
@@ -23,6 +24,7 @@ export function buildModeAwareProviderConsultationPrompt(context: CouncilContext
       ]
     : [];
   const peerInboxBlock = directPeerInboxPromptBlock(context);
+  const explicitReplyBlock = explicitReplyPromptBlock(context);
 
   return [
     "CHATCHAT_SHARED_MEETING_OBJECTIVE",
@@ -37,6 +39,7 @@ export function buildModeAwareProviderConsultationPrompt(context: CouncilContext
     "END_CHATCHAT_SHARED_MEETING_OBJECTIVE",
     ...researchLaneBlock,
     ...peerInboxBlock,
+    ...explicitReplyBlock,
     "",
     buildProviderConsultationPrompt(context),
   ].join("\n");
