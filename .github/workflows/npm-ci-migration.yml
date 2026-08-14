@@ -1,0 +1,61 @@
+name: npm ci Migration
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    name: Switch production workflows to npm ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Require committed lockfile
+        run: |
+          test -s package-lock.json
+          node -e "const lock=require('./package-lock.json'); if(lock.lockfileVersion!==3) process.exit(1)"
+
+      - name: Replace mutable installs
+        run: |
+          for file in \
+            .github/workflows/ci.yml \
+            .github/workflows/zero-config-ui.yml \
+            .github/workflows/login-concierge-ui.yml \
+            .github/workflows/real-provider-proof-ui.yml
+          do
+            sed -i 's/npm install$/npm ci/' "$file"
+          done
+          ! grep -R --line-number --fixed-strings 'npm install' \
+            .github/workflows/ci.yml \
+            .github/workflows/zero-config-ui.yml \
+            .github/workflows/login-concierge-ui.yml \
+            .github/workflows/real-provider-proof-ui.yml
+          grep -R --line-number --fixed-strings 'npm ci' \
+            .github/workflows/ci.yml \
+            .github/workflows/zero-config-ui.yml \
+            .github/workflows/login-concierge-ui.yml \
+            .github/workflows/real-provider-proof-ui.yml
+
+      - name: Commit migration to PR branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            .github/workflows/ci.yml \
+            .github/workflows/zero-config-ui.yml \
+            .github/workflows/login-concierge-ui.yml \
+            .github/workflows/real-provider-proof-ui.yml
+          if git diff --cached --quiet; then
+            echo "production workflows already use npm ci"
+          else
+            git commit -m "Use locked dependency installs in CI"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          fi
