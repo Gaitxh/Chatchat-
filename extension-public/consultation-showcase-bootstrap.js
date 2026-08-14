@@ -116,6 +116,26 @@
 
   const onUpdatedListeners = new Set();
 
+  window.addEventListener("chatchat:consultation-live", (event) => {
+    const phase = event.detail?.phase;
+    if (phase?.reason !== "fresh_signal_follow_up") return;
+    const expectedTriggerIds = Array.isArray(phase.triggerEventIds) ? phase.triggerEventIds : [];
+    document.documentElement.dataset.chatchatLiveAgendaEngineReason = "fresh_signal_follow_up";
+    let attempts = 0;
+    const verifyRenderedAgenda = () => {
+      const agenda = document.querySelector('.live-agenda[data-phase-reason="fresh_signal_follow_up"]');
+      const triggerNodes = [...(agenda?.querySelectorAll(".live-agenda__trigger") ?? [])];
+      if (agenda && triggerNodes.length >= Math.min(1, expectedTriggerIds.length || 1)) {
+        document.documentElement.dataset.chatchatLiveAgendaShowcase = "complete";
+        document.documentElement.dataset.chatchatLiveAgendaTriggerCount = String(triggerNodes.length);
+        return;
+      }
+      attempts += 1;
+      if (attempts < 40) window.setTimeout(verifyRenderedAgenda, 25);
+    };
+    window.requestAnimationFrame(verifyRenderedAgenda);
+  });
+
   window.chrome = {
     storage: {
       local: area(memoryLocal),
