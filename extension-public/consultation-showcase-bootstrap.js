@@ -8,6 +8,7 @@
   const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
   const PROPOSAL_DRAFT_KEY = "chatchat.consultation.proposal-draft.v1";
   const LOCALE_KEY = "chatchat.locale.v1";
+  const PROPOSAL_MODE_STORAGE_KEY = "chatchat.consultation.mode.v1";
   const showcaseProposal = locale === "en"
     ? "Should ChatChat make the Web Room the primary experience while keeping the browser extension as a zero-config bridge to logged-in AI providers? Examine adoption, privacy, reliability, and implementation evidence before recommending a path."
     : "ChatChat 是否应该把 Web Room 做成主要体验，同时让浏览器扩展退到幕后，作为连接已登录 AI Provider 的零配置桥梁？请从传播、隐私、可靠性和实现证据出发充分协商后再给出建议。";
@@ -80,6 +81,7 @@
   const memoryLocal = {
     [RECIPES_KEY]: recipes,
     [LOCALE_KEY]: locale,
+    [PROPOSAL_MODE_STORAGE_KEY]: "verify",
   };
   const memorySession = {
     [PARTICIPANTS_KEY]: participantRows,
@@ -317,13 +319,25 @@
     for (let attempt = 0; attempt < 120; attempt += 1) {
       const start = document.querySelector(".start-button");
       if (start instanceof HTMLButtonElement && !start.disabled) {
+        window.dispatchEvent(new CustomEvent("chatchat:proposal-mode-changed", {
+          detail: { mode: "verify", source: "restore" },
+        }));
         start.click();
         document.documentElement.dataset.chatchatConsultationShowcase = "running";
         for (let completionAttempt = 0; completionAttempt < 240; completionAttempt += 1) {
           const liveFloor = document.querySelector(".live-participant-floor");
           const workingSeats = document.querySelectorAll(".live-participant-card.is-working");
-          if (liveFloor && workingSeats.length >= 2) {
+          const laneNodes = [...document.querySelectorAll(".live-participant-lane[data-research-lane]")];
+          const laneIds = new Set(laneNodes.map((node) => node.dataset.researchLane).filter(Boolean));
+          const expectedLaneLabels = locale === "zh-CN"
+            ? ["主源核验", "最强反例", "实现约束"]
+            : ["Primary sources", "Strongest counterexample", "Implementation constraints"];
+          const laneLabelsVisible = expectedLaneLabels.every((label) =>
+            laneNodes.some((node) => node.textContent?.includes(label)),
+          );
+          if (liveFloor && workingSeats.length >= 2 && laneIds.size >= 3 && laneLabelsVisible) {
             document.documentElement.dataset.chatchatLiveFloorShowcase = "complete";
+            document.documentElement.dataset.chatchatResearchLanesShowcase = "complete";
           }
           if (
             document.querySelector(".consultation-event.event-evidence")
