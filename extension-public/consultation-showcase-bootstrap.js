@@ -313,6 +313,12 @@
     ["Make the Web Room the primary product experience and the extension a zero-config authenticated bridge. The meeting metaphor should stay visible; browser plumbing should disappear.", "让 Web Room 成为主要产品体验，让扩展成为零配置的已登录桥梁。会议本身应该被看见，浏览器管线应该消失。"],
     ["Use a Web-first Consultation Room with a narrowly-permissioned extension bridge. This best separates user experience from provider-specific browser mechanics.", "采用 Web-first 的协商会议室，并配合权限收敛的扩展桥梁。这最能把用户体验与 Provider 特定的浏览器机制分开。"],
     ["Bridge reliability and provider-page drift remain engineering risks.", "桥梁可靠性和 Provider 页面漂移仍然是工程风险。"],
+    ["What evidence justifies maintaining two product cores instead of making the extension the authenticated workflow and the web app the demonstration surface?", "哪条证据足以证明应该长期维护两个产品核心，而不是让扩展负责已登录工作流、Web App 只承担展示与传播？"],
+    ["Which browser capability is actually unique enough to justify extension-first rather than merely convenient?", "到底哪项浏览器能力独特到足以支持‘扩展优先’，而不只是更方便？"],
+    ["Chrome extension documentation describes optional host permissions and runtime permission requests, supporting an extension architecture that asks only for the AI origins a user chooses.", "Chrome 扩展文档描述了可选站点权限和运行时权限请求，这支持一种只为用户实际选择的 AI 来源请求权限的扩展架构。"],
+    ["The source can support the permission mechanism, but it still does not by itself prove that extension-first maximizes adoption. We should keep that product claim narrower.", "这条来源可以支持权限机制本身，但仍不足以单独证明‘扩展优先’会最大化用户采用率。这个产品主张应该收窄。"],
+    ["I revise to Browser Extension first. ChatChat's tool observation confirms the cited public page is reachable and exposes relevant permission metadata; that does not prove the adoption claim, but it removes one implementation uncertainty while the authenticated multi-tab workflow remains the differentiator.", "我修正为‘Browser Extension 优先’。ChatChat 的工具观察确认所引用的公开页面可访问，并暴露了相关权限元数据；这不能证明采用率主张，但它消除了一个实现不确定性，而已登录、多标签协作仍然是关键差异化能力。"],
+    ["I support extension-first for the authenticated coordination layer, while keeping a lightweight public web room for sharing and onboarding.", "我支持让扩展负责已登录的协作层，同时保留一个轻量公开 Web Room 用于分享和 onboarding。"],
   ]);
 
   function localizeContribution(contribution) {
@@ -377,18 +383,23 @@
             document.documentElement.dataset.chatchatDeliberationStoryShowcase = "complete";
           }
           const researchRoster = document.querySelector(".research-roster");
+          const sharedBoard = document.querySelector(".shared-board-card");
           const replayLaneIds = new Set(
             [...document.querySelectorAll("[data-research-roster-lane]")]
               .map((node) => node.dataset.researchRosterLane)
               .filter(Boolean),
           );
+          const rosterBeforeBoard = researchRoster instanceof HTMLElement
+            && sharedBoard instanceof HTMLElement
+            && Boolean(researchRoster.compareDocumentPosition(sharedBoard) & Node.DOCUMENT_POSITION_FOLLOWING);
           if (
             document.querySelector(".outcome-card") &&
             document.querySelector(".live-room-card") &&
             document.querySelector(".consultation-theater") &&
-            researchRoster && replayLaneIds.size >= 3
+            researchRoster && replayLaneIds.size >= 3 && rosterBeforeBoard
           ) {
             document.documentElement.dataset.chatchatResearchRosterShowcase = "complete";
+            document.documentElement.dataset.chatchatResearchRosterPlacement = "above-blackboard";
             document.documentElement.dataset.chatchatConsultationShowcase = "complete";
             return;
           }

@@ -1,4 +1,5 @@
 import { StrictMode, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { CouncilOrchestrator } from "../core/orchestrator.js";
 import type {
@@ -14,6 +15,7 @@ import { normalizeLocale, type Locale } from "../i18n/index.js";
 import { ConsultationTheater } from "./components/ConsultationTheater.js";
 import { LiveMoments } from "./components/LiveMoments.js";
 import { LiveParticipantFloor } from "./components/LiveParticipantFloor.js";
+import { ResearchRoster } from "./components/ResearchRoster.js";
 import {
   CONSULTATION_FOCUS_EVENT,
   type ConsultationFocusDetail,
@@ -53,6 +55,7 @@ function ConsultationTheaterPortal() {
   const [archiveMode, setArchiveMode] = useState(false);
   const [locale, setLocale] = useState<Locale>(() => normalizeLocale(document.documentElement.lang));
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [researchRosterRoot, setResearchRosterRoot] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     const onLive = (event: Event) => {
@@ -113,6 +116,39 @@ function ConsultationTheaterPortal() {
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    const app = document.querySelector(".consultation-app");
+    if (!(app instanceof HTMLElement)) return;
+    let rosterRoot = document.getElementById("research-roster-root");
+    if (!(rosterRoot instanceof HTMLElement)) {
+      rosterRoot = document.createElement("div");
+      rosterRoot.id = "research-roster-root";
+      rosterRoot.dataset.chatchatOwned = "true";
+      app.append(rosterRoot);
+    }
+    setResearchRosterRoot(rosterRoot);
+    return () => {
+      setResearchRosterRoot(null);
+      if (rosterRoot?.dataset.chatchatOwned === "true") rosterRoot.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!researchRosterRoot) return;
+    const app = document.querySelector(".consultation-app");
+    if (!(app instanceof HTMLElement)) return;
+    const board = app.querySelector(".shared-board-card");
+    const liveRoom = app.querySelector(".live-room-card");
+    if (board?.parentElement === app) {
+      app.insertBefore(researchRosterRoot, board);
+    } else if (liveRoom?.parentElement === app) {
+      liveRoom.insertAdjacentElement("afterend", researchRosterRoot);
+    } else {
+      app.append(researchRosterRoot);
+    }
+    researchRosterRoot.hidden = !completion?.report.researchLaneAssignments;
+  }, [researchRosterRoot, completion]);
 
   useEffect(() => {
     const theaterRoot = document.getElementById("consultation-theater-root");
@@ -176,6 +212,16 @@ function ConsultationTheaterPortal() {
   const participants = completion.report.positions.map((position) => position.participant);
   return (
     <div className="consultation-theater-portal">
+      {researchRosterRoot && completion.report.researchLaneAssignments
+        ? createPortal(
+            <ResearchRoster
+              participants={participants}
+              assignments={completion.report.researchLaneAssignments}
+              locale={locale}
+            />,
+            researchRosterRoot,
+          )
+        : null}
       {archiveMode ? (
         <div className="archive-replay-banner">
           <b>↺ {locale === "zh-CN" ? "历史回放" : "ARCHIVE REPLAY"}</b>
