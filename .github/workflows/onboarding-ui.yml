@@ -1,0 +1,101 @@
+name: Zero-config onboarding UI
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "extension/**"
+      - "extension-public/**"
+      - "src/extension/**"
+      - "scripts/validate-extension.mjs"
+      - ".github/workflows/onboarding-ui.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "extension/**"
+      - "extension-public/**"
+      - "src/extension/**"
+      - "scripts/validate-extension.mjs"
+      - ".github/workflows/onboarding-ui.yml"
+
+jobs:
+  onboarding-evidence:
+    name: Full Room · zero-config onboarding
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm install
+
+      - name: Build Browser Extension
+        run: npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Locate Chromium browser
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_BIN"
+          echo "CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
+
+      - name: Start production extension preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4181 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-onboarding-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4181/manifest.json >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4181/manifest.json >/dev/null
+
+      - name: Capture Chinese zero-config onboarding
+        run: |
+          URL='http://127.0.0.1:4181/app/app.html?showcase=onboarding&lang=zh'
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --run-all-compositor-stages-before-draw --virtual-time-budget=8000 --window-size=1440,1500 --screenshot=artifacts/chatchat-onboarding-zh.png "$URL"
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --run-all-compositor-stages-before-draw --virtual-time-budget=8000 --dump-dom "$URL" > artifacts/chatchat-onboarding-zh.html
+          test -s artifacts/chatchat-onboarding-zh.png
+          grep -q 'data-chatchat-zero-touch-onboarding-showcase="complete"' artifacts/chatchat-onboarding-zh.html
+          grep -q '你只选 AI，剩下的交给 ChatChat' artifacts/chatchat-onboarding-zh.html
+          grep -q '用 3 个 AI 组建会议室' artifacts/chatchat-onboarding-zh.html
+          grep -q '不需要 API Key' artifacts/chatchat-onboarding-zh.html
+          grep -q 'ChatGPT' artifacts/chatchat-onboarding-zh.html
+          grep -q 'Claude' artifacts/chatchat-onboarding-zh.html
+          grep -q 'Gemini' artifacts/chatchat-onboarding-zh.html
+          ! grep -qi 'selector' artifacts/chatchat-onboarding-zh.html
+
+      - name: Capture English zero-config onboarding
+        run: |
+          URL='http://127.0.0.1:4181/app/app.html?showcase=onboarding&lang=en'
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --run-all-compositor-stages-before-draw --virtual-time-budget=8000 --window-size=1440,1500 --screenshot=artifacts/chatchat-onboarding-en.png "$URL"
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --run-all-compositor-stages-before-draw --virtual-time-budget=8000 --dump-dom "$URL" > artifacts/chatchat-onboarding-en.html
+          test -s artifacts/chatchat-onboarding-en.png
+          grep -q 'data-chatchat-zero-touch-onboarding-showcase="complete"' artifacts/chatchat-onboarding-en.html
+          grep -q 'Choose the AIs. ChatChat handles the wiring.' artifacts/chatchat-onboarding-en.html
+          grep -q 'Build my room with 3 AIs' artifacts/chatchat-onboarding-en.html
+          grep -q 'No API keys' artifacts/chatchat-onboarding-en.html
+          grep -q 'ChatGPT' artifacts/chatchat-onboarding-en.html
+          grep -q 'Claude' artifacts/chatchat-onboarding-en.html
+          grep -q 'Gemini' artifacts/chatchat-onboarding-en.html
+          ! grep -qi 'selector' artifacts/chatchat-onboarding-en.html
+
+      - name: Upload onboarding product evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-zero-config-onboarding
+          path: artifacts/**
+          if-no-files-found: warn
+          retention-days: 14
