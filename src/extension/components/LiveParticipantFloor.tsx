@@ -9,6 +9,8 @@ import type {
 import { researchLaneDefinition } from "../../consultation/research-lanes.js";
 import type { Locale } from "../../i18n/index.js";
 import { CONSULTATION_FOCUS_EVENT } from "../provenance-wire.js";
+import { LiveAgenda } from "./LiveAgenda.js";
+import { OpenIssuesRadar } from "./OpenIssuesRadar.js";
 import { PeerExchangeQueue } from "./PeerExchangeQueue.js";
 import "./live-participant-floor.css";
 
@@ -122,6 +124,7 @@ export function LiveParticipantFloor({
       </header>
 
       <RoundRail phase={phase} events={events} counts={roundCounts} locale={locale} />
+      <LiveAgenda phase={phase} events={events} participants={participants} locale={locale} />
 
       <div className="live-participant-grid">
         {participants.map((participant) => (
@@ -168,6 +171,8 @@ export function LiveParticipantFloor({
         locale={locale}
         onFocusEvent={focusEvent}
       />
+
+      <OpenIssuesRadar participants={participants} events={events} locale={locale} compact />
     </section>
   );
 }
