@@ -1,4 +1,8 @@
-import type { CouncilEvent, CouncilReport } from "../core/types.js";
+import type {
+  CouncilConsultationMode,
+  CouncilEvent,
+  CouncilReport,
+} from "../core/types.js";
 
 const DB_NAME = "chatchat-consultation-history-v1";
 const DB_VERSION = 1;
@@ -21,8 +25,11 @@ export interface ConsultationHistorySummary {
   participantCount: number;
   rounds: number;
   eventCount: number;
+  mode?: CouncilConsultationMode;
+  challengeCount?: number;
   revisionCount: number;
   evidenceCount: number;
+  concessionCount?: number;
   consensusStance: string | null;
   consensusRatio: number;
   minoritySurvives: boolean;
@@ -51,8 +58,11 @@ export function summarizeConsultationArchive(
     participantCount: archive.report.positions.length,
     rounds: archive.report.rounds,
     eventCount: archive.events.length,
+    mode: archive.report.mode ?? "balanced",
+    challengeCount: archive.events.filter((event) => event.kind === "challenge").length,
     revisionCount: archive.events.filter((event) => event.kind === "revision").length,
     evidenceCount: archive.events.filter((event) => event.kind === "evidence").length,
+    concessionCount: archive.events.filter((event) => event.kind === "concede").length,
     consensusStance: archive.report.consensusStance,
     consensusRatio: archive.report.consensusRatio,
     minoritySurvives: archive.report.disagreements.length > 0,
@@ -78,6 +88,7 @@ export class ConsultationHistoryStore {
     await transactionDone(tx);
     return result
       .filter(isHistorySummary)
+      .map(normalizeHistorySummary)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, Math.max(0, limit));
   }
@@ -189,6 +200,19 @@ function isHistorySummary(value: unknown): value is ConsultationHistorySummary {
     typeof candidate.createdAt === "string" &&
     typeof candidate.eventCount === "number"
   );
+}
+
+function normalizeHistorySummary(summary: ConsultationHistorySummary): ConsultationHistorySummary {
+  return {
+    ...summary,
+    mode: isMode(summary.mode) ? summary.mode : "balanced",
+    challengeCount: typeof summary.challengeCount === "number" ? summary.challengeCount : 0,
+    concessionCount: typeof summary.concessionCount === "number" ? summary.concessionCount : 0,
+  };
+}
+
+function isMode(value: unknown): value is CouncilConsultationMode {
+  return value === "balanced" || value === "explore" || value === "decide" || value === "verify" || value === "stress_test";
 }
 
 function compact(value: string, max: number): string {
