@@ -1,6 +1,8 @@
 import type { CouncilContext, CouncilEventKind } from "../core/types.js";
 import type { ProviderProfile } from "./types.js";
 
+export const PROVIDER_EXECUTION_AUDIT_EVENT = "chatchat:provider-execution-audit";
+
 export type ProviderExecutionAuditStage =
   | "turn_started"
   | "session_prepared"
@@ -28,7 +30,16 @@ export type ProviderExecutionAuditSink = (
   event: ProviderExecutionAuditEvent,
 ) => void | Promise<void>;
 
-export const NOOP_PROVIDER_EXECUTION_AUDIT: ProviderExecutionAuditSink = () => undefined;
+/**
+ * BrowserConsultationAgent uses this by default. In Node/core tests there is no
+ * window, so the same code becomes a no-op without a second runtime contract.
+ */
+export const BROWSER_PROVIDER_EXECUTION_AUDIT: ProviderExecutionAuditSink = (event) => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<ProviderExecutionAuditEvent>(PROVIDER_EXECUTION_AUDIT_EVENT, {
+    detail: cloneProviderExecutionAudit(event),
+  }));
+};
 
 export function providerAuditBase(
   profile: ProviderProfile,
@@ -42,5 +53,13 @@ export function providerAuditBase(
     phase: context.phase,
     round: context.round,
     snapshotEventIds: context.publicEvents.map((event) => event.id),
+  };
+}
+
+export function cloneProviderExecutionAudit(event: ProviderExecutionAuditEvent): ProviderExecutionAuditEvent {
+  return {
+    ...event,
+    snapshotEventIds: [...event.snapshotEventIds],
+    ...(event.contributionKinds ? { contributionKinds: [...event.contributionKinds] } : {}),
   };
 }
