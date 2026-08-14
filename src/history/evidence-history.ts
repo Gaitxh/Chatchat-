@@ -54,12 +54,12 @@ export class EvidenceHistoryStore {
 }
 
 async function prune(db: IDBDatabase) {
-  const tx = db.transaction(STORE, readonly);
+  const tx = db.transaction(STORE, "readonly");
   const all = await requestValue<EvidenceHistoryArchive[]>(tx.objectStore(STORE).getAll());
   await transactionDone(tx);
   const stale = all.filter(isArchive).sort((a, b) => b.savedAt.localeCompare(a.savedAt)).slice(MAX_ARCHIVES);
   if (!stale.length) return;
-  const deletion = db.transaction(STORE,"readwrite");
+  const deletion = db.transaction(STORE, "readwrite");
   const done = transactionDone(deletion);
   for (const item of stale) deletion.objectStore(STORE).delete(item.sessionId);
   await done;
