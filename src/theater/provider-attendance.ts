@@ -155,7 +155,7 @@ function buildTurn(
   publicEvents: readonly CouncilEvent[],
 ): ProviderTurnAttendanceAudit | null {
   const [actorId, phaseText, roundText] = key.split("|");
-  if (!actorId || !isMeetingPhase(phaseText)) return null;
+  if (!actorId || !phaseText || !isMeetingPhase(phaseText)) return null;
   const round = Number(roundText);
   if (!Number.isFinite(round)) return null;
   const phase = phaseText;
