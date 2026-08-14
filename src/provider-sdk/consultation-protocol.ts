@@ -4,18 +4,22 @@ import type {
   CouncilEvent,
   CouncilToolFact,
 } from "../core/types.js";
+import {
+  providerVisibleConsultationContext,
+  selectProviderContextEvents,
+} from "./context-selection.js";
 import type { AdapterRecipe } from "./recipe.js";
 import type { ProviderProfile } from "./types.js";
 
 const OPEN_MARKER = "<CHATCHAT_COUNCIL_JSON>";
 const CLOSE_MARKER = "</CHATCHAT_COUNCIL_JSON>";
-const MAX_CONTEXT_EVENTS = 12;
 const MAX_EVENT_TEXT = 900;
 const MAX_TOOL_FACTS = 8;
 const MAX_TOOL_TEXT = 700;
 const MAX_CONTRIBUTIONS = 6;
 const MAX_CONTENT = 8_000;
 const MAX_PROMPT_CHARACTERS = 23_500;
+const MAX_OWN_EVENTS = 8;
 
 export interface ProviderConsultationTransportResult {
   responseText: string;
@@ -35,8 +39,9 @@ export type ProviderConsultationSessionPreparer = (
 
 export function buildProviderConsultationPrompt(context: CouncilContext): string {
   const allowedKinds = allowedKindsForPhase(context.phase).join(", ");
-  const publicEvents = context.publicEvents.slice(-MAX_CONTEXT_EVENTS).map(compactEvent);
-  const ownEvents = context.ownEvents.slice(-8).map(compactEvent);
+  const selection = selectProviderContextEvents(context.publicEvents);
+  const publicEvents = selection.events.map(compactEvent);
+  const ownEvents = context.ownEvents.slice(-MAX_OWN_EVENTS).map(compactEvent);
   const toolFacts = (context.toolFacts ?? []).slice(-MAX_TOOL_FACTS).map(compactToolFact);
   const snapshotEventIds = publicEvents.map((event) => event.id);
 
@@ -55,6 +60,10 @@ export function buildProviderConsultationPrompt(context: CouncilContext): string
     `ROUND: ${context.round}`,
     `YOUR_ACTOR_ID: ${context.participant.id}`,
     `PUBLIC_SNAPSHOT_EVENT_IDS_JSON: ${JSON.stringify(snapshotEventIds)}`,
+    `PINNED_OPEN_ISSUE_EVENT_IDS_JSON: ${JSON.stringify(selection.pinnedEventIds)}`,
+    `LATEST_ROUND_EVENT_IDS_JSON: ${JSON.stringify(selection.latestRoundEventIds)}`,
+    "Pinned events are exact public events already present in CONSULTATION_EVENTS_JSON because explicit protocol obligations remain unresolved. Pinned events have memory priority only; they do not gain authority, vote weight, truth status, or speaking priority.",
+    "The newest published round is protected before older unresolved events are pinned. Context selection changes memory coverage only and never changes Blackboard order or convergence math.",
     `ALLOWED_KINDS: ${allowedKinds}`,
     `USER_PROPOSAL_JSON: ${JSON.stringify(context.question)}`,
     `CONSULTATION_EVENTS_JSON: ${JSON.stringify(publicEvents)}`,
@@ -107,11 +116,14 @@ export function parseProviderConsultationResponse(
   }
 
   const allowed = new Set(allowedKindsForPhase(context.phase));
+  const visible = providerVisibleConsultationContext(context).context;
   const events = new Map<string, CouncilEvent>();
-  for (const event of [...context.publicEvents, ...context.ownEvents]) events.set(event.id, event);
+  for (const event of [...visible.publicEvents, ...visible.ownEvents.slice(-MAX_OWN_EVENTS)]) {
+    events.set(event.id, event);
+  }
 
   return items.map((item, index) => {
-    const contribution = parseContribution(item, context, events, index);
+    const contribution = parseContribution(item, visible, events, index);
     if (!allowed.has(contribution.kind)) {
       throw new Error(
         `Contribution ${index + 1} kind ${contribution.kind} is not allowed during ${context.phase}.`,
@@ -335,7 +347,7 @@ function confidence(value: unknown): number {
 
 function eventReference(value: unknown, events: ReadonlyMap<string, CouncilEvent>, label: string): string {
   const id = text(value, label, 240);
-  if (!events.has(id)) throw new Error(`${label} references an unknown consultation event.`);
+  if (!events.has(id)) throw new Error(`${label} references an event outside this Provider turn's visible consultation context.`);
   return id;
 }
 

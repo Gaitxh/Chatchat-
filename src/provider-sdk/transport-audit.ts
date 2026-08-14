@@ -13,6 +13,8 @@ export interface ProviderTransportAuditRecord {
   mode: ProviderExecutionMode;
   observedAt: string;
   snapshotEventIds: readonly string[];
+  pinnedOpenIssueEventIds?: readonly string[];
+  latestRoundEventIds?: readonly string[];
   repairAttempt: boolean;
   tabId: number;
   promptChars: number;
@@ -47,5 +49,7 @@ export function cloneProviderTransportAudit(record: ProviderTransportAuditRecord
   return {
     ...record,
     snapshotEventIds: [...record.snapshotEventIds],
+    ...(record.pinnedOpenIssueEventIds ? { pinnedOpenIssueEventIds: [...record.pinnedOpenIssueEventIds] } : {}),
+    ...(record.latestRoundEventIds ? { latestRoundEventIds: [...record.latestRoundEventIds] } : {}),
   };
 }

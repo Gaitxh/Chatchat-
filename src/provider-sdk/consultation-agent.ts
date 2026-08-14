@@ -4,6 +4,7 @@ import type {
   CouncilContribution,
 } from "../core/types.js";
 import { attachExplicitPeerReplies } from "../consultation/reply-provenance.js";
+import { providerVisibleConsultationContext } from "./context-selection.js";
 import {
   BROWSER_PROVIDER_EXECUTION_AUDIT,
   providerAuditBase,
@@ -28,13 +29,17 @@ export function buildProviderConsultationPrompt(context: CouncilContext): string
   return buildModeAwareProviderConsultationPrompt(context);
 }
 
-/** Real provider parse path: base schema validation first, then optional peer-reply provenance. */
+/**
+ * Real Provider parse path: base schema validation and explicit-reply provenance
+ * both use the exact same bounded public snapshot that was visible in the prompt.
+ */
 export function parseProviderConsultationTurn(
   raw: string,
   context: CouncilContext,
 ): readonly CouncilContribution[] {
-  const parsed = parseProviderConsultationResponse(raw, context);
-  return attachExplicitPeerReplies(raw, context, parsed);
+  const visible = providerVisibleConsultationContext(context).context;
+  const parsed = parseProviderConsultationResponse(raw, visible);
+  return attachExplicitPeerReplies(raw, visible, parsed);
 }
 
 export class BrowserConsultationAgent implements CouncilAgent {

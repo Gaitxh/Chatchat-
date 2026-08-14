@@ -3,11 +3,14 @@ import { consultationModeDefinition } from "../consultation/modes.js";
 import { directPeerInboxPromptBlock } from "../consultation/peer-inbox.js";
 import { explicitReplyPromptBlock } from "../consultation/reply-provenance.js";
 import { researchLaneDefinition } from "../consultation/research-lanes.js";
+import { providerVisibleConsultationContext } from "./context-selection.js";
 import { buildProviderConsultationPrompt } from "./consultation-protocol.js";
 
 export function buildModeAwareProviderConsultationPrompt(context: CouncilContext): string {
   const mode = consultationModeDefinition(context.mode);
   const lane = context.researchLane ? researchLaneDefinition(context.researchLane) : null;
+  const visible = providerVisibleConsultationContext(context);
+  const visibleContext = visible.context;
   const researchLaneBlock = lane
     ? [
         "",
@@ -23,8 +26,19 @@ export function buildModeAwareProviderConsultationPrompt(context: CouncilContext
         "END_CHATCHAT_EQUAL_RESEARCH_LANE",
       ]
     : [];
-  const peerInboxBlock = directPeerInboxPromptBlock(context);
-  const explicitReplyBlock = explicitReplyPromptBlock(context);
+  const pinnedIssueBlock = visible.selection.pinnedIssueSourceEventIds.length
+    ? [
+        "",
+        "CHATCHAT_PINNED_OPEN_ISSUES",
+        `PINNED_OPEN_ISSUE_SOURCE_EVENT_IDS_JSON: ${JSON.stringify(visible.selection.pinnedIssueSourceEventIds)}`,
+        "These source events were brought back into the bounded public snapshot because their explicit protocol obligations remain unresolved. They are already present in CONSULTATION_EVENTS_JSON; this block adds attention, not new evidence.",
+        "If a pinned source event explicitly targets you or one of your visible prior events, address it when reasonably possible before adding unrelated new points. Defend, answer, concede, revise, provide counter-evidence, or state uncertainty according to the merits.",
+        "Pinned issue status gives no event extra authority, truth status, vote weight, speaking priority, or right to force agreement. Never manufacture a response relationship unless the exact event id is visible in CONSULTATION_EVENTS_JSON.",
+        "END_CHATCHAT_PINNED_OPEN_ISSUES",
+      ]
+    : [];
+  const peerInboxBlock = directPeerInboxPromptBlock(visibleContext);
+  const explicitReplyBlock = explicitReplyPromptBlock(visibleContext);
 
   return [
     "CHATCHAT_SHARED_MEETING_OBJECTIVE",
@@ -38,9 +52,13 @@ export function buildModeAwareProviderConsultationPrompt(context: CouncilContext
       : "Follow the meeting objective while remaining willing to agree, revise, concede, or remain uncertain when warranted.",
     "END_CHATCHAT_SHARED_MEETING_OBJECTIVE",
     ...researchLaneBlock,
+    ...pinnedIssueBlock,
     ...peerInboxBlock,
     ...explicitReplyBlock,
     "",
+    // Pass the original full context here so the base prompt can expose which
+    // events were conflict-pinned; it deterministically recomputes the same
+    // visible snapshot used by inbox and explicit-reply blocks above.
     buildProviderConsultationPrompt(context),
   ].join("\n");
 }

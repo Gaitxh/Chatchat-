@@ -11,31 +11,32 @@ export type OpenMeetingIssueKind =
   | "evidence_awaiting_response"
   | "explicit_uncertainty";
 
-export interface OpenMeetingIssue {
-  id: string;
+export interface OpenMeetingIssueProvenance {
   kind: OpenMeetingIssueKind;
   sourceEventId: string;
   actorId: string;
-  actorName: string;
   round: number;
-  content: string;
   relatedEventIds: string[];
   targetActorId?: string;
+}
+
+export interface OpenMeetingIssue extends OpenMeetingIssueProvenance {
+  id: string;
+  actorName: string;
+  content: string;
   targetActorName?: string;
 }
 
 /**
- * Conservative, deterministic meeting-secretary view. It never asks an LLM
- * whether an issue "feels resolved"; only explicit public protocol edges can
- * close an item.
+ * Pure structural issue detection shared by UI and Provider context selection.
+ * It carries ids/actors/rounds only and never needs participant names or a
+ * summarizing model, so there is one canonical definition of "still open".
  */
-export function deriveOpenMeetingIssues(
-  participants: readonly CouncilParticipant[],
+export function deriveOpenMeetingIssueProvenance(
   events: readonly CouncilEvent[],
-): OpenMeetingIssue[] {
+): OpenMeetingIssueProvenance[] {
   const eventById = new Map(events.map((event) => [event.id, event] as const));
-  const participantNames = new Map(participants.map((participant) => [participant.id, participant.name] as const));
-  const result: OpenMeetingIssue[] = [];
+  const result: OpenMeetingIssueProvenance[] = [];
 
   for (const event of events) {
     if (event.kind === "question") {
@@ -45,12 +46,10 @@ export function deriveOpenMeetingIssues(
         return target ? candidate.actorId === target.actorId : candidate.actorId !== event.actorId;
       });
       if (!answered) {
-        result.push(issue(
+        result.push(provenance(
           "open_question",
           event,
-          participantNames,
           [],
-          event.content,
           target?.actorId,
         ));
       }
@@ -65,15 +64,10 @@ export function deriveOpenMeetingIssues(
         && explicitlyAnswersRequest(candidate, event.id),
       );
       if (!answered) {
-        const challenged = eventById.get(event.targetEventId);
-        result.push(issue(
+        result.push(provenance(
           "challenged_claim",
           event,
-          participantNames,
           [event.targetEventId],
-          challenged
-            ? `${actor(participantNames, event.actorId)} → ${actor(participantNames, challenged.actorId)}: ${event.content}`
-            : event.content,
           target?.actorId,
         ));
       }
@@ -89,12 +83,10 @@ export function deriveOpenMeetingIssues(
         return candidate.actorId !== event.actorId && eventReferences(candidate).includes(event.id);
       });
       if (!answered) {
-        result.push(issue(
+        result.push(provenance(
           "evidence_awaiting_response",
           event,
-          participantNames,
           event.targetEventId ? [event.targetEventId] : [],
-          event.claim || event.content,
           target?.actorId,
         ));
       }
@@ -113,35 +105,74 @@ export function deriveOpenMeetingIssues(
         }
         return false;
       });
-      if (!resolved) result.push(issue("explicit_uncertainty", event, participantNames, []));
+      if (!resolved) result.push(provenance("explicit_uncertainty", event, []));
     }
   }
 
   return result.sort((a, b) => b.round - a.round || issueRank(a.kind) - issueRank(b.kind) || a.sourceEventId.localeCompare(b.sourceEventId));
 }
 
-function issue(
+/**
+ * Conservative, deterministic meeting-secretary view. It never asks an LLM
+ * whether an issue "feels resolved"; only explicit public protocol edges can
+ * close an item.
+ */
+export function deriveOpenMeetingIssues(
+  participants: readonly CouncilParticipant[],
+  events: readonly CouncilEvent[],
+): OpenMeetingIssue[] {
+  const eventById = new Map(events.map((event) => [event.id, event] as const));
+  const participantNames = new Map(participants.map((participant) => [participant.id, participant.name] as const));
+
+  return deriveOpenMeetingIssueProvenance(events).flatMap((item) => {
+    const event = eventById.get(item.sourceEventId);
+    if (!event) return [];
+    const content = issueContent(item.kind, event, item.relatedEventIds, eventById, participantNames);
+    return [{
+      ...item,
+      id: `${item.kind}:${item.sourceEventId}`,
+      actorName: actor(participantNames, item.actorId),
+      content,
+      ...(item.targetActorId ? {
+        targetActorName: actor(participantNames, item.targetActorId),
+      } : {}),
+    } satisfies OpenMeetingIssue];
+  });
+}
+
+function provenance(
   kind: OpenMeetingIssueKind,
   event: CouncilEvent,
-  participantNames: ReadonlyMap<string, string>,
   relatedEventIds: readonly string[],
-  content = event.content,
   targetActorId?: string,
-): OpenMeetingIssue {
+): OpenMeetingIssueProvenance {
   return {
-    id: `${kind}:${event.id}`,
     kind,
     sourceEventId: event.id,
     actorId: event.actorId,
-    actorName: actor(participantNames, event.actorId),
     round: event.round,
-    content,
     relatedEventIds: [...relatedEventIds],
-    ...(targetActorId ? {
-      targetActorId,
-      targetActorName: actor(participantNames, targetActorId),
-    } : {}),
+    ...(targetActorId ? { targetActorId } : {}),
   };
+}
+
+function issueContent(
+  kind: OpenMeetingIssueKind,
+  event: CouncilEvent,
+  relatedEventIds: readonly string[],
+  eventById: ReadonlyMap<string, CouncilEvent>,
+  participantNames: ReadonlyMap<string, string>,
+): string {
+  if (kind === "challenged_claim" && event.kind === "challenge") {
+    const challenged = relatedEventIds[0] ? eventById.get(relatedEventIds[0]) : undefined;
+    return challenged
+      ? `${actor(participantNames, event.actorId)} → ${actor(participantNames, challenged.actorId)}: ${event.content}`
+      : event.content;
+  }
+  if (kind === "evidence_awaiting_response" && event.kind === "evidence") {
+    return event.claim || event.content;
+  }
+  return event.content;
 }
 
 function actor(names: ReadonlyMap<string, string>, actorId: string): string {
