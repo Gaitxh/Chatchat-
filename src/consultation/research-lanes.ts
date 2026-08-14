@@ -46,30 +46,57 @@ export const RESEARCH_LANES: readonly ResearchLaneDefinition[] = [
 
 const BY_ID = new Map(RESEARCH_LANES.map((lane) => [lane.id, lane] as const));
 
+const MODE_LANE_ORDER: Readonly<Record<CouncilConsultationMode, readonly CouncilResearchLane[]>> = {
+  balanced: [
+    "primary_sources",
+    "strongest_counterexample",
+    "implementation_constraints",
+    "user_failure_modes",
+    "historical_base_rate",
+  ],
+  verify: [
+    "primary_sources",
+    "strongest_counterexample",
+    "implementation_constraints",
+    "historical_base_rate",
+    "user_failure_modes",
+  ],
+  stress_test: [
+    "strongest_counterexample",
+    "user_failure_modes",
+    "implementation_constraints",
+    "primary_sources",
+    "historical_base_rate",
+  ],
+  decide: [
+    "implementation_constraints",
+    "primary_sources",
+    "user_failure_modes",
+    "strongest_counterexample",
+    "historical_base_rate",
+  ],
+  explore: [
+    "historical_base_rate",
+    "user_failure_modes",
+    "primary_sources",
+    "strongest_counterexample",
+    "implementation_constraints",
+  ],
+};
+
 export function researchLaneDefinition(lane: CouncilResearchLane): ResearchLaneDefinition {
   return BY_ID.get(lane)!;
 }
 
+/**
+ * Every consultation gets explicit research missions. The mode only changes the
+ * ordering of those missions; it never grants any participant more authority.
+ */
 export function consultationResearchLaneAssignments(
   mode: CouncilConsultationMode,
   participants: readonly CouncilParticipant[],
 ): Record<string, CouncilResearchLane> {
-  if (mode !== "verify" && mode !== "stress_test") return {};
-  const order: readonly CouncilResearchLane[] = mode === "stress_test"
-    ? [
-        "strongest_counterexample",
-        "user_failure_modes",
-        "implementation_constraints",
-        "primary_sources",
-        "historical_base_rate",
-      ]
-    : [
-        "primary_sources",
-        "strongest_counterexample",
-        "implementation_constraints",
-        "historical_base_rate",
-        "user_failure_modes",
-      ];
+  const order = MODE_LANE_ORDER[mode];
   return Object.fromEntries(
     participants.map((participant, index) => [participant.id, order[index % order.length]!]),
   );
