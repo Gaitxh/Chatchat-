@@ -46,6 +46,7 @@ import {
   type TeachSelection,
 } from "../provider-sdk/recipe.js";
 import type { ProviderProfile } from "../provider-sdk/types.js";
+import { AUTOMATIC_TEAM_ASSEMBLED_EVENT } from "./automatic-team-wire.js";
 import {
   CONNECTION_RETRY_REQUESTED_EVENT,
   type ConnectionRetryRequestedDetail,
@@ -138,6 +139,15 @@ function ConsultationApp() {
   useEffect(() => {
     void hydrate();
     void refreshCandidateTabs();
+  }, []);
+
+  useEffect(() => {
+    const onAutomaticTeamAssembled = () => {
+      void hydrate();
+      void refreshCandidateTabs();
+    };
+    window.addEventListener(AUTOMATIC_TEAM_ASSEMBLED_EVENT, onAutomaticTeamAssembled);
+    return () => window.removeEventListener(AUTOMATIC_TEAM_ASSEMBLED_EVENT, onAutomaticTeamAssembled);
   }, []);
 
   useEffect(() => {
