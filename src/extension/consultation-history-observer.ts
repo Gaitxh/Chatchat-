@@ -5,6 +5,12 @@ import {
 } from "../evidence/evidence-ledger.js";
 import { ConsultationHistoryStore, createConsultationArchive } from "../history/consultation-history.js";
 import { EvidenceHistoryStore } from "../history/evidence-history.js";
+import {
+  ExecutionAuditHistoryStore,
+  createExecutionAuditHistoryArchive,
+} from "../history/execution-audit-history.js";
+import { providerExecutionAuditSnapshot } from "../provider-sdk/execution-audit.js";
+import { providerTransportAuditSnapshot } from "../provider-sdk/transport-audit.js";
 import { announceConsultationHistoryUpdated } from "./history-wire.js";
 
 declare const chrome: any;
@@ -13,6 +19,7 @@ const COMPLETE_EVENT = "chatchat:consultation-complete";
 const MARKER = "__chatchatConsultationHistoryObserverV1";
 const historyStore = new ConsultationHistoryStore();
 const evidenceHistory = new EvidenceHistoryStore();
+const executionHistory = new ExecutionAuditHistoryStore();
 
 interface CompletionDetail {
   report: CouncilReport;
@@ -40,7 +47,12 @@ async function saveCompleted(report: CouncilReport, events: readonly CouncilEven
     const archiveSave = historyStore.save(createConsultationArchive(report, events));
     const evidenceSave = currentEvidenceSnapshot(events)
       .then((evidenceSnapshot) => evidenceHistory.save(report.sessionId, evidenceSnapshot));
-    await Promise.all([archiveSave, evidenceSave]);
+    const executionSave = executionHistory.save(createExecutionAuditHistoryArchive(
+      report.sessionId,
+      providerTransportAuditSnapshot(report.sessionId),
+      providerExecutionAuditSnapshot(report.sessionId),
+    ));
+    await Promise.all([archiveSave, evidenceSave, executionSave]);
     announceConsultationHistoryUpdated(report.sessionId);
   } catch (caught) {
     // History is a local durability feature. A persistence failure must never

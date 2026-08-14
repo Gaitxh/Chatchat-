@@ -70,7 +70,7 @@ PUBLIC_SNAPSHOT_EVENT_IDS_JSON: ["event_...", "event_...", ...]
 
 Attendance Audit 也会在这个 Demo 中完整渲染，用来测试审计机制本身；但页面继续醒目标记 `DEMO · SYNTHETIC`，明确说明第三方模型并没有真的出席。
 
-现在 live-deliberation Chromium guard 还必须亲眼看到至少一条：
+live-deliberation Chromium guard 还必须亲眼看到至少一条：
 
 - 状态为 `published` 或 `repaired`；
 - Prompt 公共快照事件数大于 0；
@@ -78,8 +78,39 @@ Attendance Audit 也会在这个 Demo 中完整渲染，用来测试审计机制
 
 这证明**审计链和产品 UI 在真实 Chromium 中端到端工作**，但不会把 synthetic fixture 偷换成真实 Provider 推理。
 
-## 当前持久化边界
+## Durable execution receipt
 
-现阶段 Attendance Audit 是**运行中的内存审计视图**。会议历史已经会单独保存公开结构化事件，但 transport / parse / repair 这套执行审计记录还没有进入一个正式的持久化 archive contract。
+一场协商闭会时，ChatChat 现在会把原始执行证据冻结成一个本地 IndexedDB sidecar，并使用和 consultation archive 相同的 `sessionId`：
 
-所以在我们真正补上持久化之前，ChatChat 不应该暗示这些执行审计记录在浏览器重启后仍然完整存在。下一步很自然就是把它做成每场会议的 durable execution receipt。
+- 该 session 的全部 Provider transport records；
+- 该 session 的全部 parse / repair / fallback audit events；
+- 当时是 `live-provider-tabs` 还是真正的 `synthetic-showcase`。
+
+sidecar 数据库是 `chatchat-provider-execution-history-v1`。它会和普通 consultation archive、冻结 Evidence history 并行保存；只有三者都完成之后，系统才广播 `chatchat:consultation-history-updated`。
+
+这里保存的是**原始审计票据**，不是 UI 当时算出来的 `12/12 已验证` 数字。打开历史记录时，ChatChat 会重新组合：
+
+1. 冻结的 transport receipt；
+2. 冻结的 parse / repair / fallback receipt；
+3. consultation archive 中冻结的 Blackboard events。
+
+再重新推导 Provider Attendance model。这样以后 UI 算法升级，旧会议仍然可以从原始票据重新解释，而不是把旧版派生数字当成不可修改的历史事实。
+
+## 历史回放
+
+Consultation History 卡片现在会显示已验证 Provider 轮次、repair、fallback 和失败数量。打开一场旧会议，会展开 `LOCAL · EXECUTION RECEIPT`：逐席、逐轮查看 snapshot 数量、页面响应、解析结果、Blackboard 发布数量，以及精确 snapshot / published event IDs。
+
+历史执行回放会产生 **0 次 Provider 调用**。浏览器重启后也不会为了“补票据”重新问今天的 Provider 页面昨天发生了什么。
+
+在 execution receipt 功能出现之前生成的旧 archive 仍然有效；它们只会明确显示“这条记录早于 durable Provider execution receipt”，不会编造缺失 provenance。
+
+## 浏览器持久化证明
+
+现有 History Chromium guard 现在把 execution durability 也纳入同一条产品契约。只有它从同一个 session 中同时读到：
+
+- `chatchat-consultation-history-v1 / archives`；以及
+- `chatchat-provider-execution-history-v1 / receipts`
+
+才会把 history persistence 标记为 complete。
+
+execution receipt 还必须真实包含 transport records、parse/repair records、至少一个非空 peer-visible Prompt snapshot，以及至少一个 `structured_parsed` 事件。这些检查直接从闭会后的 IndexedDB 读取，而不是从 live DOM 猜出来。

@@ -30,16 +30,30 @@ export type ProviderExecutionAuditSink = (
   event: ProviderExecutionAuditEvent,
 ) => void | Promise<void>;
 
+const MAX_BUFFERED_EVENTS = 720;
+const buffer: ProviderExecutionAuditEvent[] = [];
+
 /**
  * BrowserConsultationAgent uses this by default. In Node/core tests there is no
- * window, so the same code becomes a no-op without a second runtime contract.
+ * window, so the event dispatch becomes a no-op while the contract remains the
+ * same. Browser runs keep a bounded raw ledger so completion persistence can
+ * freeze the exact parse/repair/fallback history without reading React state.
  */
 export const BROWSER_PROVIDER_EXECUTION_AUDIT: ProviderExecutionAuditSink = (event) => {
+  const copy = cloneProviderExecutionAudit(event);
   if (typeof window === "undefined") return;
+  buffer.push(copy);
+  if (buffer.length > MAX_BUFFERED_EVENTS) buffer.splice(0, buffer.length - MAX_BUFFERED_EVENTS);
   window.dispatchEvent(new CustomEvent<ProviderExecutionAuditEvent>(PROVIDER_EXECUTION_AUDIT_EVENT, {
-    detail: cloneProviderExecutionAudit(event),
+    detail: copy,
   }));
 };
+
+export function providerExecutionAuditSnapshot(sessionId: string): ProviderExecutionAuditEvent[] {
+  return buffer
+    .filter((event) => event.sessionId === sessionId)
+    .map(cloneProviderExecutionAudit);
+}
 
 export function providerAuditBase(
   profile: ProviderProfile,

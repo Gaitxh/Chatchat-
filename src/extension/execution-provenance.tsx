@@ -6,27 +6,29 @@ import {
   type ProviderExecutionAuditEvent,
 } from "../provider-sdk/execution-audit.js";
 import {
+  PROVIDER_TRANSPORT_AUDIT_EVENT,
+  recordProviderTransportAudit,
+  type ProviderExecutionMode,
+  type ProviderTransportAuditRecord,
+} from "../provider-sdk/transport-audit.js";
+import {
   buildProviderAttendanceAudit,
   type ProviderAttendanceAuditModel,
-  type ProviderTransportAuditRecord,
   type ProviderTurnAttendanceAudit,
 } from "../theater/provider-attendance.js";
 import "./execution-provenance.css";
 
 const PROPOSAL_DRAFT_KEY = "chatchat.consultation.proposal-draft.v1";
-const TRANSPORT_EVENT = "chatchat:provider-transport";
+const TRANSPORT_EVENT = PROVIDER_TRANSPORT_AUDIT_EVENT;
 const LIVE_EVENT = "chatchat:consultation-live";
 const SYNTHETIC_SHOWCASE = new URLSearchParams(location.search).get("showcase") === "consultation";
 const browserChrome = (globalThis as typeof globalThis & { chrome?: any }).chrome;
 
 type ReceiptState = "sending" | "received" | "failed";
-type ExecutionMode = "synthetic-showcase" | "live-provider-tabs";
+type ExecutionMode = ProviderExecutionMode;
 
 interface TransportReceiptDetail extends ProviderTransportAuditRecord {
-  tabId: number;
   state: ReceiptState;
-  mode: ExecutionMode;
-  promptChars: number;
 }
 
 interface TransportReceipt extends TransportReceiptDetail {
@@ -435,7 +437,7 @@ async function readSyntheticProposal(): Promise<string | null> {
 }
 
 function dispatchReceipt(detail: TransportReceiptDetail) {
-  window.dispatchEvent(new CustomEvent<TransportReceiptDetail>(TRANSPORT_EVENT, { detail }));
+  recordProviderTransportAudit(detail);
 }
 
 async function resolveTab(tabId: number): Promise<{ host: string; title: string }> {

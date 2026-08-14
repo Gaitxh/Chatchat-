@@ -4,6 +4,12 @@ const execution = fs.readFileSync("src/extension/execution-provenance.tsx", "utf
 const attendance = fs.readFileSync("src/theater/provider-attendance.ts", "utf8");
 const agent = fs.readFileSync("src/provider-sdk/consultation-agent.ts", "utf8");
 const prompt = fs.readFileSync("src/provider-sdk/consultation-protocol.ts", "utf8");
+const executionLedger = fs.readFileSync("src/provider-sdk/execution-audit.ts", "utf8");
+const transportLedger = fs.readFileSync("src/provider-sdk/transport-audit.ts", "utf8");
+const executionHistory = fs.readFileSync("src/history/execution-audit-history.ts", "utf8");
+const historyObserver = fs.readFileSync("src/extension/consultation-history-observer.ts", "utf8");
+const historyPortal = fs.readFileSync("src/extension/consultation-history-portal.tsx", "utf8");
+const historyGuard = fs.readFileSync("extension-public/history-persistence-showcase-guard.js", "utf8");
 const auditDocEn = fs.readFileSync("docs/PROVIDER_ATTENDANCE_AUDIT.md", "utf8");
 const auditDocZh = fs.readFileSync("docs/PROVIDER_ATTENDANCE_AUDIT.zh-CN.md", "utf8");
 const app = fs.readFileSync("app/app.html", "utf8");
@@ -35,6 +41,7 @@ for (const claim of [
   'data-provider-attendance-audit',
   'data-attendance-snapshot-count',
   'data-attendance-published-count',
+  'recordProviderTransportAudit',
   'RUN_SPEECH',
 ]) {
   assert(execution.includes(claim), `Execution boundary is missing: ${claim}`);
@@ -45,9 +52,6 @@ assert(
   "Synthetic showcase must offer a real-mode exit that removes the showcase query parameter.",
 );
 
-// The real product path must still send the generated consultation prompt into
-// the selected browser tab. This is intentionally checked separately from the
-// synthetic showcase so a demo fixture cannot substitute for real page I/O.
 for (const claim of [
   'new BrowserConsultationAgent(',
   'type: "RUN_SPEECH"',
@@ -58,10 +62,6 @@ for (const claim of [
   assert(panel.includes(claim), `Live provider transport path disappeared: ${claim}`);
 }
 
-// A provider turn must carry an explicit session/snapshot identity in the exact
-// prompt that is sent to the page. The audit must then distinguish parse,
-// repair, fallback and Blackboard publication instead of treating page I/O as
-// proof that a model contribution entered the meeting.
 for (const claim of [
   'SESSION_ID:',
   'PUBLIC_SNAPSHOT_EVENT_IDS_JSON:',
@@ -91,24 +91,78 @@ for (const claim of [
   assert(attendance.includes(claim), `Attendance audit model is missing: ${claim}`);
 }
 
+for (const [label, source, claims] of [
+  ["execution ledger", executionLedger, ['MAX_BUFFERED_EVENTS', 'providerExecutionAuditSnapshot', 'buffer.push(copy)']],
+  ["transport ledger", transportLedger, ['MAX_BUFFERED_RECORDS', 'providerTransportAuditSnapshot', 'recordProviderTransportAudit', 'buffer.push(copy)']],
+]) {
+  for (const claim of claims) assert(source.includes(claim), `${label} is missing durable-freeze prerequisite: ${claim}`);
+}
+
+for (const claim of [
+  'chatchat-provider-execution-history-v1',
+  'ExecutionAuditHistoryArchive',
+  'createExecutionAuditHistoryArchive',
+  'transports',
+  'execution',
+  'MAX_ARCHIVES = 24',
+]) {
+  assert(executionHistory.includes(claim), `Execution history store is missing: ${claim}`);
+}
+for (const claim of [
+  'ExecutionAuditHistoryStore',
+  'providerTransportAuditSnapshot(report.sessionId)',
+  'providerExecutionAuditSnapshot(report.sessionId)',
+  'createExecutionAuditHistoryArchive',
+  'Promise.all([archiveSave, evidenceSave, executionSave])',
+]) {
+  assert(historyObserver.includes(claim), `Consultation completion does not durably freeze execution audit: ${claim}`);
+}
+for (const claim of [
+  'ExecutionAuditHistoryStore',
+  'buildProviderAttendanceAudit',
+  'LOCAL · EXECUTION RECEIPT',
+  'data-history-execution-audit="loaded"',
+  'data-history-execution-snapshot-count',
+  'data-history-execution-published-count',
+  'executionHistory.delete(sessionId)',
+  'executionHistory.clear()',
+]) {
+  assert(historyPortal.includes(claim), `History UI does not replay/delete execution receipts correctly: ${claim}`);
+}
+for (const claim of [
+  'chatchat-provider-execution-history-v1',
+  'chatchatExecutionHistoryPersistenceShowcase',
+  'chatchatExecutionHistoryReplayShowcase',
+  'execution.transports',
+  'execution.execution',
+  'record.stage === "structured_parsed"',
+  'record.snapshotEventIds.length > 0',
+  'historyButton.click()',
+  'data-history-execution-audit="loaded"',
+  'data-history-execution-snapshot-count',
+  'data-history-execution-published-count',
+]) {
+  assert(historyGuard.includes(claim), `Chromium history proof does not enforce durable execution receipt replay: ${claim}`);
+}
+
 for (const [label, doc] of [["English", auditDocEn], ["Chinese", auditDocZh]]) {
   for (const claim of [
     'PUBLIC_SNAPSHOT_EVENT_IDS_JSON',
     'Blackboard',
     'FALLBACK',
     'DEMO · SYNTHETIC',
+    'chatchat-provider-execution-history-v1',
   ]) {
     assert(doc.includes(claim), `${label} attendance audit documentation is missing: ${claim}`);
   }
 }
 assert(auditDocEn.includes('does **not** expose or infer hidden model chain-of-thought'), "English audit docs must preserve the hidden-reasoning boundary.");
 assert(auditDocZh.includes('不展示、也不推断模型隐藏的思维链'), "Chinese audit docs must preserve the hidden-reasoning boundary.");
-assert(auditDocEn.includes('live, in-memory execution view'), "Docs must disclose that execution audit persistence is not implemented yet.");
-assert(auditDocZh.includes('运行中的内存审计视图'), "Chinese docs must disclose that execution audit persistence is not implemented yet.");
+assert(auditDocEn.includes('Durable execution receipt'), "English docs must describe durable execution receipt history.");
+assert(auditDocZh.includes('Durable execution receipt'), "Chinese docs must describe durable execution receipt history.");
+assert(auditDocEn.includes('zero Provider calls'), "English docs must preserve archive replay no-call semantics.");
+assert(auditDocZh.includes('0 次 Provider 调用'), "Chinese docs must preserve archive replay no-call semantics.");
 
-// The showcase is known to be synthetic and deterministic. Keeping these
-// assertions makes that fact explicit instead of allowing CI fixture speech to
-// silently masquerade as third-party model inference.
 for (const claim of [
   'if (params.get("showcase") !== "consultation") return;',
   'Synthetic automatic connection passed.',
@@ -135,7 +189,7 @@ for (const claim of [
   assert(liveGuard.includes(claim), `Real Chromium showcase proof does not enforce execution attendance: ${claim}`);
 }
 
-console.log("✓ synthetic/live execution boundary, per-seat attendance audit, and docs are mechanically enforced");
+console.log("✓ live/synthetic execution, per-seat attendance, durable receipts, history replay and Chromium proof are mechanically enforced");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`Execution boundary check failed: ${message}`);
