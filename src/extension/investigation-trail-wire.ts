@@ -1,4 +1,7 @@
-import type { PendingInvestigationFollowUp } from "../history/investigation-trail.js";
+import type {
+  InvestigationTrailEdge,
+  PendingInvestigationFollowUp,
+} from "../history/investigation-trail.js";
 
 export const INVESTIGATION_FOLLOW_UP_STAGED_EVENT = "chatchat:investigation-follow-up-staged";
 export const INVESTIGATION_FOLLOW_UP_CLEAR_EVENT = "chatchat:investigation-follow-up-clear";
@@ -7,6 +10,10 @@ export const INVESTIGATION_TRAIL_UPDATED_EVENT = "chatchat:investigation-trail-u
 
 export interface InvestigationFollowUpChangedDetail {
   pending: PendingInvestigationFollowUp | null;
+}
+
+export interface InvestigationTrailUpdatedDetail {
+  edges?: InvestigationTrailEdge[];
 }
 
 export function stageInvestigationFollowUp(pending: PendingInvestigationFollowUp): void {
@@ -27,6 +34,10 @@ export function announceInvestigationFollowUpChanged(
   }));
 }
 
-export function announceInvestigationTrailUpdated(): void {
-  window.dispatchEvent(new Event(INVESTIGATION_TRAIL_UPDATED_EVENT));
+export function announceInvestigationTrailUpdated(
+  edges?: readonly InvestigationTrailEdge[],
+): void {
+  window.dispatchEvent(new CustomEvent<InvestigationTrailUpdatedDetail>(INVESTIGATION_TRAIL_UPDATED_EVENT, {
+    detail: edges ? { edges: [...edges] } : {},
+  }));
 }

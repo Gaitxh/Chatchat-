@@ -61,8 +61,8 @@ async function linkCompletedFollowUp(report: CouncilReport): Promise<void> {
     return;
   }
 
-  await store.save(edge);
+  const edges = await store.save(edge);
   await store.clearPending();
   announceInvestigationFollowUpChanged(null);
-  announceInvestigationTrailUpdated();
+  announceInvestigationTrailUpdated(edges);
 }

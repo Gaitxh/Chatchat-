@@ -9,6 +9,7 @@ import { CONSULTATION_HISTORY_UPDATED_EVENT } from "./history-wire.js";
 import {
   announceInvestigationTrailUpdated,
   INVESTIGATION_TRAIL_UPDATED_EVENT,
+  type InvestigationTrailUpdatedDetail,
 } from "./investigation-trail-wire.js";
 
 const COMPLETE_EVENT = "chatchat:consultation-complete";
@@ -26,14 +27,19 @@ function InvestigationTrailPortal() {
   useEffect(() => {
     queueRefreshBurst();
     const refreshSoon = () => queueRefreshBurst();
-    window.addEventListener(INVESTIGATION_TRAIL_UPDATED_EVENT, refreshSoon);
+    const onTrailUpdated = (event: Event) => {
+      const snapshot = (event as CustomEvent<InvestigationTrailUpdatedDetail>).detail?.edges;
+      if (Array.isArray(snapshot)) setEdges([...snapshot]);
+      queueRefreshBurst();
+    };
+    window.addEventListener(INVESTIGATION_TRAIL_UPDATED_EVENT, onTrailUpdated);
     window.addEventListener(COMPLETE_EVENT, refreshSoon);
     window.addEventListener(CONSULTATION_HISTORY_UPDATED_EVENT, refreshSoon);
 
     return () => {
       for (const timer of refreshTimersRef.current) window.clearTimeout(timer);
       refreshTimersRef.current = [];
-      window.removeEventListener(INVESTIGATION_TRAIL_UPDATED_EVENT, refreshSoon);
+      window.removeEventListener(INVESTIGATION_TRAIL_UPDATED_EVENT, onTrailUpdated);
       window.removeEventListener(COMPLETE_EVENT, refreshSoon);
       window.removeEventListener(CONSULTATION_HISTORY_UPDATED_EVENT, refreshSoon);
     };
@@ -97,7 +103,7 @@ function InvestigationTrailPortal() {
         );
         if (nextEdges.length !== storedEdges.length) {
           await trailStore.replace(nextEdges);
-          announceInvestigationTrailUpdated();
+          announceInvestigationTrailUpdated(nextEdges);
         }
       }
 
