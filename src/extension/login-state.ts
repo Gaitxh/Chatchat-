@@ -21,15 +21,22 @@ export function classifyLoginState(input: LoginStateInspection): LoginState {
 
   const pathAndTitle = `${current.hostname} ${current.pathname} ${current.search} ${title}`;
   const crossOrigin = current.origin !== expected.origin;
-  if (crossOrigin && (AUTH_HOST_PATTERN.test(current.hostname) || AUTH_TEXT_PATTERN.test(pathAndTitle))) {
-    return "needs_login";
+  if (crossOrigin) {
+    return AUTH_HOST_PATTERN.test(current.hostname) || AUTH_TEXT_PATTERN.test(pathAndTitle)
+      ? "needs_login"
+      : "not_login";
   }
 
-  if (AUTH_TEXT_PATTERN.test(pathAndTitle)) return "needs_login";
-  if ((input.passwordInputs ?? 0) > 0) return "needs_login";
-
+  const passwordInputs = input.passwordInputs ?? 0;
   const loginControls = input.loginControls ?? 0;
   const composers = input.composerCandidates ?? 0;
+
+  // A same-origin page that already exposes a usable AI composer should remain
+  // usable even if the product also offers an optional account/sign-in control.
+  if (composers > 0 && passwordInputs === 0) return "not_login";
+
+  if (passwordInputs > 0) return "needs_login";
+  if (AUTH_TEXT_PATTERN.test(pathAndTitle)) return "needs_login";
   if (loginControls > 0 && composers === 0) return "needs_login";
 
   return "not_login";
