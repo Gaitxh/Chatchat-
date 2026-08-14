@@ -6,21 +6,39 @@ import {
 
 const MAX_EVIDENCE_BYTES = 256 * 1024;
 const EVIDENCE_TIMEOUT_MS = 8_000;
+const FULL_ROOM_PATH = "app/app.html";
 
-const enablePanelOnAction = async () => {
+const configurePrimarySurface = async () => {
   try {
-    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
   } catch (error) {
-    console.warn("ChatChat could not enable action-click side panel behavior", error);
+    console.warn("ChatChat could not configure the optional Side Panel behavior", error);
   }
 };
 
+async function openFullRoom() {
+  const appUrl = chrome.runtime.getURL(FULL_ROOM_PATH);
+  const tabs = await chrome.tabs.query({});
+  const existing = tabs.find((tab) => typeof tab.url === "string" && tab.url.startsWith(appUrl));
+  if (existing?.id) {
+    await chrome.tabs.update(existing.id, { active: true });
+    return;
+  }
+  await chrome.tabs.create({ url: appUrl, active: true });
+}
+
 chrome.runtime.onInstalled.addListener(() => {
-  void enablePanelOnAction();
+  void configurePrimarySurface();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  void enablePanelOnAction();
+  void configurePrimarySurface();
+});
+
+chrome.action.onClicked.addListener(() => {
+  void openFullRoom().catch((error) => {
+    console.warn("ChatChat could not open the Full Room", error);
+  });
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -136,4 +154,4 @@ async function readBoundedText(response, maxBytes) {
   return { text, bytesRead, truncated };
 }
 
-void enablePanelOnAction();
+void configurePrimarySurface();
