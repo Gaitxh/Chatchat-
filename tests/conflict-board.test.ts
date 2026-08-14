@@ -62,5 +62,18 @@ const uncertaintyBoard = deriveConflictBoard(participants, uncertaintyOnly);
 assert(uncertaintyBoard.threads[0]?.status === "open", "Explicit unresolved uncertainty should be visible even without a peer target");
 assert(uncertaintyBoard.threads[0]?.anchorEventId === "u1", "Uncertainty thread must preserve its own exact anchor event");
 
+const movedButOpenEvents: CouncilEvent[] = [
+  { ...base, id: "m1", round: 1, actorId: "claude", kind: "argument", stance: "A", content: "Initial position A.", confidence: .7 },
+  { ...base, id: "m-challenge", round: 2, actorId: "gpt", kind: "challenge", targetEventId: "m1", content: "This assumption is still unsupported." },
+  { ...base, id: "m-evidence", round: 2, actorId: "gemini", kind: "evidence", targetEventId: "m1", claim: "A separate premise has evidence.", content: "This evidence changes part of the picture.", confidence: .8 },
+  { ...base, id: "m2", round: 3, actorId: "claude", kind: "revision", previousEventId: "m1", stance: "B", content: "I revise because of the evidence, but I have not answered the challenge.", confidence: .82, causedBy: ["m-evidence"] },
+];
+const movedButOpenBoard = deriveConflictBoard(participants, movedButOpenEvents);
+const movedButOpen = movedButOpenBoard.threads.find((thread) => thread.anchorEventId === "m1");
+assert(movedButOpen?.status === "open", "Unanswered obligations must keep the thread OPEN even after a revision");
+assert(movedButOpen.counts.revision === 1 && movedButOpen.movementEventIds.includes("m2"), "Open status must not erase explicit position movement");
+assert(movedButOpen.openIssueEventIds.includes("m-challenge"), "The unanswered challenge must remain exactly traceable after movement");
+
 console.log("✓ ChatChat Conflict Board deterministic provenance tests passed");
+console.log("✓ Conflict threads keep movement and unresolved obligations as independent facts");
 console.log("✓ Conflict threads do not use prose similarity or hidden-chair summarization");
