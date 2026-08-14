@@ -51,11 +51,23 @@ function ProposalModePortal() {
 
   useEffect(() => {
     const root = document.getElementById("proposal-mode-root");
-    const proposal = document.querySelector(".consultation-app .proposal-card");
-    const textarea = proposal?.querySelector("textarea");
-    if (!root || !proposal) return;
-    if (textarea) proposal.insertBefore(root, textarea);
-    else proposal.append(root);
+    if (!root) return;
+
+    const mount = () => {
+      const proposal = document.querySelector(".consultation-app .proposal-card");
+      const textarea = proposal?.querySelector("textarea");
+      if (!proposal) return false;
+      if (textarea) proposal.insertBefore(root, textarea);
+      else proposal.append(root);
+      return true;
+    };
+
+    if (mount()) return;
+    const observer = new MutationObserver(() => {
+      if (mount()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, []);
 
   async function choose(next: CouncilConsultationMode, nextSource: ProposalModeSelectionDetail["source"]) {
