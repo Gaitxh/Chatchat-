@@ -77,10 +77,12 @@
         const draftPreserved = currentTextarea instanceof HTMLTextAreaElement
           && currentTextarea.value === expectedDraft;
         const consultationReady = startButton instanceof HTMLButtonElement && !startButton.disabled;
+        const legacyGuideAbsent = !document.querySelector(".first-run-guide");
 
-        if (onboardingGone && readyRows.length >= 2 && draftPreserved && consultationReady) {
+        if (onboardingGone && readyRows.length >= 2 && draftPreserved && consultationReady && legacyGuideAbsent) {
           document.documentElement.dataset.chatchatZeroConfigAssembly = "complete";
           document.documentElement.dataset.chatchatZeroConfigDraftPreserved = "complete";
+          document.documentElement.dataset.chatchatZeroConfigLegacyGuide = "suppressed";
           return;
         }
       }
