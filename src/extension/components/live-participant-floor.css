@@ -207,6 +207,56 @@
 
 .is-failed .live-participant-state-dot { background: #ce716b; }
 
+.live-participant-lane {
+  display: grid;
+  grid-template-columns: 22px minmax(0,1fr) auto;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+  padding: 6px 7px;
+  border-radius: 8px;
+  border: 1px solid rgba(111,165,234,.18);
+  background: rgba(74,118,178,.08);
+}
+
+.live-participant-lane > span {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(255,255,255,.055);
+  font-size: 10px;
+}
+
+.live-participant-lane > div {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.live-participant-lane small {
+  color: #7f8b9b;
+  font-size: 5.9px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.live-participant-lane strong {
+  overflow: hidden;
+  color: #c5d9f4;
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-participant-lane > i {
+  color: #718096;
+  font-size: 5.8px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
 .live-participant-action {
   min-height: 24px;
   display: flex;
@@ -329,4 +379,6 @@
   .live-participant-floor__header { display: grid; }
   .live-phase-chip { justify-items: start; }
   .live-participant-grid { grid-template-columns: 1fr; }
+  .live-participant-lane { grid-template-columns: 22px minmax(0,1fr); }
+  .live-participant-lane > i { grid-column: 2; }
 }

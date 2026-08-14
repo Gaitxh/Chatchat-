@@ -6,6 +6,7 @@ import type {
   CouncilParticipantTurnUpdate,
   CouncilPhaseUpdate,
 } from "../../core/types.js";
+import { researchLaneDefinition } from "../../consultation/research-lanes.js";
 import type { Locale } from "../../i18n/index.js";
 import "./live-participant-floor.css";
 
@@ -33,6 +34,8 @@ const COPY = {
     failed: "Turn failed",
     noAction: "No public action yet",
     latestStance: "Current stance",
+    researchFocus: "Research focus",
+    equalLane: "equal authority",
     evidenceDesk: "EVIDENCE DESK",
     evidenceTitle: "Evidence placed on the table",
     noEvidence: "No participant has submitted structured evidence yet.",
@@ -57,6 +60,8 @@ const COPY = {
     failed: "本轮失败",
     noAction: "还没有公开动作",
     latestStance: "当前立场",
+    researchFocus: "研究焦点",
+    equalLane: "权力完全平等",
     evidenceDesk: "证据桌",
     evidenceTitle: "已经放上桌面的证据",
     noEvidence: "目前还没有参与者提交结构化证据。",
@@ -175,6 +180,7 @@ function ParticipantCard({
   const stance = [...actorEvents].reverse().find((event) => event.kind === "argument" || event.kind === "revision" || event.kind === "final_position");
   const kinds = activity?.contributionKinds ?? (latest ? [latest.kind] : []);
   const stats = eventStats(actorEvents);
+  const lane = activity?.researchLane ? researchLaneDefinition(activity.researchLane) : null;
   const isWorking = activity?.state === "working" && activity.round === phase?.round && activity.phase === phase.phase;
   const status = isWorking
     ? workingText(phase?.phase ?? "sealed", locale)
@@ -194,6 +200,17 @@ function ParticipantCard({
         </div>
         <i className="live-participant-state-dot" aria-hidden="true" />
       </div>
+
+      {lane ? (
+        <div className="live-participant-lane" data-research-lane={lane.id}>
+          <span>{lane.icon}</span>
+          <div>
+            <small>{copy.researchFocus}</small>
+            <strong>{locale === "zh-CN" ? lane.zhCN.label : lane.en.label}</strong>
+          </div>
+          <i>{copy.equalLane}</i>
+        </div>
+      ) : null}
 
       <div className="live-participant-action">
         {kinds.length ? kinds.slice(0, 3).map((kind) => (

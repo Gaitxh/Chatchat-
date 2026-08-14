@@ -50,6 +50,6 @@ function installProposalModeCapability(): void {
     options: CouncilRunOptions = {},
   ) {
     const mode = options.mode ?? currentMode;
-    return originalRun.call(this, question, applyConsultationModePolicy(mode, options));
+    return originalRun.call(this, question, applyConsultationModePolicy(mode, options, this.participants));
   }) as typeof originalRun;
 }
