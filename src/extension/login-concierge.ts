@@ -154,9 +154,16 @@ async function inspectPage(participant: ParticipantRecord, currentUrl: string): 
 
 function decorateLoginState(row: HTMLElement, providerName: string) {
   row.classList.add("connection-needs-login");
-  if (row.querySelector(".login-concierge-note")) return;
-
   const locale: Locale = document.documentElement.lang.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
+  const openButton = row.querySelector<HTMLButtonElement>(".participant-row-actions button:first-child");
+  if (openButton) {
+    if (!openButton.dataset.conciergeOriginalLabel) {
+      openButton.dataset.conciergeOriginalLabel = openButton.textContent?.trim() || "Open";
+    }
+    openButton.textContent = locale === "zh-CN" ? "去登录" : "Sign in";
+  }
+
+  if (row.querySelector(".login-concierge-note")) return;
   const note = document.createElement("div");
   note.className = "login-concierge-note";
   const strong = document.createElement("strong");
@@ -175,4 +182,9 @@ function decorateLoginState(row: HTMLElement, providerName: string) {
 function clearLoginState(row: HTMLElement) {
   row.classList.remove("connection-needs-login");
   row.querySelector(".login-concierge-note")?.remove();
+  const openButton = row.querySelector<HTMLButtonElement>(".participant-row-actions button:first-child");
+  if (openButton?.dataset.conciergeOriginalLabel) {
+    openButton.textContent = openButton.dataset.conciergeOriginalLabel;
+    delete openButton.dataset.conciergeOriginalLabel;
+  }
 }
