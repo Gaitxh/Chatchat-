@@ -45,6 +45,9 @@ const sidePanelHtml = fs.readFileSync("extension/sidepanel.html", "utf8");
 const appHtml = fs.readFileSync("app/app.html", "utf8");
 const loginConcierge = fs.readFileSync("src/extension/login-concierge.ts", "utf8");
 const loginState = fs.readFileSync("src/extension/login-state.ts", "utf8");
+const pageInspection = fs.readFileSync("src/extension/provider-page-inspection.ts", "utf8");
+const selfHealing = fs.readFileSync("src/extension/provider-self-healing.ts", "utf8");
+const recovery = fs.readFileSync("src/extension/provider-recovery.ts", "utf8");
 const gateBProofUi = fs.readFileSync("src/extension/gate-b-proof-ui.ts", "utf8");
 const gateBObserver = fs.readFileSync("src/extension/gate-b-observer.ts", "utf8");
 const proofPack = fs.readFileSync("src/validation/proof-pack.ts", "utf8");
@@ -116,13 +119,16 @@ for (const surface of [appHtml, sidePanelHtml]) {
   if (!surface.includes("/src/extension/login-concierge.ts")) {
     throw new Error("Every browser consultation surface must mount the Login Concierge.");
   }
+  if (!surface.includes("/src/extension/provider-self-healing.ts")) {
+    throw new Error("Every browser consultation surface must mount bounded Provider self-healing.");
+  }
   if (!surface.includes("/src/extension/gate-b-proof-ui.ts")) {
     throw new Error("Every browser consultation surface must mount the Real Provider Proof observer/UI.");
   }
 }
 
 for (const required of [
-  "classifyLoginState",
+  "inspectProviderPage",
   "connection-needs-login",
   "No retry needed",
   "不用回来点重试",
@@ -135,6 +141,18 @@ for (const required of [
 }
 
 for (const required of [
+  "classifyLoginState",
+  "passwordInputs",
+  "loginControls",
+  "composerCandidates",
+  "No prompt text, model response",
+]) {
+  if (!pageInspection.includes(required)) {
+    throw new Error(`Shared Provider page inspection contract is missing: ${required}`);
+  }
+}
+
+for (const required of [
   "needs_login",
   "passwordInputs",
   "loginControls",
@@ -142,6 +160,33 @@ for (const required of [
 ]) {
   if (!loginState.includes(required)) {
     throw new Error(`Login-state classifier contract is missing: ${required}`);
+  }
+}
+
+for (const required of [
+  "fresh_session_rediscovery",
+  "createdByChatChat",
+  "onExpectedOrigin",
+  "freshSessionAlreadyTried",
+  "wait_for_login",
+  "advanced_repair",
+]) {
+  if (!recovery.includes(required)) {
+    throw new Error(`Provider recovery ladder contract is missing: ${required}`);
+  }
+}
+
+for (const required of [
+  "inspectProviderPage",
+  "createdByChatChat",
+  'step !== "fresh_session_rediscovery"',
+  "chrome.tabs.update(participant.tabId, { url: participant.startUrl })",
+  "connection-self-healing",
+  "你不需要操作",
+  "No action needed",
+]) {
+  if (!selfHealing.includes(required)) {
+    throw new Error(`Bounded Provider self-healing contract is missing: ${required}`);
   }
 }
 
@@ -191,7 +236,8 @@ console.log("✓ ChatChat primary browser product language is equal-participant 
 console.log("✓ ChatChat Web Room defaults to zero-config automatic setup");
 console.log("✓ ChatChat novice onboarding hides internal setup jargon");
 console.log("✓ ChatChat toolbar opens the Full Room directly");
-console.log("✓ ChatChat treats provider login as an automatic-resume state, not configuration failure");
+console.log("✓ ChatChat Login Concierge and recovery share privacy-safe Provider page inspection");
+console.log("✓ ChatChat Provider self-healing is bounded to one safe ChatChat-owned fresh-session recovery");
 console.log("✓ ChatChat Real Provider Proof observes the current Browser Consultation and rejects synthetic live evidence");
 
 function extractVisibleCopy(sourceText) {
