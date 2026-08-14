@@ -1,7 +1,10 @@
 import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { CouncilEvent, CouncilReport } from "../core/types.js";
-import type { ConsultationReceiptExecutionIntegrity } from "../consultation/receipt-integrity.js";
+import {
+  legacyConsultationReceiptExecutionIntegrity,
+  type ConsultationReceiptExecutionIntegrity,
+} from "../consultation/receipt-integrity.js";
 import {
   EVIDENCE_VERIFICATIONS_STORAGE_KEY,
   type EvidenceVerificationSnapshot,
@@ -81,7 +84,7 @@ function ConsultationReceiptPortal() {
         if (!archiveModeRef.current || openSessionRef.current !== archive.sessionId) return;
         setVerifications(evidenceArchive?.verifications ?? {});
         if (!auditArchive) {
-          setExecutionIntegrity(undefined);
+          setExecutionIntegrity(legacyConsultationReceiptExecutionIntegrity());
           return;
         }
         const attendance = buildProviderAttendanceAudit(
