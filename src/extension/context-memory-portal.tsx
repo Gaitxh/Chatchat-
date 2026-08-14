@@ -9,6 +9,10 @@ import {
   cloneProviderExecutionAudit,
   type ProviderExecutionAuditEvent,
 } from "../provider-sdk/execution-audit.js";
+import {
+  deriveProviderContextMemory,
+  type ProviderContextMemoryTurn,
+} from "../theater/context-memory.js";
 import "./context-memory-portal.css";
 
 const LIVE_EVENT = "chatchat:consultation-live";
@@ -28,18 +32,6 @@ interface MemoryView {
   sessionId: string;
   archive: boolean;
   events: ProviderExecutionAuditEvent[];
-}
-
-interface MemoryTurn {
-  key: string;
-  actorId: string;
-  actorName: string;
-  phase: ProviderExecutionAuditEvent["phase"];
-  round: number;
-  snapshotEventIds: string[];
-  pinnedOpenIssueEventIds?: string[];
-  latestRoundEventIds?: string[];
-  observedAt: string;
 }
 
 function ContextMemoryPortal() {
@@ -105,29 +97,27 @@ function ContextMemoryPortal() {
     return () => observer.disconnect();
   }, []);
 
-  const turns = useMemo(() => deriveMemoryTurns(view?.events ?? []), [view?.events]);
+  const model = useMemo(() => deriveProviderContextMemory(view?.events ?? []), [view?.events]);
   useEffect(() => {
     const root = document.getElementById("context-memory-root");
-    if (!root || !turns.length) return;
+    if (!root || !model.turns.length) return;
     const execution = document.getElementById("execution-provenance-root");
-    if (execution?.parentElement) {
-      execution.insertAdjacentElement("afterend", root);
-    }
-  }, [turns.length]);
+    if (execution?.parentElement) execution.insertAdjacentElement("afterend", root);
+  }, [model.turns.length]);
 
-  if (!view || !turns.length) return null;
+  if (!view || !model.turns.length) return null;
   const zh = locale === "zh-CN";
-  const pinnedTurns = turns.filter((turn) => (turn.pinnedOpenIssueEventIds?.length ?? 0) > 0);
-  const legacyTurns = turns.filter((turn) => turn.pinnedOpenIssueEventIds === undefined || turn.latestRoundEventIds === undefined);
-  const visible = [...turns].sort((a, b) => b.round - a.round || b.observedAt.localeCompare(a.observedAt)).slice(0, 12);
+  const visible = [...model.turns]
+    .sort((a, b) => b.round - a.round || b.observedAt.localeCompare(a.observedAt))
+    .slice(0, 12);
 
   return (
     <section
       className={`context-memory-audit ${view.archive ? "is-archive" : "is-live"}`}
       data-context-memory-audit="visible"
       data-context-memory-session={view.sessionId}
-      data-context-memory-pinned-turns={pinnedTurns.length}
-      data-context-memory-legacy-turns={legacyTurns.length}
+      data-context-memory-pinned-turns={model.pinnedTurnCount}
+      data-context-memory-legacy-turns={model.legacyTurnCount}
     >
       <header>
         <div>
@@ -138,52 +128,15 @@ function ContextMemoryPortal() {
             : "Provider context keeps a fixed event budget. The newest public round is protected first; only older structurally unresolved events that would fall out of the window are pinned back. Pinning changes memory coverage, not authority."}</p>
         </div>
         <div className="context-memory-summary">
-          <b>{turns.length}<small>{zh ? "轮审计" : "turns"}</small></b>
-          <b>{pinnedTurns.length}<small>{zh ? "发生 pin" : "pinned"}</small></b>
+          <b>{model.turns.length}<small>{zh ? "轮审计" : "turns"}</small></b>
+          <b>{model.pinnedTurnCount}<small>{zh ? "发生 pin" : "pinned"}</small></b>
         </div>
       </header>
 
       {view.archive ? <div className="context-memory-archive">↺ {zh ? "历史收据：只读取闭会时冻结的 execution audit，不重新调用 Provider。" : "Historical receipt: frozen execution audit only; no Provider calls."}</div> : null}
 
       <div className="context-memory-turns">
-        {visible.map((turn) => {
-          const pinned = turn.pinnedOpenIssueEventIds;
-          const latest = turn.latestRoundEventIds;
-          const legacy = pinned === undefined || latest === undefined;
-          return (
-            <article
-              key={turn.key}
-              className={`context-memory-turn ${pinned?.length ? "has-pins" : ""} ${legacy ? "is-legacy" : ""}`}
-              data-context-memory-turn={turn.key}
-              data-context-memory-round={turn.round}
-              data-context-memory-snapshot-count={turn.snapshotEventIds.length}
-              {...(pinned ? { "data-context-memory-pinned-count": pinned.length } : {})}
-              {...(latest ? { "data-context-memory-latest-count": latest.length } : {})}
-            >
-              <div className="context-memory-turn__head">
-                <strong>{turn.actorName}</strong>
-                <span>{turn.phase.toUpperCase()} · R{turn.round}</span>
-              </div>
-              <div className="context-memory-turn__metrics">
-                <span><b>{turn.snapshotEventIds.length}</b>{zh ? "快照" : "snapshot"}</span>
-                {legacy ? (
-                  <span className="legacy">— {zh ? "旧版选择审计" : "legacy selection audit"}</span>
-                ) : (
-                  <>
-                    <span className={pinned.length ? "pinned" : ""}><b>{pinned.length}</b>{zh ? "旧未决 pin" : "pinned old issues"}</span>
-                    <span><b>{latest.length}</b>{zh ? "最新轮保护" : "latest-round protected"}</span>
-                  </>
-                )}
-              </div>
-              {pinned?.length ? (
-                <div className="context-memory-turn__ids" data-context-memory-pinned-ids="visible">
-                  <span>{zh ? "被恢复的事件 ID" : "RESTORED EVENT IDS"}</span>
-                  {pinned.slice(0, 6).map((eventId) => <code key={eventId}>{eventId}</code>)}
-                </div>
-              ) : null}
-            </article>
-          );
-        })}
+        {visible.map((turn) => <MemoryTurnCard key={turn.key} turn={turn} zh={zh} />)}
       </div>
       <footer>{zh
         ? "Pin ≠ 重要性评分 · Pin ≠ 正确性 · Pin ≠ 投票权。它只防止仍未回应的结构化义务被时间窗口遗忘。"
@@ -192,24 +145,41 @@ function ContextMemoryPortal() {
   );
 }
 
-function deriveMemoryTurns(events: readonly ProviderExecutionAuditEvent[]): MemoryTurn[] {
-  const byKey = new Map<string, MemoryTurn>();
-  for (const event of events) {
-    if (event.stage !== "turn_started") continue;
-    const key = `${event.sessionId}|${event.actorId}|${event.phase}|${event.round}`;
-    byKey.set(key, {
-      key,
-      actorId: event.actorId,
-      actorName: event.providerName,
-      phase: event.phase,
-      round: event.round,
-      snapshotEventIds: [...event.snapshotEventIds],
-      ...(event.pinnedOpenIssueEventIds ? { pinnedOpenIssueEventIds: [...event.pinnedOpenIssueEventIds] } : {}),
-      ...(event.latestRoundEventIds ? { latestRoundEventIds: [...event.latestRoundEventIds] } : {}),
-      observedAt: event.observedAt,
-    });
-  }
-  return [...byKey.values()];
+function MemoryTurnCard({ turn, zh }: { turn: ProviderContextMemoryTurn; zh: boolean }) {
+  const pinned = turn.pinnedOpenIssueEventIds;
+  const latest = turn.latestRoundEventIds;
+  return (
+    <article
+      className={`context-memory-turn ${pinned?.length ? "has-pins" : ""} ${turn.legacySelectionAudit ? "is-legacy" : ""}`}
+      data-context-memory-turn={turn.key}
+      data-context-memory-round={turn.round}
+      data-context-memory-snapshot-count={turn.snapshotEventIds.length}
+      {...(pinned ? { "data-context-memory-pinned-count": pinned.length } : {})}
+      {...(latest ? { "data-context-memory-latest-count": latest.length } : {})}
+    >
+      <div className="context-memory-turn__head">
+        <strong>{turn.actorName}</strong>
+        <span>{turn.phase.toUpperCase()} · R{turn.round}</span>
+      </div>
+      <div className="context-memory-turn__metrics">
+        <span><b>{turn.snapshotEventIds.length}</b>{zh ? "快照" : "snapshot"}</span>
+        {turn.legacySelectionAudit ? (
+          <span className="legacy">— {zh ? "旧版选择审计" : "legacy selection audit"}</span>
+        ) : (
+          <>
+            <span className={pinned?.length ? "pinned" : ""}><b>{pinned?.length ?? 0}</b>{zh ? "旧未决 pin" : "pinned old issues"}</span>
+            <span><b>{latest?.length ?? 0}</b>{zh ? "最新轮保护" : "latest-round protected"}</span>
+          </>
+        )}
+      </div>
+      {pinned?.length ? (
+        <div className="context-memory-turn__ids" data-context-memory-pinned-ids="visible">
+          <span>{zh ? "被恢复的事件 ID" : "RESTORED EVENT IDS"}</span>
+          {pinned.slice(0, 6).map((eventId) => <code key={eventId}>{eventId}</code>)}
+        </div>
+      ) : null}
+    </article>
+  );
 }
 
 const root = document.getElementById("context-memory-root");
