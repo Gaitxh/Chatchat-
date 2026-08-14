@@ -4,6 +4,8 @@
 
   const COMPLETE_ATTR = "data-chatchat-live-deliberation-showcase";
   const EXCHANGE_ATTR = "data-chatchat-peer-exchange-showcase";
+  const AGENDA_ATTR = "data-chatchat-agenda-showcase";
+  const OPEN_ISSUES_ATTR = "data-chatchat-open-issues-showcase";
   const SECRETARIAT_ATTR = "data-chatchat-meeting-secretariat-showcase";
   let sawFreshSignalAgenda = false;
   let sawOpenIssue = false;
@@ -19,11 +21,17 @@
 
     const agenda = document.querySelector('[data-phase-reason="fresh_signal_follow_up"]');
     const agendaTrigger = agenda?.querySelector("[data-agenda-trigger-event]");
-    if (agenda && agendaTrigger) sawFreshSignalAgenda = true;
+    if (agenda && agendaTrigger) {
+      sawFreshSignalAgenda = true;
+      markComplete(AGENDA_ATTR);
+    }
 
     const openIssues = document.querySelector(".open-issues-radar.has-open-issues");
     const openIssue = openIssues?.querySelector("[data-open-issue-event]");
-    if (openIssues && openIssue) sawOpenIssue = true;
+    if (openIssues && openIssue) {
+      sawOpenIssue = true;
+      markComplete(OPEN_ISSUES_ATTR);
+    }
 
     const secretariatComplete = sawFreshSignalAgenda && sawOpenIssue;
     if (secretariatComplete) markComplete(SECRETARIAT_ATTR);
