@@ -1,6 +1,11 @@
 import fs from "node:fs";
 
 const execution = fs.readFileSync("src/extension/execution-provenance.tsx", "utf8");
+const attendance = fs.readFileSync("src/theater/provider-attendance.ts", "utf8");
+const agent = fs.readFileSync("src/provider-sdk/consultation-agent.ts", "utf8");
+const prompt = fs.readFileSync("src/provider-sdk/consultation-protocol.ts", "utf8");
+const auditDocEn = fs.readFileSync("docs/PROVIDER_ATTENDANCE_AUDIT.md", "utf8");
+const auditDocZh = fs.readFileSync("docs/PROVIDER_ATTENDANCE_AUDIT.zh-CN.md", "utf8");
 const app = fs.readFileSync("app/app.html", "utf8");
 const sidepanel = fs.readFileSync("extension/sidepanel.html", "utf8");
 const panel = fs.readFileSync("src/extension/consultation-panel.tsx", "utf8");
@@ -27,6 +32,9 @@ for (const claim of [
   'Synthetic showcase only supports its fixed demo proposal',
   'textarea.readOnly = true',
   'data-provider-receipt',
+  'data-provider-attendance-audit',
+  'data-attendance-snapshot-count',
+  'data-attendance-published-count',
   'RUN_SPEECH',
 ]) {
   assert(execution.includes(claim), `Execution boundary is missing: ${claim}`);
@@ -50,6 +58,54 @@ for (const claim of [
   assert(panel.includes(claim), `Live provider transport path disappeared: ${claim}`);
 }
 
+// A provider turn must carry an explicit session/snapshot identity in the exact
+// prompt that is sent to the page. The audit must then distinguish parse,
+// repair, fallback and Blackboard publication instead of treating page I/O as
+// proof that a model contribution entered the meeting.
+for (const claim of [
+  'SESSION_ID:',
+  'PUBLIC_SNAPSHOT_EVENT_IDS_JSON:',
+  'CONSULTATION_EVENTS_JSON:',
+]) {
+  assert(prompt.includes(claim), `Provider prompt audit identity disappeared: ${claim}`);
+}
+for (const claim of [
+  'turn_started',
+  'structured_parsed',
+  'repair_requested',
+  'structured_failed',
+  'fallback_emitted',
+  'BROWSER_PROVIDER_EXECUTION_AUDIT',
+]) {
+  assert(agent.includes(claim), `BrowserConsultationAgent audit stage disappeared: ${claim}`);
+}
+for (const claim of [
+  'response_captured',
+  'structured_parsed',
+  'published',
+  'repaired',
+  'fallback',
+  'publishedEventIds',
+  'snapshotEventIds',
+]) {
+  assert(attendance.includes(claim), `Attendance audit model is missing: ${claim}`);
+}
+
+for (const [label, doc] of [["English", auditDocEn], ["Chinese", auditDocZh]]) {
+  for (const claim of [
+    'PUBLIC_SNAPSHOT_EVENT_IDS_JSON',
+    'Blackboard',
+    'FALLBACK',
+    'DEMO · SYNTHETIC',
+  ]) {
+    assert(doc.includes(claim), `${label} attendance audit documentation is missing: ${claim}`);
+  }
+}
+assert(auditDocEn.includes('does **not** expose or infer hidden model chain-of-thought'), "English audit docs must preserve the hidden-reasoning boundary.");
+assert(auditDocZh.includes('不展示、也不推断模型隐藏的思维链'), "Chinese audit docs must preserve the hidden-reasoning boundary.");
+assert(auditDocEn.includes('live, in-memory execution view'), "Docs must disclose that execution audit persistence is not implemented yet.");
+assert(auditDocZh.includes('运行中的内存审计视图'), "Chinese docs must disclose that execution audit persistence is not implemented yet.");
+
 // The showcase is known to be synthetic and deterministic. Keeping these
 // assertions makes that fact explicit instead of allowing CI fixture speech to
 // silently masquerade as third-party model inference.
@@ -65,16 +121,21 @@ for (const claim of [
 
 for (const claim of [
   'data-chatchat-execution-boundary-showcase',
+  'data-chatchat-provider-attendance-showcase',
   'data-execution-mode="synthetic-showcase"',
   'data-synthetic-showcase-warning="visible"',
   'data-synthetic-proposal-locked="true"',
   'data-provider-receipt="received"',
+  'data-provider-attendance-audit="active"',
+  'data-attendance-turn-state="published"',
+  'data-attendance-snapshot-count',
   'sawHonestSyntheticBoundary',
+  'sawVerifiedAttendance',
 ]) {
-  assert(liveGuard.includes(claim), `Real Chromium showcase proof does not enforce the synthetic/live boundary: ${claim}`);
+  assert(liveGuard.includes(claim), `Real Chromium showcase proof does not enforce execution attendance: ${claim}`);
 }
 
-console.log("✓ synthetic showcase and live provider execution are visibly and mechanically separated");
+console.log("✓ synthetic/live execution boundary, per-seat attendance audit, and docs are mechanically enforced");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`Execution boundary check failed: ${message}`);

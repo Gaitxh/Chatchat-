@@ -4,6 +4,11 @@ import type {
   CouncilContribution,
 } from "../core/types.js";
 import { attachExplicitPeerReplies } from "../consultation/reply-provenance.js";
+import {
+  BROWSER_PROVIDER_EXECUTION_AUDIT,
+  providerAuditBase,
+  type ProviderExecutionAuditSink,
+} from "./execution-audit.js";
 import { buildModeAwareProviderConsultationPrompt } from "./consultation-mode-prompt.js";
 import {
   parseProviderConsultationResponse,
@@ -38,6 +43,7 @@ export class BrowserConsultationAgent implements CouncilAgent {
   readonly #recipe: AdapterRecipe;
   readonly #transport: ProviderConsultationTransport;
   readonly #prepareSession: ProviderConsultationSessionPreparer;
+  readonly #audit: ProviderExecutionAuditSink;
   #preparedSessionId: string | null = null;
 
   constructor(
@@ -45,6 +51,7 @@ export class BrowserConsultationAgent implements CouncilAgent {
     recipe: AdapterRecipe,
     transport: ProviderConsultationTransport,
     prepareSession: ProviderConsultationSessionPreparer = NOOP_PREPARE,
+    audit: ProviderExecutionAuditSink = BROWSER_PROVIDER_EXECUTION_AUDIT,
   ) {
     if (!adapterRecipeComplete(recipe)) {
       throw new Error("A real consultation participant requires a complete 3/3 Adapter Recipe.");
@@ -53,6 +60,7 @@ export class BrowserConsultationAgent implements CouncilAgent {
     this.#recipe = recipe;
     this.#transport = transport;
     this.#prepareSession = prepareSession;
+    this.#audit = audit;
     this.participant = {
       id: profile.profileId,
       name: profile.displayName,
@@ -62,6 +70,9 @@ export class BrowserConsultationAgent implements CouncilAgent {
   }
 
   async respond(context: CouncilContext): Promise<readonly CouncilContribution[]> {
+    const base = providerAuditBase(this.#profile, context);
+    await this.#audit({ ...base, stage: "turn_started", observedAt: new Date().toISOString() });
+
     try {
       if (
         !context.sessionId.startsWith("extension-consultation-gate:") &&
@@ -69,15 +80,25 @@ export class BrowserConsultationAgent implements CouncilAgent {
       ) {
         await this.#prepareSession(this.#profile, this.#recipe);
         this.#preparedSessionId = context.sessionId;
+        await this.#audit({ ...base, stage: "session_prepared", observedAt: new Date().toISOString() });
       }
       return await runConsultationTurn(
         this.#profile,
         this.#recipe,
         context,
         this.#transport,
+        this.#audit,
       );
     } catch (caught) {
-      return fallbackContribution(context, caught);
+      const contribution = fallbackContribution(context, caught);
+      await this.#audit({
+        ...base,
+        stage: "fallback_emitted",
+        contributionKinds: contribution.map((item) => item.kind),
+        error: truncate(errorMessage(caught), 600),
+        observedAt: new Date().toISOString(),
+      });
+      return contribution;
     }
   }
 }
@@ -87,12 +108,29 @@ async function runConsultationTurn(
   recipe: AdapterRecipe,
   context: CouncilContext,
   transport: ProviderConsultationTransport,
+  audit: ProviderExecutionAuditSink,
 ): Promise<readonly CouncilContribution[]> {
+  const base = providerAuditBase(profile, context);
   const prompt = buildProviderConsultationPrompt(context);
   const first = await transport(profile, recipe, prompt);
   try {
-    return parseProviderConsultationTurn(first.responseText, context);
+    const parsed = parseProviderConsultationTurn(first.responseText, context);
+    await audit({
+      ...base,
+      stage: "structured_parsed",
+      attempt: 1,
+      contributionKinds: parsed.map((item) => item.kind),
+      observedAt: new Date().toISOString(),
+    });
+    return parsed;
   } catch (firstError) {
+    await audit({
+      ...base,
+      stage: "repair_requested",
+      attempt: 1,
+      error: truncate(errorMessage(firstError), 600),
+      observedAt: new Date().toISOString(),
+    });
     const repairPrompt = [
       prompt,
       "",
@@ -102,8 +140,23 @@ async function runConsultationTurn(
     ].join("\n");
     const second = await transport(profile, recipe, repairPrompt);
     try {
-      return parseProviderConsultationTurn(second.responseText, context);
+      const repaired = parseProviderConsultationTurn(second.responseText, context);
+      await audit({
+        ...base,
+        stage: "structured_parsed",
+        attempt: 2,
+        contributionKinds: repaired.map((item) => item.kind),
+        observedAt: new Date().toISOString(),
+      });
+      return repaired;
     } catch (secondError) {
+      await audit({
+        ...base,
+        stage: "structured_failed",
+        attempt: 2,
+        error: truncate(errorMessage(secondError), 600),
+        observedAt: new Date().toISOString(),
+      });
       throw new Error(
         `Structured consultation output failed twice. First: ${errorMessage(firstError)} Second: ${errorMessage(secondError)}`,
       );

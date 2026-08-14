@@ -9,10 +9,12 @@
   const OPEN_ISSUES_ATTR = "data-chatchat-open-issues-showcase";
   const SECRETARIAT_ATTR = "data-chatchat-meeting-secretariat-showcase";
   const EXECUTION_BOUNDARY_ATTR = "data-chatchat-execution-boundary-showcase";
+  const ATTENDANCE_ATTR = "data-chatchat-provider-attendance-showcase";
   let sawFreshSignalAgenda = false;
   let sawOpenIssue = false;
   let sawStrongPersuasion = false;
   let sawHonestSyntheticBoundary = false;
+  let sawVerifiedAttendance = false;
 
   function markComplete(attribute) {
     if (document.documentElement.getAttribute(attribute) === "complete") return;
@@ -20,9 +22,9 @@
   }
 
   function inspect() {
-    // Agenda, Open Issues and persuasion are transient live UI. Observe them
-    // before unrelated surface requirements so a genuine render is retained
-    // even when another React subtree commits one tick later.
+    // Agenda, Open Issues, persuasion and attendance are transient live UI.
+    // Observe them before unrelated surface requirements so a genuine render
+    // is retained even when another React subtree commits one tick later.
     const agenda = document.querySelector('[data-phase-reason="fresh_signal_follow_up"]');
     const agendaTrigger = agenda?.querySelector("[data-agenda-trigger-event]");
     if (agenda && agendaTrigger) {
@@ -52,6 +54,18 @@
     if (execution && warning && lockedProposal && syntheticReceipt) {
       sawHonestSyntheticBoundary = true;
       markComplete(EXECUTION_BOUNDARY_ATTR);
+    }
+
+    const attendance = document.querySelector('[data-provider-attendance-audit="active"]');
+    const verifiedTurn = attendance?.querySelector(
+      '[data-attendance-turn-state="published"], [data-attendance-turn-state="repaired"]',
+    );
+    const peerSnapshotTurn = attendance?.querySelector(
+      '[data-attendance-snapshot-count]:not([data-attendance-snapshot-count="0"])[data-attendance-published-count]:not([data-attendance-published-count="0"])',
+    );
+    if (attendance && verifiedTurn && peerSnapshotTurn) {
+      sawVerifiedAttendance = true;
+      markComplete(ATTENDANCE_ATTR);
     }
 
     const secretariatComplete = sawFreshSignalAgenda && sawOpenIssue;
@@ -93,6 +107,7 @@
       && secretariatComplete
       && sawStrongPersuasion
       && sawHonestSyntheticBoundary
+      && sawVerifiedAttendance
       && researchDesk
       && researchLane
       && researchEvidenceCount

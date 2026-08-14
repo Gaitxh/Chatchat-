@@ -38,6 +38,7 @@ export function buildProviderConsultationPrompt(context: CouncilContext): string
   const publicEvents = context.publicEvents.slice(-MAX_CONTEXT_EVENTS).map(compactEvent);
   const ownEvents = context.ownEvents.slice(-8).map(compactEvent);
   const toolFacts = (context.toolFacts ?? []).slice(-MAX_TOOL_FACTS).map(compactToolFact);
+  const snapshotEventIds = publicEvents.map((event) => event.id);
 
   const prompt = [
     "You are an independent and equal participant in ChatChat, a multi-AI consultation conference.",
@@ -49,9 +50,11 @@ export function buildProviderConsultationPrompt(context: CouncilContext): string
     "When another participant or new evidence changes your view, use revision/concede explicitly. When support is insufficient, use uncertain instead of inventing facts.",
     "Use short, stable stance labels so positions can be compared without erasing nuance from the explanation.",
     "",
+    `SESSION_ID: ${context.sessionId}`,
     `PHASE: ${context.phase}`,
     `ROUND: ${context.round}`,
     `YOUR_ACTOR_ID: ${context.participant.id}`,
+    `PUBLIC_SNAPSHOT_EVENT_IDS_JSON: ${JSON.stringify(snapshotEventIds)}`,
     `ALLOWED_KINDS: ${allowedKinds}`,
     `USER_PROPOSAL_JSON: ${JSON.stringify(context.question)}`,
     `CONSULTATION_EVENTS_JSON: ${JSON.stringify(publicEvents)}`,
