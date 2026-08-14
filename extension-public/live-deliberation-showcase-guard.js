@@ -8,9 +8,11 @@
   const AGENDA_ATTR = "data-chatchat-agenda-showcase";
   const OPEN_ISSUES_ATTR = "data-chatchat-open-issues-showcase";
   const SECRETARIAT_ATTR = "data-chatchat-meeting-secretariat-showcase";
+  const EXECUTION_BOUNDARY_ATTR = "data-chatchat-execution-boundary-showcase";
   let sawFreshSignalAgenda = false;
   let sawOpenIssue = false;
   let sawStrongPersuasion = false;
+  let sawHonestSyntheticBoundary = false;
 
   function markComplete(attribute) {
     if (document.documentElement.getAttribute(attribute) === "complete") return;
@@ -41,6 +43,15 @@
     if (persuasion) {
       sawStrongPersuasion = true;
       markComplete(PERSUASION_ATTR);
+    }
+
+    const execution = document.querySelector('[data-execution-mode="synthetic-showcase"]');
+    const warning = execution?.querySelector('[data-synthetic-showcase-warning="visible"]');
+    const lockedProposal = document.querySelector('textarea[data-synthetic-proposal-locked="true"]');
+    const syntheticReceipt = execution?.querySelector('[data-provider-receipt="received"]');
+    if (execution && warning && lockedProposal && syntheticReceipt) {
+      sawHonestSyntheticBoundary = true;
+      markComplete(EXECUTION_BOUNDARY_ATTR);
     }
 
     const secretariatComplete = sawFreshSignalAgenda && sawOpenIssue;
@@ -81,6 +92,7 @@
       && peerLifecycleComplete
       && secretariatComplete
       && sawStrongPersuasion
+      && sawHonestSyntheticBoundary
       && researchDesk
       && researchLane
       && researchEvidenceCount
