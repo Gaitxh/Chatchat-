@@ -4,12 +4,9 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: write
-
 jobs:
   migrate:
-    name: Switch production workflows to npm ci
+    name: Generate locked workflow candidates
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -44,18 +41,18 @@ jobs:
             .github/workflows/login-concierge-ui.yml \
             .github/workflows/real-provider-proof-ui.yml
 
-      - name: Commit migration to PR branch
+      - name: Stage generated workflow candidates
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            .github/workflows/ci.yml \
-            .github/workflows/zero-config-ui.yml \
-            .github/workflows/login-concierge-ui.yml \
-            .github/workflows/real-provider-proof-ui.yml
-          if git diff --cached --quiet; then
-            echo "production workflows already use npm ci"
-          else
-            git commit -m "Use locked dependency installs in CI"
-            git push origin "HEAD:${GITHUB_HEAD_REF}"
-          fi
+          mkdir -p workflow-candidates
+          cp .github/workflows/ci.yml workflow-candidates/ci.yml
+          cp .github/workflows/zero-config-ui.yml workflow-candidates/zero-config-ui.yml
+          cp .github/workflows/login-concierge-ui.yml workflow-candidates/login-concierge-ui.yml
+          cp .github/workflows/real-provider-proof-ui.yml workflow-candidates/real-provider-proof-ui.yml
+
+      - name: Upload generated workflow candidates
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-npm-ci-workflows
+          path: workflow-candidates/*.yml
+          if-no-files-found: error
+          retention-days: 2
