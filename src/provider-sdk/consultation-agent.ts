@@ -5,7 +5,7 @@ import type {
 } from "../core/types.js";
 import { attachExplicitPeerReplies } from "../consultation/reply-provenance.js";
 import {
-  NOOP_PROVIDER_EXECUTION_AUDIT,
+  BROWSER_PROVIDER_EXECUTION_AUDIT,
   providerAuditBase,
   type ProviderExecutionAuditSink,
 } from "./execution-audit.js";
@@ -51,7 +51,7 @@ export class BrowserConsultationAgent implements CouncilAgent {
     recipe: AdapterRecipe,
     transport: ProviderConsultationTransport,
     prepareSession: ProviderConsultationSessionPreparer = NOOP_PREPARE,
-    audit: ProviderExecutionAuditSink = NOOP_PROVIDER_EXECUTION_AUDIT,
+    audit: ProviderExecutionAuditSink = BROWSER_PROVIDER_EXECUTION_AUDIT,
   ) {
     if (!adapterRecipeComplete(recipe)) {
       throw new Error("A real consultation participant requires a complete 3/3 Adapter Recipe.");
