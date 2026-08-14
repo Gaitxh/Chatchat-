@@ -1,4 +1,5 @@
 import {
+  advanceProviderRecoveryAttempt,
   classifyProviderConnectionFailure,
   planProviderRecovery,
 } from "../src/extension/provider-recovery.js";
@@ -18,5 +19,23 @@ assert(planProviderRecovery({ failureKind: "composer_missing", createdByChatChat
 assert(planProviderRecovery({ failureKind: "off_provider", createdByChatChat: true, onExpectedOrigin: false, loginRequired: false, freshSessionAlreadyTried: false }) === "advanced_repair", "off-origin tabs must fail closed");
 assert(planProviderRecovery({ failureKind: "unknown", createdByChatChat: true, onExpectedOrigin: true, loginRequired: true, freshSessionAlreadyTried: false }) === "wait_for_login", "Provider login must be owned by Login Concierge, not fresh-session recovery");
 assert(planProviderRecovery({ failureKind: "response_timeout", createdByChatChat: true, onExpectedOrigin: true, loginRequired: false, freshSessionAlreadyTried: true }) === "advanced_repair", "fresh-session recovery must be bounded to one attempt");
+
+const initialReset = advanceProviderRecoveryAttempt({ phase: "resetting", connectionState: "failed" });
+assert(initialReset.phase === "resetting" && initialReset.visible, "the one-shot reset should be visibly self-healing while waiting for auto-resume");
+
+const reconnecting = advanceProviderRecoveryAttempt({ phase: "resetting", connectionState: "connecting" });
+assert(reconnecting.phase === "reconnecting" && reconnecting.visible, "the existing automatic connector should keep the self-healing state visible while reconnecting");
+
+const exhausted = advanceProviderRecoveryAttempt({ phase: "reconnecting", connectionState: "failed" });
+assert(exhausted.phase === "exhausted" && !exhausted.visible, "a failed post-reset reconnect must stop claiming that self-healing is still running");
+
+const stickyExhausted = advanceProviderRecoveryAttempt({ phase: "exhausted", connectionState: "connecting" });
+assert(stickyExhausted.phase === "exhausted" && !stickyExhausted.visible, "later manual/login retries must not be relabeled as self-healing or authorize another reset");
+
+const resetTimeout = advanceProviderRecoveryAttempt({ phase: "resetting", connectionState: "failed", resetWaitExpired: true });
+assert(resetTimeout.phase === "exhausted" && !resetTimeout.visible, "a reset that never reaches the automatic connector must stop showing an endless healing state");
+
+const recovered = advanceProviderRecoveryAttempt({ phase: "reconnecting", connectionState: "ready" });
+assert(recovered.phase === null && !recovered.visible, "READY should retire the recovery attempt completely");
 
 console.log("✓ ChatChat Provider self-healing recovery ladder tests passed");
