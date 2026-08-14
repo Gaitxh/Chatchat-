@@ -73,8 +73,12 @@ function ProposalModePortal() {
   async function choose(next: CouncilConsultationMode, nextSource: ProposalModeSelectionDetail["source"]) {
     setMode(next);
     setSource(nextSource);
-    await chrome.storage.local.set({ [PROPOSAL_MODE_STORAGE_KEY]: next });
     announceProposalMode(next, nextSource);
+    try {
+      await chrome.storage.local.set({ [PROPOSAL_MODE_STORAGE_KEY]: next });
+    } catch {
+      // The visible selection still governs the current in-memory consultation.
+    }
   }
 
   const definition = useMemo(() => consultationModeDefinition(mode), [mode]);
