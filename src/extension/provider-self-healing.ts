@@ -1,7 +1,9 @@
 import { inspectProviderPage } from "./provider-page-inspection.js";
 import {
+  advanceProviderRecoveryAttempt,
   classifyProviderConnectionFailure,
   planProviderRecovery,
+  type ProviderRecoveryAttemptPhase,
 } from "./provider-recovery.js";
 
 declare const chrome: any;
@@ -9,6 +11,7 @@ declare const chrome: any;
 const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
 const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
 const RECOVERY_KEY = "chatchat.provider-self-healing.v1";
+const RESET_WAIT_MS = 15_000;
 const MARKER = "__chatchatProviderSelfHealingV1";
 
 type MarkedWindow = Window & { [MARKER]?: true };
@@ -34,6 +37,7 @@ interface RecoveryRecord {
   startedAt: string;
   failureKind: string;
   startUrl: string;
+  phase: ProviderRecoveryAttemptPhase;
 }
 
 install();
@@ -48,7 +52,12 @@ function install() {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["class", "lang"],
+    attributeFilter: ["class"],
+  });
+  const localeObserver = new MutationObserver(queueRefresh);
+  localeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["lang"],
   });
   chrome.tabs?.onUpdated?.addListener?.(() => queueRefresh());
   chrome.storage?.onChanged?.addListener?.((changes: Record<string, unknown>) => {
@@ -85,14 +94,16 @@ async function refresh() {
     const rows = [...document.querySelectorAll<HTMLElement>(".participant-row")];
     const participantIds = new Set(participants.map((participant) => participant.seatId));
     let recoveryChanged = pruneMissingParticipants(recovery, participantIds);
+    const now = Date.now();
 
     for (let index = 0; index < participants.length; index += 1) {
       const participant = participants[index]!;
       const connection = connections[participant.seatId] ?? {};
       const row = rows[index];
+      const record = recovery[participant.seatId];
 
       if (connection.state === "ready") {
-        if (recovery[participant.seatId]) {
+        if (record) {
           delete recovery[participant.seatId];
           recoveryChanged = true;
         }
@@ -100,14 +111,32 @@ async function refresh() {
         continue;
       }
 
-      if (connection.state !== "failed") {
-        if (recovery[participant.seatId]) decorateRecovering(row, participant.providerName);
+      if (record) {
+        const resetWaitExpired = record.phase === "resetting"
+          && recoveryAgeMs(record, now) >= RESET_WAIT_MS;
+        const attempt = advanceProviderRecoveryAttempt({
+          phase: record.phase,
+          connectionState: connection.state ?? "idle",
+          resetWaitExpired,
+        });
+
+        if (attempt.phase === null) {
+          delete recovery[participant.seatId];
+          recoveryChanged = true;
+          clearRecoveryNote(row);
+          continue;
+        }
+        if (attempt.phase !== record.phase) {
+          recovery[participant.seatId] = { ...record, phase: attempt.phase };
+          recoveryChanged = true;
+        }
+        if (attempt.visible) decorateRecovering(row, participant.providerName);
         else clearRecoveryNote(row);
         continue;
       }
 
-      if (recovery[participant.seatId]) {
-        decorateRecovering(row, participant.providerName);
+      if (connection.state !== "failed") {
+        clearRecoveryNote(row);
         continue;
       }
 
@@ -131,6 +160,7 @@ async function refresh() {
         startedAt: new Date().toISOString(),
         failureKind,
         startUrl: participant.startUrl,
+        phase: "resetting",
       };
       recoveryChanged = true;
       decorateRecovering(row, participant.providerName);
@@ -138,9 +168,15 @@ async function refresh() {
 
       try {
         await chrome.tabs.update(participant.tabId, { url: participant.startUrl });
+        window.setTimeout(queueRefresh, RESET_WAIT_MS + 250);
       } catch {
-        // Keep the recovery record so we do not enter a navigation loop. The
-        // existing Advanced repair path remains available to the user.
+        recovery[participant.seatId] = {
+          ...recovery[participant.seatId]!,
+          phase: "exhausted",
+        };
+        recoveryChanged = true;
+        clearRecoveryNote(row);
+        await store.set({ [RECOVERY_KEY]: recovery });
       }
     }
 
@@ -197,10 +233,22 @@ function clearRecoveryNote(row: HTMLElement | undefined) {
 
 function normalizeRecovery(value: unknown): Record<string, RecoveryRecord> {
   if (!isRecord(value)) return {};
-  return Object.fromEntries(Object.entries(value).filter(([, item]) => {
-    if (!isRecord(item)) return false;
-    return typeof item.seatId === "string" && typeof item.startedAt === "string";
-  })) as Record<string, RecoveryRecord>;
+  const result: Record<string, RecoveryRecord> = {};
+  for (const [seatId, item] of Object.entries(value)) {
+    if (!isRecord(item)) continue;
+    if (typeof item.seatId !== "string" || typeof item.startedAt !== "string") continue;
+    const phase = item.phase === "resetting" || item.phase === "reconnecting" || item.phase === "exhausted"
+      ? item.phase
+      : "exhausted";
+    result[seatId] = {
+      seatId: item.seatId,
+      startedAt: item.startedAt,
+      failureKind: typeof item.failureKind === "string" ? item.failureKind : "unknown",
+      startUrl: typeof item.startUrl === "string" ? item.startUrl : "",
+      phase,
+    };
+  }
+  return result;
 }
 
 function pruneMissingParticipants(
@@ -215,6 +263,11 @@ function pruneMissingParticipants(
     }
   }
   return changed;
+}
+
+function recoveryAgeMs(record: RecoveryRecord, now: number): number {
+  const startedAt = Date.parse(record.startedAt);
+  return Number.isFinite(startedAt) ? Math.max(0, now - startedAt) : Number.POSITIVE_INFINITY;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
