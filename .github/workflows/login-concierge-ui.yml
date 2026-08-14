@@ -28,6 +28,15 @@ jobs:
           npm install
           npm run build:extension
 
+      - name: Enforce runtime-driven automatic resume
+        run: |
+          grep -q 'chatchat:connection-retry-requested' extension-public/auto-resume-login.js
+          grep -q 'CONNECTION_RETRY_REQUESTED_EVENT' src/extension/consultation-panel.tsx
+          grep -q 'requestConnectionRetry' src/extension/web-room-onboarding.tsx
+          ! grep -q 'setup-participant .verify-button' extension-public/auto-resume-login.js
+          ! grep -q 'querySelector' extension-public/auto-resume-login.js
+          ! grep -q 'retry.click' src/extension/web-room-onboarding.tsx
+
       - name: Install CJK screenshot fonts
         run: |
           sudo apt-get update
