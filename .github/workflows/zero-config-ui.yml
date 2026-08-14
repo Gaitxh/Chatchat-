@@ -28,6 +28,14 @@ jobs:
           npm install
           npm run build:extension
 
+      - name: Protect existing AI conversations
+        run: |
+          grep -q 'automaticTeamLaunchUrl' src/extension/web-room-onboarding.tsx
+          grep -q 'createdByChatChat: true' src/extension/web-room-onboarding.tsx
+          grep -q 'never sends' src/extension/automatic-team.ts
+          ! grep -q 'findReusableAutomaticTeamTab' src/extension/web-room-onboarding.tsx
+          ! grep -q 'findReusableAutomaticTeamTab' src/extension/automatic-team.ts
+
       - name: Install CJK screenshot fonts
         run: |
           sudo apt-get update
@@ -78,7 +86,8 @@ jobs:
           grep -q 'ZERO-CONFIG START' artifacts/chatchat-zero-config-en.html
           grep -q 'Automatic team: ChatGPT · Claude · Gemini' artifacts/chatchat-zero-config-en.html
           grep -q 'Assemble my AI room' artifacts/chatchat-zero-config-en.html
-          grep -q 'reuses AI sites already open' artifacts/chatchat-zero-config-en.html
+          grep -q 'existing conversations stay untouched' artifacts/chatchat-zero-config-en.html
+          grep -q 'Your existing AI conversations stay untouched' artifacts/chatchat-zero-config-en.html
           ! grep -q 'Start automatic setup' artifacts/chatchat-zero-config-en.html
 
       - name: Capture fresh Chinese Full Room
@@ -107,7 +116,8 @@ jobs:
           grep -q '零配置开始' artifacts/chatchat-zero-config-zh.html
           grep -q '自动团队：ChatGPT · Claude · Gemini' artifacts/chatchat-zero-config-zh.html
           grep -q '组建我的 AI 会议室' artifacts/chatchat-zero-config-zh.html
-          grep -q '优先复用浏览器里已经打开的 AI' artifacts/chatchat-zero-config-zh.html
+          grep -q '不会往你原来的聊天里塞握手或协商内容' artifacts/chatchat-zero-config-zh.html
+          grep -q '你原来的 AI 对话不会被改动' artifacts/chatchat-zero-config-zh.html
           ! grep -q '开始自动配置' artifacts/chatchat-zero-config-zh.html
 
       - name: Save preview log
