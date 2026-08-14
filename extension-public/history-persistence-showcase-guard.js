@@ -7,10 +7,7 @@
   const ARCHIVES = "archives";
   const EXECUTION_DB_NAME = "chatchat-provider-execution-history-v1";
   const EXECUTION_STORE = "receipts";
-  // This script runs in <head>, before body roots exist. Full Room declares its
-  // product identity on <html data-surface="web-app">, which is already parsed
-  // here and therefore cannot be confused with the compact Side Panel.
-  const OWNS_HISTORY_UI = document.documentElement.dataset.surface === "web-app";
+  const HAS_HISTORY_UI = document.documentElement.dataset.surface === "web-app";
   let checking = false;
 
   window.addEventListener(HISTORY_UPDATED_EVENT, (event) => {
@@ -63,10 +60,10 @@
 
       document.documentElement.dataset.chatchatExecutionHistoryPersistenceShowcase = "complete";
 
-      // Side Panel intentionally has no Consultation History UI. It still has to
-      // prove exact-session archive + execution receipt durability. Full Room
-      // owns historical replay and therefore carries the stronger UI reopen gate.
-      if (!OWNS_HISTORY_UI) {
+      // Side Panel deliberately has no Consultation History UI. It still proves
+      // that the exact execution receipt was durably stored; replay belongs to
+      // the Full Room surface.
+      if (!HAS_HISTORY_UI) {
         document.documentElement.dataset.chatchatExecutionHistoryReplayShowcase = "not-applicable";
         document.documentElement.dataset.chatchatHistoryPersistenceShowcase = "complete";
         return;
@@ -84,6 +81,16 @@
       if (!historicalTurn) {
         throw new Error("Historical execution receipt did not replay a peer-visible published turn.");
       }
+
+      // Context Memory Audit must independently rehydrate the frozen selection
+      // provenance (including at least one real pin) before the Full Room
+      // history proof can claim completion.
+      await waitForElement(() =>
+        document.documentElement.dataset.chatchatContextMemoryHistoryShowcase === "complete"
+          ? document.documentElement
+          : null,
+      );
+
       document.documentElement.dataset.chatchatExecutionHistoryReplayShowcase = "complete";
       document.documentElement.dataset.chatchatHistoryPersistenceShowcase = "complete";
     } catch {
