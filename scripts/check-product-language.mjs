@@ -42,6 +42,9 @@ const automaticTeam = fs.readFileSync("src/extension/automatic-team.ts", "utf8")
 const webAppCss = fs.readFileSync("src/extension/web-app.css", "utf8");
 const serviceWorker = fs.readFileSync("extension-public/service-worker.js", "utf8");
 const sidePanelHtml = fs.readFileSync("extension/sidepanel.html", "utf8");
+const appHtml = fs.readFileSync("app/app.html", "utf8");
+const loginConcierge = fs.readFileSync("src/extension/login-concierge.ts", "utf8");
+const loginState = fs.readFileSync("src/extension/login-state.ts", "utf8");
 const onboardingCopy = extractVisibleCopy(webOnboarding);
 
 for (const required of [
@@ -106,10 +109,41 @@ if (sidePanelHtml.includes("open-web-room.js")) {
   throw new Error("Side Panel must not be a mandatory trampoline into the Full Room.");
 }
 
+for (const surface of [appHtml, sidePanelHtml]) {
+  if (!surface.includes("/src/extension/login-concierge.ts")) {
+    throw new Error("Every browser consultation surface must mount the Login Concierge.");
+  }
+}
+
+for (const required of [
+  "classifyLoginState",
+  "connection-needs-login",
+  "No retry needed",
+  "不用回来点重试",
+  "Sign in",
+  "去登录",
+]) {
+  if (!loginConcierge.includes(required)) {
+    throw new Error(`Login Concierge contract is missing: ${required}`);
+  }
+}
+
+for (const required of [
+  "needs_login",
+  "passwordInputs",
+  "loginControls",
+  "composerCandidates",
+]) {
+  if (!loginState.includes(required)) {
+    throw new Error(`Login-state classifier contract is missing: ${required}`);
+  }
+}
+
 console.log("✓ ChatChat primary browser product language is equal-participant consultation");
 console.log("✓ ChatChat Web Room defaults to zero-config automatic setup");
 console.log("✓ ChatChat novice onboarding hides internal setup jargon");
 console.log("✓ ChatChat toolbar opens the Full Room directly");
+console.log("✓ ChatChat treats provider login as an automatic-resume state, not configuration failure");
 
 function extractVisibleCopy(sourceText) {
   const start = sourceText.indexOf("const COPY = {");
