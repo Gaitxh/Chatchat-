@@ -1,6 +1,14 @@
-export function stageProposalInExistingComposer(proposal: string): boolean {
+import type { CouncilConsultationMode } from "../core/types.js";
+import { requestProposalMode } from "./proposal-mode-wire.js";
+
+export function stageProposalInExistingComposer(
+  proposal: string,
+  mode?: CouncilConsultationMode,
+): boolean {
   const textarea = document.querySelector<HTMLTextAreaElement>(".proposal-card textarea");
   if (!textarea || !proposal.trim()) return false;
+
+  if (mode) requestProposalMode(mode, "next-move");
 
   const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
   if (setter) setter.call(textarea, proposal);
