@@ -1,0 +1,73 @@
+name: Research Lanes Showcase Migration
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Seed Verify mode and require visible research lanes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('extension-public/consultation-showcase-bootstrap.js')
+          text = path.read_text()
+
+          def replace_once(old, new):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected exactly one match, got {count}: {old[:100]!r}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              '  const LOCALE_KEY = "chatchat.locale.v1";\n',
+              '  const LOCALE_KEY = "chatchat.locale.v1";\n  const PROPOSAL_MODE_STORAGE_KEY = "chatchat.consultation.mode.v1";\n',
+          )
+          replace_once(
+              '''  const memoryLocal = {\n    [RECIPES_KEY]: recipes,\n    [LOCALE_KEY]: locale,\n  };''',
+              '''  const memoryLocal = {\n    [RECIPES_KEY]: recipes,\n    [LOCALE_KEY]: locale,\n    [PROPOSAL_MODE_STORAGE_KEY]: "verify",\n  };''',
+          )
+          replace_once(
+              '''      if (start instanceof HTMLButtonElement && !start.disabled) {\n        start.click();\n        document.documentElement.dataset.chatchatConsultationShowcase = "running";''',
+              '''      if (start instanceof HTMLButtonElement && !start.disabled) {\n        window.dispatchEvent(new CustomEvent("chatchat:proposal-mode-changed", {\n          detail: { mode: "verify", source: "restore" },\n        }));\n        start.click();\n        document.documentElement.dataset.chatchatConsultationShowcase = "running";''',
+          )
+          replace_once(
+              '''          const liveFloor = document.querySelector(".live-participant-floor");\n          const workingSeats = document.querySelectorAll(".live-participant-card.is-working");\n          if (liveFloor && workingSeats.length >= 2) {\n            document.documentElement.dataset.chatchatLiveFloorShowcase = "complete";\n          }''',
+              '''          const liveFloor = document.querySelector(".live-participant-floor");\n          const workingSeats = document.querySelectorAll(".live-participant-card.is-working");\n          const laneNodes = [...document.querySelectorAll(".live-participant-lane[data-research-lane]")];\n          const laneIds = new Set(laneNodes.map((node) => node.dataset.researchLane).filter(Boolean));\n          const expectedLaneLabels = locale === "zh-CN"\n            ? ["主源核验", "最强反例", "实现约束"]\n            : ["Primary sources", "Strongest counterexample", "Implementation constraints"];\n          const laneLabelsVisible = expectedLaneLabels.every((label) =>\n            laneNodes.some((node) => node.textContent?.includes(label)),\n          );\n          if (liveFloor && workingSeats.length >= 2 && laneIds.size >= 3 && laneLabelsVisible) {\n            document.documentElement.dataset.chatchatLiveFloorShowcase = "complete";\n            document.documentElement.dataset.chatchatResearchLanesShowcase = "complete";\n          }''',
+          )
+
+          for required in [
+              'PROPOSAL_MODE_STORAGE_KEY',
+              'chatchatResearchLanesShowcase',
+              'data-research-lane',
+              'Primary sources',
+              '主源核验',
+          ]:
+              if required not in text:
+                  raise SystemExit(f'missing Research Lane showcase contract: {required}')
+          path.write_text(text)
+          PY
+
+      - name: Commit source migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add extension-public/consultation-showcase-bootstrap.js
+          if git diff --cached --quiet; then
+            echo "showcase already migrated"
+          else
+            git commit -m "Show Research Lanes in the live consultation demo"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          fi
