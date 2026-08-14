@@ -21,6 +21,7 @@ const tests = [
   "dist/tests/live-persuasion.test.js",
   "dist/tests/provider-attendance.test.js",
   "dist/tests/execution-audit-history.test.js",
+  "dist/tests/meeting-integrity.test.js",
   "dist/tests/consultation-theater.test.js",
   "dist/tests/live-moments.test.js",
   "dist/tests/discussion-stream.test.js",
