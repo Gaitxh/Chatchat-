@@ -89,6 +89,7 @@ function printAgenda(
       ? "OPEN CONSULTATION"
       : "FINAL POSITIONS";
   console.log(`\n\n🧭 LIVE AGENDA · ${phase} · R${update.round}`);
+  if (update.reason) console.log(`Protocol reason: ${update.reason}`);
   console.log(`Why this phase exists: ${agendaReason(update.reason)}`);
   if (typeof update.alignmentRatio === "number") {
     console.log(`Alignment: ${Math.round(update.alignmentRatio * 100)}% · descriptive only, never authority`);
