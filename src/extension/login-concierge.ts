@@ -1,5 +1,4 @@
 import { classifyLoginState } from "./login-state.js";
-import "./login-concierge.css";
 
 declare const chrome: any;
 
