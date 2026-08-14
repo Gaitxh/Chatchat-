@@ -1,26 +1,32 @@
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import type { CouncilEvent, CouncilParticipant, CouncilPhase } from "../core/types.js";
+import {
+  PROVIDER_EXECUTION_AUDIT_EVENT,
+  type ProviderExecutionAuditEvent,
+} from "../provider-sdk/execution-audit.js";
+import {
+  buildProviderAttendanceAudit,
+  type ProviderAttendanceAuditModel,
+  type ProviderTransportAuditRecord,
+  type ProviderTurnAttendanceAudit,
+} from "../theater/provider-attendance.js";
 import "./execution-provenance.css";
 
 const PROPOSAL_DRAFT_KEY = "chatchat.consultation.proposal-draft.v1";
 const TRANSPORT_EVENT = "chatchat:provider-transport";
+const LIVE_EVENT = "chatchat:consultation-live";
 const SYNTHETIC_SHOWCASE = new URLSearchParams(location.search).get("showcase") === "consultation";
 const browserChrome = (globalThis as typeof globalThis & { chrome?: any }).chrome;
 
 type ReceiptState = "sending" | "received" | "failed";
 type ExecutionMode = "synthetic-showcase" | "live-provider-tabs";
 
-interface TransportReceiptDetail {
+interface TransportReceiptDetail extends ProviderTransportAuditRecord {
   tabId: number;
   state: ReceiptState;
   mode: ExecutionMode;
-  phase: string;
-  round: number;
   promptChars: number;
-  responseChars?: number;
-  elapsedMs?: number;
-  error?: string;
-  observedAt: string;
 }
 
 interface TransportReceipt extends TransportReceiptDetail {
@@ -29,11 +35,21 @@ interface TransportReceipt extends TransportReceiptDetail {
   attempts: number;
 }
 
+interface ConsultationLiveDetail {
+  participants?: CouncilParticipant[];
+  events?: CouncilEvent[];
+}
+
 installTransportObserver();
 
 function ExecutionProvenance() {
-  const [receipts, setReceipts] = useState<Record<number, TransportReceipt>>({});
+  const [receipts, setReceipts] = useState<Record<string, TransportReceipt>>({});
+  const [executionAudit, setExecutionAudit] = useState<ProviderExecutionAuditEvent[]>([]);
+  const [participants, setParticipants] = useState<CouncilParticipant[]>([]);
+  const [publicEvents, setPublicEvents] = useState<CouncilEvent[]>([]);
   const mode: ExecutionMode = SYNTHETIC_SHOWCASE ? "synthetic-showcase" : "live-provider-tabs";
+  const zh = document.documentElement.lang.toLowerCase().startsWith("zh")
+    || new URLSearchParams(location.search).get("lang") !== "en";
 
   useEffect(() => {
     document.documentElement.dataset.chatchatExecutionMode = mode;
@@ -48,29 +64,52 @@ function ExecutionProvenance() {
       if (!detail || typeof detail.tabId !== "number") return;
       void resolveTab(detail.tabId).then((tab) => {
         setReceipts((current) => {
-          const previous = current[detail.tabId];
+          const key = transportKey(detail);
+          const previous = current[key];
           const next: TransportReceipt = {
             ...detail,
             host: tab.host,
             title: tab.title,
             attempts: detail.state === "sending" ? (previous?.attempts ?? 0) + 1 : previous?.attempts ?? 1,
           };
-          return { ...current, [detail.tabId]: next };
+          return trimReceiptRecord({ ...current, [key]: next });
         });
       });
     };
+    const onExecutionAudit = (event: Event) => {
+      const detail = (event as CustomEvent<ProviderExecutionAuditEvent>).detail;
+      if (!detail?.sessionId || !detail.actorId) return;
+      setExecutionAudit((current) => [...current, cloneExecutionAudit(detail)].slice(-500));
+    };
+    const onLive = (event: Event) => {
+      const detail = (event as CustomEvent<ConsultationLiveDetail>).detail;
+      if (Array.isArray(detail?.participants)) setParticipants(detail.participants.map((item) => ({ ...item })));
+      if (Array.isArray(detail?.events)) setPublicEvents(detail.events.map((item) => ({ ...item })));
+    };
     window.addEventListener(TRANSPORT_EVENT, onReceipt);
-    return () => window.removeEventListener(TRANSPORT_EVENT, onReceipt);
+    window.addEventListener(PROVIDER_EXECUTION_AUDIT_EVENT, onExecutionAudit);
+    window.addEventListener(LIVE_EVENT, onLive);
+    return () => {
+      window.removeEventListener(TRANSPORT_EVENT, onReceipt);
+      window.removeEventListener(PROVIDER_EXECUTION_AUDIT_EVENT, onExecutionAudit);
+      window.removeEventListener(LIVE_EVENT, onLive);
+    };
   }, []);
 
+  const transportRecords = useMemo(() => Object.values(receipts), [receipts]);
   const ordered = useMemo(
-    () => Object.values(receipts).sort((a, b) => a.tabId - b.tabId),
-    [receipts],
+    () => [...transportRecords].sort((a, b) => b.observedAt.localeCompare(a.observedAt)).slice(0, 18),
+    [transportRecords],
+  );
+  const attendance = useMemo(
+    () => buildProviderAttendanceAudit(participants, transportRecords, executionAudit, publicEvents),
+    [participants, transportRecords, executionAudit, publicEvents],
   );
 
   return (
     <div className={`execution-provenance mode-${mode}`} data-execution-mode={mode}>
       {SYNTHETIC_SHOWCASE ? <SyntheticBoundaryNotice /> : null}
+      <AttendanceAudit model={attendance} zh={zh} synthetic={SYNTHETIC_SHOWCASE} />
       <section className="execution-receipts" aria-live="polite">
         <header>
           <div>
@@ -78,7 +117,7 @@ function ExecutionProvenance() {
             <strong>{SYNTHETIC_SHOWCASE ? "这里没有调用真实 AI" : "真实标签页传输收据"}</strong>
             <p>{SYNTHETIC_SHOWCASE
               ? "这些收据只记录 CI / Demo 夹具返回。它们不能证明 ChatGPT、Claude、Gemini 或其他真实 Provider 做过推理。"
-              : "这里证明哪一个真实 AI 标签页收到了本轮 Prompt、是否返回了页面响应以及耗时。它不展示也不声称读取模型隐藏思维链。"}</p>
+              : "这里证明哪一个真实 AI 标签页收到了本轮 Prompt、Prompt 中包含哪一个公共事件快照、页面是否返回响应以及耗时。它不展示也不声称读取模型隐藏思维链。"}</p>
           </div>
           <b className={`execution-mode-badge ${SYNTHETIC_SHOWCASE ? "is-demo" : "is-live"}`}>
             {SYNTHETIC_SHOWCASE ? "DEMO · SYNTHETIC" : "LIVE · PROVIDER TABS"}
@@ -87,7 +126,7 @@ function ExecutionProvenance() {
 
         {ordered.length ? (
           <div className="execution-receipt-list">
-            {ordered.map((receipt) => <ReceiptRow key={receipt.tabId} receipt={receipt} />)}
+            {ordered.map((receipt) => <ReceiptRow key={transportKey(receipt)} receipt={receipt} />)}
           </div>
         ) : (
           <div className="execution-receipts-empty">
@@ -97,6 +136,118 @@ function ExecutionProvenance() {
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function AttendanceAudit({
+  model,
+  zh,
+  synthetic,
+}: {
+  model: ProviderAttendanceAuditModel;
+  zh: boolean;
+  synthetic: boolean;
+}) {
+  const hasTurns = model.totalTurns > 0;
+  return (
+    <section
+      className={`provider-attendance-audit ${hasTurns ? "has-turns" : "is-empty"}`}
+      data-provider-attendance-audit={hasTurns ? "active" : "waiting"}
+      data-provider-attendance-session={model.sessionId ?? ""}
+    >
+      <header>
+        <div>
+          <span>{zh ? "会议出席与执行审计" : "PROVIDER ATTENDANCE & EXECUTION AUDIT"}</span>
+          <strong>{zh ? "谁真的来了、看到了什么、最后发布了什么" : "Who actually attended, what they saw, and what reached the Blackboard"}</strong>
+          <p>{zh
+            ? synthetic
+              ? "下面仍然是合成夹具的审计链，用来证明 UI/协议流程；不能把这些席位当成真实第三方模型出席。"
+              : "只有“真实标签页返回 → 结构化解析成功 → 事件进入 Blackboard”的轮次才会标记为已验证。页面响应本身不等于成功参与。"
+            : synthetic
+              ? "This is still a synthetic-fixture audit chain for UI/protocol proof; it is not evidence that third-party models attended."
+              : "A turn is verified only after live tab response → structured parse → Blackboard publication. A page response alone is not successful attendance."}</p>
+        </div>
+        <div className="attendance-summary">
+          <b>{model.verifiedTurns}/{model.totalTurns || 0}</b>
+          <small>{zh ? "已验证轮次" : "verified turns"}</small>
+        </div>
+      </header>
+
+      {hasTurns ? (
+        <>
+          <div className="attendance-metrics">
+            <span>✓ {model.verifiedTurns} {zh ? "发布完成" : "published"}</span>
+            <span>↺ {model.repairedTurns} {zh ? "格式修复" : "repaired"}</span>
+            <span>≈ {model.fallbackTurns} fallback</span>
+            <span>! {model.failedTurns} {zh ? "失败" : "failed"}</span>
+          </div>
+          <div className="attendance-seat-list">
+            {model.seats.filter((seat) => seat.turns.length).map((seat) => (
+              <article
+                className="attendance-seat"
+                key={seat.actorId}
+                data-attendance-seat={seat.actorId}
+                data-attendance-verified-turns={seat.verifiedTurns}
+              >
+                <div className="attendance-seat__heading">
+                  <div><strong>{seat.participantName}</strong><span>{seat.host ?? seat.providerId}</span></div>
+                  <b>{seat.verifiedTurns}/{seat.turns.length}</b>
+                </div>
+                <div className="attendance-turn-list">
+                  {seat.turns.map((turn) => <AttendanceTurn key={turn.key} turn={turn} zh={zh} />)}
+                </div>
+              </article>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="attendance-empty">
+          {zh ? "尚未开始正式协商。开会后这里会逐轮形成不可冒充的执行链。" : "No consultation turn yet. Each seat will build a non-inferred execution chain here once the meeting starts."}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AttendanceTurn({ turn, zh }: { turn: ProviderTurnAttendanceAudit; zh: boolean }) {
+  const label = attendanceStateLabel(turn.state, zh);
+  const verified = turn.state === "published" || turn.state === "repaired";
+  return (
+    <div
+      className={`attendance-turn state-${turn.state}`}
+      data-attendance-turn-state={turn.state}
+      data-attendance-round={turn.round}
+      data-attendance-phase={turn.phase}
+      data-attendance-snapshot-count={turn.snapshotEventIds.length}
+      data-attendance-published-count={turn.publishedEventIds.length}
+    >
+      <div className="attendance-turn__top">
+        <span>{turn.phase.toUpperCase()} · R{turn.round}</span>
+        <b>{verified ? "✓ " : ""}{label}</b>
+      </div>
+      <div className="attendance-turn__chain">
+        <span>{zh ? "快照" : "snapshot"} {turn.snapshotEventIds.length}</span>
+        <i>→</i>
+        <span>{turn.transportReceived ? (zh ? "页面已返回" : "response") : turn.transportFailed ? (zh ? "传输失败" : "failed") : (zh ? "等待响应" : "waiting")}</span>
+        <i>→</i>
+        <span>{turn.contributionKinds.length ? `${zh ? "解析" : "parsed"} ${turn.contributionKinds.length}` : (zh ? "未解析" : "not parsed")}</span>
+        <i>→</i>
+        <span>{zh ? "黑板" : "board"} {turn.publishedEventIds.length}</span>
+      </div>
+      <div className="attendance-turn__meta">
+        {turn.repairRequested ? <em>↺ {zh ? "使用过 repair" : "repair used"}</em> : null}
+        {turn.elapsedMs != null ? <em>{formatDuration(turn.elapsedMs)}</em> : null}
+        {turn.responseChars != null ? <em>{turn.responseChars.toLocaleString()} chars</em> : null}
+      </div>
+      {(turn.snapshotEventIds.length || turn.publishedEventIds.length || turn.error) ? (
+        <details>
+          <summary>{zh ? "查看审计 ID" : "Audit IDs"}</summary>
+          {turn.snapshotEventIds.length ? <p><b>{zh ? "本轮 Prompt 公共快照" : "Prompt public snapshot"}</b>{turn.snapshotEventIds.map((id) => <code key={id}>{id}</code>)}</p> : null}
+          {turn.publishedEventIds.length ? <p><b>{zh ? "本轮发布事件" : "Published events"}</b>{turn.publishedEventIds.map((id) => <code key={id}>{id}</code>)}</p> : null}
+          {turn.error ? <p className="attendance-turn__error">{turn.error}</p> : null}
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -133,6 +284,8 @@ function ReceiptRow({ receipt }: { receipt: TransportReceipt }) {
       data-provider-tab={receipt.tabId}
       data-provider-phase={receipt.phase}
       data-provider-round={receipt.round}
+      data-provider-snapshot-count={receipt.snapshotEventIds.length}
+      data-provider-repair={receipt.repairAttempt ? "true" : "false"}
     >
       <div className="execution-receipt__status"><i />{label}</div>
       <div className="execution-receipt__identity">
@@ -141,10 +294,12 @@ function ReceiptRow({ receipt }: { receipt: TransportReceipt }) {
       </div>
       <div className="execution-receipt__meta">
         <span>{receipt.phase.toUpperCase()} · R{receipt.round}</span>
+        <span>{receipt.snapshotEventIds.length} snapshot events</span>
         <span>{receipt.promptChars.toLocaleString()} prompt chars</span>
         {receipt.responseChars != null ? <span>{receipt.responseChars.toLocaleString()} response chars</span> : null}
         {receipt.elapsedMs != null ? <span>{formatDuration(receipt.elapsedMs)}</span> : null}
-        {receipt.attempts > 1 ? <span>{receipt.attempts} attempts</span> : null}
+        {receipt.repairAttempt ? <span>REPAIR</span> : null}
+        {receipt.attempts > 1 ? <span>{receipt.attempts} sends</span> : null}
       </div>
       {receipt.error ? <p>{receipt.error}</p> : null}
     </article>
@@ -231,10 +386,37 @@ function installTransportObserver() {
   }
 }
 
-function promptMeta(prompt: string): { phase: string; round: number } {
-  const phase = prompt.match(/PHASE:\s*(sealed|debate|final)/i)?.[1]?.toLowerCase() ?? "consultation";
+function promptMeta(prompt: string): Omit<TransportReceiptDetail, "tabId" | "state" | "mode" | "promptChars" | "observedAt"> {
+  const phaseText = prompt.match(/PHASE:\s*(sealed|debate|final)/i)?.[1]?.toLowerCase() ?? "consultation";
+  const phase = isPhase(phaseText) ? phaseText : "consultation";
   const round = Number(prompt.match(/ROUND:\s*(\d+)/i)?.[1] ?? "0");
-  return { phase, round };
+  const sessionId = prompt.match(/SESSION_ID:\s*([^\n]+)/)?.[1]?.trim() ?? "unknown-session";
+  const actorId = prompt.match(/YOUR_ACTOR_ID:\s*([^\n]+)/)?.[1]?.trim() ?? "unknown-actor";
+  const snapshotEventIds = parseJsonLine(prompt, "PUBLIC_SNAPSHOT_EVENT_IDS_JSON");
+  return {
+    sessionId,
+    actorId,
+    phase,
+    round,
+    snapshotEventIds,
+    repairAttempt: /\nREPAIR ATTEMPT:\s*/i.test(prompt),
+  };
+}
+
+function parseJsonLine(prompt: string, label: string): string[] {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const raw = prompt.match(new RegExp(`${escaped}:\\s*([^\\n]+)`))?.[1];
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function isPhase(value: string): value is CouncilPhase {
+  return value === "sealed" || value === "debate" || value === "final";
 }
 
 function isHandshakePrompt(prompt: string): boolean {
@@ -287,6 +469,34 @@ function exitSyntheticShowcase() {
   url.searchParams.delete("showcase");
   url.searchParams.delete("live-proof");
   location.assign(url.toString());
+}
+
+function attendanceStateLabel(state: ProviderTurnAttendanceAudit["state"], zh: boolean): string {
+  if (state === "published") return zh ? "已验证" : "VERIFIED";
+  if (state === "repaired") return zh ? "已验证 · 修复后" : "VERIFIED · REPAIRED";
+  if (state === "fallback") return "FALLBACK";
+  if (state === "failed") return zh ? "失败" : "FAILED";
+  if (state === "structured_parsed") return zh ? "已解析，等待发布" : "PARSED · WAITING";
+  if (state === "response_captured") return zh ? "已捕获页面响应" : "RESPONSE CAPTURED";
+  if (state === "prompt_sent") return zh ? "Prompt 已发送" : "PROMPT SENT";
+  return zh ? "轮次已开始" : "TURN STARTED";
+}
+
+function transportKey(receipt: Pick<TransportReceiptDetail, "tabId" | "sessionId" | "actorId" | "phase" | "round" | "repairAttempt">): string {
+  return `${receipt.sessionId}|${receipt.actorId}|${receipt.tabId}|${receipt.phase}|${receipt.round}|${receipt.repairAttempt ? "repair" : "first"}`;
+}
+
+function trimReceiptRecord(record: Record<string, TransportReceipt>): Record<string, TransportReceipt> {
+  const entries = Object.entries(record).sort((a, b) => b[1].observedAt.localeCompare(a[1].observedAt)).slice(0, 240);
+  return Object.fromEntries(entries);
+}
+
+function cloneExecutionAudit(event: ProviderExecutionAuditEvent): ProviderExecutionAuditEvent {
+  return {
+    ...event,
+    snapshotEventIds: [...event.snapshotEventIds],
+    ...(event.contributionKinds ? { contributionKinds: [...event.contributionKinds] } : {}),
+  };
 }
 
 function formatDuration(ms: number): string {
