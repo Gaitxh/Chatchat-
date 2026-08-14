@@ -3,7 +3,7 @@ import type {
   CouncilConsultationMode,
   CouncilRunOptions,
 } from "../core/types.js";
-import { consultationModeRunPolicy } from "../consultation/mode-policy.js";
+import { applyConsultationModePolicy } from "../consultation/mode-options.js";
 import {
   isConsultationMode,
   PROPOSAL_MODE_CHANGED_EVENT,
@@ -50,13 +50,6 @@ function installProposalModeCapability(): void {
     options: CouncilRunOptions = {},
   ) {
     const mode = options.mode ?? currentMode;
-    const policy = consultationModeRunPolicy(mode);
-    return originalRun.call(this, question, {
-      ...options,
-      mode,
-      maxRounds: policy.maxRounds,
-      minDebateRounds: policy.minDebateRounds,
-      convergenceThreshold: policy.convergenceThreshold,
-    });
+    return originalRun.call(this, question, applyConsultationModePolicy(mode, options));
   }) as typeof originalRun;
 }
