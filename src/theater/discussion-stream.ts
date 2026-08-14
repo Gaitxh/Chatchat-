@@ -16,6 +16,10 @@ export interface DiscussionEntry {
   id: string;
   event: CouncilEvent;
   actorName: string;
+  replyToEventId?: string;
+  replyToActorId?: string;
+  replyToActorName?: string;
+  replyToExcerpt?: string;
   targetActorId?: string;
   targetActorName?: string;
   targetEventId?: string;
@@ -54,6 +58,12 @@ export function buildDiscussionStream(
 
   for (const event of events) {
     const actorName = participantById.get(event.actorId)?.name ?? event.actorId;
+    const replyToEventId = explicitReplyEventId(event);
+    const replyToEvent = replyToEventId ? eventById.get(replyToEventId) : undefined;
+    const replyToActorId = replyToEvent?.actorId;
+    const replyToActorName = replyToActorId
+      ? participantById.get(replyToActorId)?.name ?? replyToActorId
+      : undefined;
     const targetEventId = explicitTargetEventId(event);
     const targetEvent = targetEventId ? eventById.get(targetEventId) : undefined;
     const directTargetActorId = event.kind === "question" ? event.targetActorId : undefined;
@@ -83,6 +93,10 @@ export function buildDiscussionStream(
       event,
       actorName,
       causes,
+      ...(replyToEventId ? { replyToEventId } : {}),
+      ...(replyToActorId ? { replyToActorId } : {}),
+      ...(replyToActorName ? { replyToActorName } : {}),
+      ...(replyToEvent ? { replyToExcerpt: compactExcerpt(eventText(replyToEvent), 150) } : {}),
       ...(targetActorId ? { targetActorId } : {}),
       ...(targetActorName ? { targetActorName } : {}),
       ...(targetEventId ? { targetEventId } : {}),
@@ -106,6 +120,18 @@ export function buildDiscussionStream(
     eventCount: events.length,
     participantCount: participants.length,
   };
+}
+
+function explicitReplyEventId(event: CouncilEvent): string | undefined {
+  switch (event.kind) {
+    case "argument":
+    case "evidence":
+    case "question":
+    case "uncertain":
+      return event.replyToEventId;
+    default:
+      return undefined;
+  }
 }
 
 function explicitTargetEventId(event: CouncilEvent): string | undefined {
