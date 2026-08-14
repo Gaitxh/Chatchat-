@@ -9,7 +9,8 @@ import { buildProviderConsultationPrompt } from "./consultation-protocol.js";
 export function buildModeAwareProviderConsultationPrompt(context: CouncilContext): string {
   const mode = consultationModeDefinition(context.mode);
   const lane = context.researchLane ? researchLaneDefinition(context.researchLane) : null;
-  const visibleContext = providerVisibleConsultationContext(context).context;
+  const visible = providerVisibleConsultationContext(context);
+  const visibleContext = visible.context;
   const researchLaneBlock = lane
     ? [
         "",
@@ -23,6 +24,17 @@ export function buildModeAwareProviderConsultationPrompt(context: CouncilContext
         "Evidence becomes shared meeting material only after it is published to the Blackboard. Other participants must get a later shared snapshot before that evidence can legitimately be treated as having influenced them.",
         "Never fabricate a source, quotation, date, event id, tool result, or research action.",
         "END_CHATCHAT_EQUAL_RESEARCH_LANE",
+      ]
+    : [];
+  const pinnedIssueBlock = visible.selection.pinnedIssueSourceEventIds.length
+    ? [
+        "",
+        "CHATCHAT_PINNED_OPEN_ISSUES",
+        `PINNED_OPEN_ISSUE_SOURCE_EVENT_IDS_JSON: ${JSON.stringify(visible.selection.pinnedIssueSourceEventIds)}`,
+        "These source events were brought back into the bounded public snapshot because their explicit protocol obligations remain unresolved. They are already present in CONSULTATION_EVENTS_JSON; this block adds attention, not new evidence.",
+        "If a pinned source event explicitly targets you or one of your visible prior events, address it when reasonably possible before adding unrelated new points. Defend, answer, concede, revise, provide counter-evidence, or state uncertainty according to the merits.",
+        "Pinned issue status gives no event extra authority, truth status, vote weight, speaking priority, or right to force agreement. Never manufacture a response relationship unless the exact event id is visible in CONSULTATION_EVENTS_JSON.",
+        "END_CHATCHAT_PINNED_OPEN_ISSUES",
       ]
     : [];
   const peerInboxBlock = directPeerInboxPromptBlock(visibleContext);
@@ -40,6 +52,7 @@ export function buildModeAwareProviderConsultationPrompt(context: CouncilContext
       : "Follow the meeting objective while remaining willing to agree, revise, concede, or remain uncertain when warranted.",
     "END_CHATCHAT_SHARED_MEETING_OBJECTIVE",
     ...researchLaneBlock,
+    ...pinnedIssueBlock,
     ...peerInboxBlock,
     ...explicitReplyBlock,
     "",
