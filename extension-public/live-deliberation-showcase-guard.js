@@ -28,9 +28,9 @@
   });
 
   function inspect() {
-    const stream = document.querySelector(".live-discussion-stream");
-    if (!(stream instanceof HTMLElement)) return false;
-
+    // Agenda and Open Issues are phase-transition UI. Observe them before any
+    // unrelated live-surface requirement so a real transient render is not
+    // discarded merely because another React subtree commits one tick later.
     const agenda = document.querySelector('[data-phase-reason="fresh_signal_follow_up"]');
     const agendaTrigger = agenda?.querySelector("[data-agenda-trigger-event]");
     if (agenda && agendaTrigger) {
@@ -47,6 +47,9 @@
 
     const secretariatComplete = sawFreshSignalAgenda && sawOpenIssue;
     if (secretariatComplete) markComplete(SECRETARIAT_ATTR);
+
+    const stream = document.querySelector(".live-discussion-stream");
+    if (!(stream instanceof HTMLElement)) return false;
 
     const answeredExchange = document.querySelector('[data-peer-response-state="answered"][data-peer-response-event]');
     const queuedStage = answeredExchange?.querySelector('[data-peer-stage="queued"]');
