@@ -4,14 +4,13 @@ import type { Locale } from "../../i18n/index.js";
 import {
   deriveEvidenceLedger,
   evidenceDisplayState,
+  EVIDENCE_VERIFICATIONS_STORAGE_KEY,
   type EvidenceRecord,
   type EvidenceVerificationSnapshot,
 } from "../../evidence/evidence-ledger.js";
 import "./evidence-board.css";
 
 declare const chrome: any;
-
-const STORAGE_KEY = "chatchat.evidence.verifications.v1";
 
 interface EvidenceBoardProps {
   participants: readonly CouncilParticipant[];
@@ -79,12 +78,15 @@ export function EvidenceBoard({ participants, events, locale }: EvidenceBoardPro
 
   useEffect(() => {
     const store = chrome.storage.session ?? chrome.storage.local;
-    void store.get(STORAGE_KEY).then((value: Record<string, unknown>) => {
-      const stored = value[STORAGE_KEY];
-      if (stored && typeof stored === "object") {
-        setVerifications(stored as Record<string, EvidenceVerificationSnapshot>);
-      }
+    void store.get(EVIDENCE_VERIFICATIONS_STORAGE_KEY).then((value: Record<string, unknown>) => {
+      setVerifications(normalizeVerifications(value[EVIDENCE_VERIFICATIONS_STORAGE_KEY]));
     });
+    const onStorage = (changes: Record<string, { newValue?: unknown }>) => {
+      if (!changes[EVIDENCE_VERIFICATIONS_STORAGE_KEY]) return;
+      setVerifications(normalizeVerifications(changes[EVIDENCE_VERIFICATIONS_STORAGE_KEY].newValue));
+    };
+    chrome.storage?.onChanged?.addListener(onStorage);
+    return () => chrome.storage?.onChanged?.removeListener(onStorage);
   }, []);
 
   async function checkRecord(record: EvidenceRecord) {
@@ -129,12 +131,12 @@ export function EvidenceBoard({ participants, events, locale }: EvidenceBoardPro
 
   async function saveVerification(eventId: string, verification: EvidenceVerificationSnapshot) {
     const store = chrome.storage.session ?? chrome.storage.local;
-    const existing = await store.get(STORAGE_KEY);
+    const existing = await store.get(EVIDENCE_VERIFICATIONS_STORAGE_KEY);
     const next = {
-      ...((existing[STORAGE_KEY] ?? {}) as Record<string, EvidenceVerificationSnapshot>),
+      ...normalizeVerifications(existing[EVIDENCE_VERIFICATIONS_STORAGE_KEY]),
       [eventId]: verification,
     };
-    await store.set({ [STORAGE_KEY]: next });
+    await store.set({ [EVIDENCE_VERIFICATIONS_STORAGE_KEY]: next });
     setVerifications(next);
   }
 
@@ -211,6 +213,10 @@ function sourceStateLabel(state: ReturnType<typeof evidenceDisplayState>["source
   if (state === "unavailable") return copy.unavailable;
   if (state === "unsupported") return copy.unsupported;
   return copy.unchecked;
+}
+
+function normalizeVerifications(value: unknown): Record<string, EvidenceVerificationSnapshot> {
+  return value && typeof value === "object" ? value as Record<string, EvidenceVerificationSnapshot> : {};
 }
 
 function formatObserved(value: string, locale: Locale): string {
