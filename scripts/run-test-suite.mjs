@@ -16,6 +16,8 @@ const tests = [
   "dist/tests/peer-inbox.test.js",
   "dist/tests/reply-provenance.test.js",
   "dist/tests/peer-exchange.test.js",
+  "dist/tests/live-agenda.test.js",
+  "dist/tests/open-issues.test.js",
   "dist/tests/consultation-theater.test.js",
   "dist/tests/live-moments.test.js",
   "dist/tests/discussion-stream.test.js",
