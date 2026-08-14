@@ -2,68 +2,69 @@ import type { AdapterRecipe } from "../provider-sdk/recipe.js";
 import { adapterRecipeComplete } from "../provider-sdk/recipe.js";
 import type { ProviderProofSnapshot } from "../validation/proof-pack.js";
 
-export interface BrowserHouseProofSeat {
+export interface BrowserConsultationProofParticipant {
   seatId: string;
   providerId: string;
   origin: string;
 }
 
-export type BrowserHouseProofState = "idle" | "running" | "pass" | "fail";
+export type BrowserConsultationProofState = "idle" | "running" | "pass" | "fail";
 
-export interface CaptureBrowserHouseProofInput {
-  seats: readonly BrowserHouseProofSeat[];
+export interface CaptureBrowserConsultationProofInput {
+  participants: readonly BrowserConsultationProofParticipant[];
   recipes: Readonly<Record<string, AdapterRecipe>>;
-  tests: Readonly<Record<string, BrowserHouseProofState>>;
-  gates: Readonly<Record<string, BrowserHouseProofState>>;
+  tests: Readonly<Record<string, BrowserConsultationProofState>>;
+  gates: Readonly<Record<string, BrowserConsultationProofState>>;
   providerHostSeatIds: readonly string[];
 }
 
-export interface CaptureAdmittedBrowserHouseProofInput {
-  seats: readonly BrowserHouseProofSeat[];
+export interface CaptureReadyBrowserConsultationProofInput {
+  participants: readonly BrowserConsultationProofParticipant[];
   recipes: Readonly<Record<string, AdapterRecipe>>;
+  readySeatIds: readonly string[];
   providerHostSeatIds: readonly string[];
-}
-
-export function captureBrowserHouseProviderProof(
-  input: CaptureBrowserHouseProofInput,
-): ProviderProofSnapshot[] {
-  const healthy = new Set(input.providerHostSeatIds);
-  return input.seats.map((seat) => ({
-    providerId: seat.providerId,
-    adapterId: "extension.tab",
-    host: publicHost(seat.origin),
-    recipeReady: adapterRecipeComplete(input.recipes[seat.origin]),
-    testPassed: input.tests[seat.seatId] === "pass",
-    councilGatePassed: input.gates[seat.seatId] === "pass",
-    providerHostHealthy: healthy.has(seat.seatId),
-    seated: true,
-  }));
 }
 
 /**
- * Browser Side Panel admission invariant:
- * a seat cannot reach CouncilOrchestrator unless its origin Recipe is complete
- * and that independent tab has passed Test Speech plus Council Gate in the
- * current Side Panel runtime. Use this helper only for those exact admitted
- * participant seat ids.
+ * Freeze privacy-safe Provider readiness metadata for current Browser Consultation
+ * participants. READY in the current browser product means the automatic
+ * connection handshake and structured Consultation Gate have both completed.
  */
-export function captureAdmittedBrowserHouseProviderProof(
-  input: CaptureAdmittedBrowserHouseProofInput,
+export function captureReadyBrowserConsultationProviderProof(
+  input: CaptureReadyBrowserConsultationProofInput,
 ): ProviderProofSnapshot[] {
   const healthy = new Set(input.providerHostSeatIds);
-  return input.seats.map((seat) => ({
-    providerId: seat.providerId,
+  const ready = new Set(input.readySeatIds);
+  return input.participants.map((participant) => ({
+    providerId: participant.providerId,
     adapterId: "extension.tab",
-    host: publicHost(seat.origin),
-    recipeReady: adapterRecipeComplete(input.recipes[seat.origin]),
-    testPassed: true,
-    councilGatePassed: true,
-    providerHostHealthy: healthy.has(seat.seatId),
+    host: publicHost(participant.origin),
+    recipeReady: adapterRecipeComplete(input.recipes[participant.origin]),
+    testPassed: ready.has(participant.seatId),
+    councilGatePassed: ready.has(participant.seatId),
+    providerHostHealthy: healthy.has(participant.seatId),
     seated: true,
   }));
 }
 
-export function seatStillOnProviderOrigin(
+/** Explicit state helper retained for lower-level browser adapter tests. */
+export function captureBrowserConsultationProviderProof(
+  input: CaptureBrowserConsultationProofInput,
+): ProviderProofSnapshot[] {
+  const healthy = new Set(input.providerHostSeatIds);
+  return input.participants.map((participant) => ({
+    providerId: participant.providerId,
+    adapterId: "extension.tab",
+    host: publicHost(participant.origin),
+    recipeReady: adapterRecipeComplete(input.recipes[participant.origin]),
+    testPassed: input.tests[participant.seatId] === "pass",
+    councilGatePassed: input.gates[participant.seatId] === "pass",
+    providerHostHealthy: healthy.has(participant.seatId),
+    seated: true,
+  }));
+}
+
+export function participantStillOnProviderOrigin(
   expectedOrigin: string,
   currentUrl: string | undefined,
 ): boolean {
@@ -81,6 +82,53 @@ export function seatStillOnProviderOrigin(
     return false;
   }
 }
+
+/*
+ * Compatibility aliases for archived tests/integrations created during the
+ * Browser House naming era. New product code must use the Consultation names.
+ */
+export type BrowserHouseProofSeat = BrowserConsultationProofParticipant;
+export type BrowserHouseProofState = BrowserConsultationProofState;
+export interface CaptureBrowserHouseProofInput {
+  seats: readonly BrowserHouseProofSeat[];
+  recipes: Readonly<Record<string, AdapterRecipe>>;
+  tests: Readonly<Record<string, BrowserHouseProofState>>;
+  gates: Readonly<Record<string, BrowserHouseProofState>>;
+  providerHostSeatIds: readonly string[];
+}
+export interface CaptureAdmittedBrowserHouseProofInput {
+  seats: readonly BrowserHouseProofSeat[];
+  recipes: Readonly<Record<string, AdapterRecipe>>;
+  providerHostSeatIds: readonly string[];
+}
+
+/** @deprecated Use captureBrowserConsultationProviderProof. */
+export function captureBrowserHouseProviderProof(
+  input: CaptureBrowserHouseProofInput,
+): ProviderProofSnapshot[] {
+  return captureBrowserConsultationProviderProof({
+    participants: input.seats,
+    recipes: input.recipes,
+    tests: input.tests,
+    gates: input.gates,
+    providerHostSeatIds: input.providerHostSeatIds,
+  });
+}
+
+/** @deprecated Use captureReadyBrowserConsultationProviderProof. */
+export function captureAdmittedBrowserHouseProviderProof(
+  input: CaptureAdmittedBrowserHouseProofInput,
+): ProviderProofSnapshot[] {
+  return captureReadyBrowserConsultationProviderProof({
+    participants: input.seats,
+    recipes: input.recipes,
+    readySeatIds: input.seats.map((seat) => seat.seatId),
+    providerHostSeatIds: input.providerHostSeatIds,
+  });
+}
+
+/** @deprecated Use participantStillOnProviderOrigin. */
+export const seatStillOnProviderOrigin = participantStillOnProviderOrigin;
 
 function publicHost(origin: string): string {
   try {
