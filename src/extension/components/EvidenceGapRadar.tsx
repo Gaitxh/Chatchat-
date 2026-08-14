@@ -28,7 +28,7 @@ const LABELS: Record<EvidenceGapKind, { icon: string; en: string; zh: string }> 
 
 export function EvidenceGapRadar({
   participants,
-  events,
+ events,
   verifications = {},
   locale,
   onFocusEvent,
@@ -59,7 +59,12 @@ export function EvidenceGapRadar({
       {radar.items.length ? (
         <div className="gap-radar-list">
           {radar.items.slice(0, 8).map((item) => (
-            <GapCard key={item.id} item={item} zh={zh} onFocusEvent={onFocusEvent} />
+            <GapCard
+              key={item.id}
+              item={item}
+              zh={zh}
+              {...(onFocusEvent ? { onFocusEvent } : {})}
+            />
           ))}
         </div>
       ) : (
