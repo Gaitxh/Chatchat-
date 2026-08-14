@@ -1,6 +1,9 @@
 import fs from "node:fs";
 
 const execution = fs.readFileSync("src/extension/execution-provenance.tsx", "utf8");
+const attendance = fs.readFileSync("src/theater/provider-attendance.ts", "utf8");
+const agent = fs.readFileSync("src/provider-sdk/consultation-agent.ts", "utf8");
+const prompt = fs.readFileSync("src/provider-sdk/consultation-protocol.ts", "utf8");
 const app = fs.readFileSync("app/app.html", "utf8");
 const sidepanel = fs.readFileSync("extension/sidepanel.html", "utf8");
 const panel = fs.readFileSync("src/extension/consultation-panel.tsx", "utf8");
@@ -27,6 +30,9 @@ for (const claim of [
   'Synthetic showcase only supports its fixed demo proposal',
   'textarea.readOnly = true',
   'data-provider-receipt',
+  'data-provider-attendance-audit',
+  'data-attendance-snapshot-count',
+  'data-attendance-published-count',
   'RUN_SPEECH',
 ]) {
   assert(execution.includes(claim), `Execution boundary is missing: ${claim}`);
@@ -50,6 +56,39 @@ for (const claim of [
   assert(panel.includes(claim), `Live provider transport path disappeared: ${claim}`);
 }
 
+// A provider turn must carry an explicit session/snapshot identity in the exact
+// prompt that is sent to the page. The audit must then distinguish parse,
+// repair, fallback and Blackboard publication instead of treating page I/O as
+// proof that a model contribution entered the meeting.
+for (const claim of [
+  'SESSION_ID:',
+  'PUBLIC_SNAPSHOT_EVENT_IDS_JSON:',
+  'CONSULTATION_EVENTS_JSON:',
+]) {
+  assert(prompt.includes(claim), `Provider prompt audit identity disappeared: ${claim}`);
+}
+for (const claim of [
+  'turn_started',
+  'structured_parsed',
+  'repair_requested',
+  'structured_failed',
+  'fallback_emitted',
+  'BROWSER_PROVIDER_EXECUTION_AUDIT',
+]) {
+  assert(agent.includes(claim), `BrowserConsultationAgent audit stage disappeared: ${claim}`);
+}
+for (const claim of [
+  'response_captured',
+  'structured_parsed',
+  'published',
+  'repaired',
+  'fallback',
+  'publishedEventIds',
+  'snapshotEventIds',
+]) {
+  assert(attendance.includes(claim), `Attendance audit model is missing: ${claim}`);
+}
+
 // The showcase is known to be synthetic and deterministic. Keeping these
 // assertions makes that fact explicit instead of allowing CI fixture speech to
 // silently masquerade as third-party model inference.
@@ -65,16 +104,21 @@ for (const claim of [
 
 for (const claim of [
   'data-chatchat-execution-boundary-showcase',
+  'data-chatchat-provider-attendance-showcase',
   'data-execution-mode="synthetic-showcase"',
   'data-synthetic-showcase-warning="visible"',
   'data-synthetic-proposal-locked="true"',
   'data-provider-receipt="received"',
+  'data-provider-attendance-audit="active"',
+  'data-attendance-turn-state="published"',
+  'data-attendance-snapshot-count',
   'sawHonestSyntheticBoundary',
+  'sawVerifiedAttendance',
 ]) {
-  assert(liveGuard.includes(claim), `Real Chromium showcase proof does not enforce the synthetic/live boundary: ${claim}`);
+  assert(liveGuard.includes(claim), `Real Chromium showcase proof does not enforce execution attendance: ${claim}`);
 }
 
-console.log("✓ synthetic showcase and live provider execution are visibly and mechanically separated");
+console.log("✓ synthetic/live execution boundary and per-seat attendance audit are mechanically enforced");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`Execution boundary check failed: ${message}`);
