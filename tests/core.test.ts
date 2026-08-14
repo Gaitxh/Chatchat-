@@ -119,7 +119,9 @@ await new CouncilOrchestrator([
   maxRounds: 3,
   minDebateRounds: 1,
   convergenceThreshold: 0.75,
-  onPhase: (update) => stablePhases.push(update),
+  onPhase: (update) => {
+    stablePhases.push(update);
+  },
 });
 assert(
   stablePhases.map(({ phase, round }) => `${phase}:${round}`).join(",") ===
@@ -162,7 +164,9 @@ async function assertFreshSignalGetsResponseRound(
     maxRounds: 3,
     minDebateRounds: 1,
     convergenceThreshold: 0.75,
-    onPhase: (update) => phases.push(update),
+    onPhase: (update) => {
+      phases.push(update);
+    },
   });
 
   assert(
