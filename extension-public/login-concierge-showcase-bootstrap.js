@@ -3,6 +3,7 @@
   if (params.get("showcase") !== "login-concierge") return;
 
   const locale = params.get("lang") === "zh" ? "zh-CN" : "en";
+  const journey = params.get("journey") === "resume" ? "resume" : "static";
   const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
   const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
   const RECIPES_KEY = "chatchat.extension.recipes.v1";
@@ -45,6 +46,7 @@
     active: false,
     status: "complete",
   };
+  let loginComplete = false;
 
   function area(memory) {
     return {
@@ -64,6 +66,24 @@
     };
   }
 
+  const recipe = {
+    profileId: participant.origin,
+    composerSelector: "[data-chatchat-demo=composer]",
+    sendSelector: "[data-chatchat-demo=send]",
+    responseSelector: "[data-chatchat-demo=response]",
+    createdAt: "2026-08-14T00:00:00.000Z",
+    updatedAt: "2026-08-14T00:00:00.000Z",
+  };
+
+  const structuredReady = () => `<CHATCHAT_COUNCIL_JSON>${JSON.stringify({
+    contributions: [{
+      kind: "argument",
+      stance: "READY",
+      content: "Structured consultation protocol accepted after login.",
+      confidence: 0.99,
+    }],
+  })}</CHATCHAT_COUNCIL_JSON>`;
+
   window.chrome = {
     storage: {
       local: area(memoryLocal),
@@ -76,11 +96,9 @@
     scripting: {
       async executeScript() {
         return [{
-          result: {
-            passwordInputs: 1,
-            loginControls: 2,
-            composerCandidates: 0,
-          },
+          result: loginComplete
+            ? { passwordInputs: 0, loginControls: 0, composerCandidates: 1 }
+            : { passwordInputs: 1, loginControls: 2, composerCandidates: 0 },
         }];
       },
     },
@@ -107,11 +125,35 @@
         if (payload?.type === "PING") {
           return { ok: true, result: { url: tab.url, title: tab.title, readyState: "complete" } };
         }
-        if (payload?.type === "AUTO_SETUP" || payload?.type === "RUN_SPEECH") {
+        if (!loginComplete && (payload?.type === "AUTO_SETUP" || payload?.type === "RUN_SPEECH" || payload?.type === "AWAIT_RECIPE")) {
           return { ok: false, error: "Provider is waiting for login." };
         }
+        if (payload?.type === "AUTO_SETUP") {
+          await delay(240);
+          return {
+            ok: true,
+            result: {
+              recipe,
+              responseText: "CHATCHAT_READY",
+              elapsedMs: 240,
+              diagnostics: { mode: "synthetic-post-login-automatic" },
+            },
+          };
+        }
+        if (payload?.type === "RUN_SPEECH") {
+          await delay(280);
+          const prompt = String(payload.prompt ?? "");
+          return {
+            ok: true,
+            result: {
+              responseText: /Protocol handshake only/i.test(prompt) ? structuredReady() : "CHATCHAT_READY",
+              elapsedMs: 280,
+              responseCount: 1,
+            },
+          };
+        }
         if (payload?.type === "AWAIT_RECIPE") {
-          return { ok: false, error: "Provider is waiting for login." };
+          return { ok: true, result: { ready: true, elapsedMs: 20 } };
         }
         return { ok: true, result: {} };
       },
@@ -121,4 +163,29 @@
       async sendMessage() { return { ok: false, error: "Not used in Login Concierge showcase." }; },
     },
   };
+
+  if (journey === "resume") void simulateLoginAfterConciergeAppears();
+
+  async function simulateLoginAfterConciergeAppears() {
+    for (let attempt = 0; attempt < 180; attempt += 1) {
+      if (document.querySelector(".participant-row.connection-needs-login")) {
+        document.documentElement.dataset.chatchatLoginJourneySawPrompt = "true";
+        await delay(350);
+        loginComplete = true;
+        tab.url = "https://claude.ai/new";
+        tab.title = "Claude";
+        participant.url = tab.url;
+        for (const listener of onUpdatedListeners) {
+          listener(tab.id, { url: tab.url, status: "complete" }, { ...tab });
+        }
+        return;
+      }
+      await delay(50);
+    }
+    document.documentElement.dataset.chatchatLoginJourneyBootstrap = "failed-no-login-prompt";
+  }
+
+  function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 })();
