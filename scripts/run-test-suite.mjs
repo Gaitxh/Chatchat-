@@ -19,6 +19,7 @@ const tests = [
   "dist/tests/live-agenda.test.js",
   "dist/tests/open-issues.test.js",
   "dist/tests/conflict-board.test.js",
+  "dist/tests/context-selection.test.js",
   "dist/tests/live-persuasion.test.js",
   "dist/tests/provider-attendance.test.js",
   "dist/tests/execution-audit-history.test.js",
