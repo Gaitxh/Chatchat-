@@ -1,0 +1,100 @@
+name: Provider Self-Healing UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: chatchat-provider-self-healing-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  self-healing:
+    name: Provider self-healing · one safe reset to READY
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install and build production extension
+        run: |
+          npm install
+          npm run check
+          npm test
+          npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Locate Chromium browser
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_BIN"
+          echo "CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
+
+      - name: Start production preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4184 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-self-healing-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4184/manifest.json >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4184/manifest.json >/dev/null
+
+      - name: Capture English self-healing state
+        run: |
+          URL='http://127.0.0.1:4184/app/app.html?showcase=provider-self-healing&journey=static&lang=en'
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --run-all-compositor-stages-before-draw --virtual-time-budget=9000 --window-size=1440,1900 --screenshot=artifacts/chatchat-self-healing-en.png "$URL"
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --run-all-compositor-stages-before-draw --virtual-time-budget=9000 --dump-dom "$URL" > artifacts/chatchat-self-healing-en.html
+          test -s artifacts/chatchat-self-healing-en.png
+          grep -q 'data-chatchat-provider-self-healing-showcase="complete"' artifacts/chatchat-self-healing-en.html
+          grep -q 'data-chatchat-self-healing-navigation-count="1"' artifacts/chatchat-self-healing-en.html
+          grep -q 'Claude is self-healing' artifacts/chatchat-self-healing-en.html
+          grep -q 'No action needed' artifacts/chatchat-self-healing-en.html
+
+      - name: Capture Chinese self-healing state
+        run: |
+          URL='http://127.0.0.1:4184/app/app.html?showcase=provider-self-healing&journey=static&lang=zh'
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --run-all-compositor-stages-before-draw --virtual-time-budget=9000 --window-size=1440,1900 --screenshot=artifacts/chatchat-self-healing-zh.png "$URL"
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --run-all-compositor-stages-before-draw --virtual-time-budget=9000 --dump-dom "$URL" > artifacts/chatchat-self-healing-zh.html
+          test -s artifacts/chatchat-self-healing-zh.png
+          grep -q 'data-chatchat-provider-self-healing-showcase="complete"' artifacts/chatchat-self-healing-zh.html
+          grep -q 'data-chatchat-self-healing-navigation-count="1"' artifacts/chatchat-self-healing-zh.html
+          grep -q 'Claude 正在自动修复连接' artifacts/chatchat-self-healing-zh.html
+          grep -q '你不需要操作' artifacts/chatchat-self-healing-zh.html
+
+      - name: Prove automatic self-healing reaches READY
+        run: |
+          for LANG in en zh; do
+            URL="http://127.0.0.1:4184/app/app.html?showcase=provider-self-healing&journey=resume&lang=$LANG"
+            "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --run-all-compositor-stages-before-draw --virtual-time-budget=16000 --dump-dom "$URL" > "artifacts/chatchat-self-healed-$LANG.html"
+            grep -q 'data-chatchat-provider-self-healing-visible="complete"' "artifacts/chatchat-self-healed-$LANG.html"
+            grep -q 'data-chatchat-provider-self-healing-connecting="complete"' "artifacts/chatchat-self-healed-$LANG.html"
+            grep -q 'data-chatchat-provider-self-healing-showcase="complete"' "artifacts/chatchat-self-healed-$LANG.html"
+            grep -q 'data-chatchat-self-healing-navigation-count="1"' "artifacts/chatchat-self-healed-$LANG.html"
+            grep -q 'participant-row connection-ready is-ready' "artifacts/chatchat-self-healed-$LANG.html"
+          done
+
+      - name: Save preview log
+        if: always()
+        run: cp /tmp/chatchat-self-healing-preview.log artifacts/preview.log 2>/dev/null || true
+
+      - name: Upload self-healing browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-provider-self-healing-ui
+          path: artifacts/**
+          if-no-files-found: warn
+          retention-days: 14
