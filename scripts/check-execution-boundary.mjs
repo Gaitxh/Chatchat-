@@ -4,6 +4,8 @@ const execution = fs.readFileSync("src/extension/execution-provenance.tsx", "utf
 const attendance = fs.readFileSync("src/theater/provider-attendance.ts", "utf8");
 const agent = fs.readFileSync("src/provider-sdk/consultation-agent.ts", "utf8");
 const prompt = fs.readFileSync("src/provider-sdk/consultation-protocol.ts", "utf8");
+const auditDocEn = fs.readFileSync("docs/PROVIDER_ATTENDANCE_AUDIT.md", "utf8");
+const auditDocZh = fs.readFileSync("docs/PROVIDER_ATTENDANCE_AUDIT.zh-CN.md", "utf8");
 const app = fs.readFileSync("app/app.html", "utf8");
 const sidepanel = fs.readFileSync("extension/sidepanel.html", "utf8");
 const panel = fs.readFileSync("src/extension/consultation-panel.tsx", "utf8");
@@ -89,6 +91,21 @@ for (const claim of [
   assert(attendance.includes(claim), `Attendance audit model is missing: ${claim}`);
 }
 
+for (const [label, doc] of [["English", auditDocEn], ["Chinese", auditDocZh]]) {
+  for (const claim of [
+    'PUBLIC_SNAPSHOT_EVENT_IDS_JSON',
+    'Blackboard',
+    'FALLBACK',
+    'DEMO · SYNTHETIC',
+  ]) {
+    assert(doc.includes(claim), `${label} attendance audit documentation is missing: ${claim}`);
+  }
+}
+assert(auditDocEn.includes('does **not** expose or infer hidden model chain-of-thought'), "English audit docs must preserve the hidden-reasoning boundary.");
+assert(auditDocZh.includes('不展示、也不推断模型隐藏的思维链'), "Chinese audit docs must preserve the hidden-reasoning boundary.");
+assert(auditDocEn.includes('live, in-memory execution view'), "Docs must disclose that execution audit persistence is not implemented yet.");
+assert(auditDocZh.includes('运行中的内存审计视图'), "Chinese docs must disclose that execution audit persistence is not implemented yet.");
+
 // The showcase is known to be synthetic and deterministic. Keeping these
 // assertions makes that fact explicit instead of allowing CI fixture speech to
 // silently masquerade as third-party model inference.
@@ -118,7 +135,7 @@ for (const claim of [
   assert(liveGuard.includes(claim), `Real Chromium showcase proof does not enforce execution attendance: ${claim}`);
 }
 
-console.log("✓ synthetic/live execution boundary and per-seat attendance audit are mechanically enforced");
+console.log("✓ synthetic/live execution boundary, per-seat attendance audit, and docs are mechanically enforced");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`Execution boundary check failed: ${message}`);
