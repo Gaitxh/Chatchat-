@@ -7,6 +7,8 @@ import type {
   CouncilContribution,
   CouncilEvent,
   CouncilParticipant,
+  CouncilPhaseReason,
+  CouncilPhaseUpdate,
   CouncilReport,
   CouncilResearchLane,
   CouncilRunOptions,
@@ -44,7 +46,16 @@ export class CouncilOrchestrator {
     const sessionId = createId("session");
     const blackboard = new Blackboard();
 
-    await options.onPhase?.({ phase: "sealed", round: 1 });
+    await options.onPhase?.({
+      phase: "sealed",
+      round: 1,
+      reason: "sealed_start",
+      alignmentRatio: 0,
+      convergenceThreshold,
+      debateRoundsCompleted: 0,
+      minimumDebateRounds: minDebateRounds,
+      maxRounds,
+    });
     const sealedFacts = await this.#facts(options, "sealed", 1, []);
     const sealed = await Promise.all(this.#agents.map(async (agent) => ({
       agent,
@@ -70,8 +81,23 @@ export class CouncilOrchestrator {
 
     let lastRound = 1;
     let stopReason: CouncilStopReason = "round_budget";
+    let nextDebateReason: CouncilPhaseReason = "initial_debate";
+    let nextTriggerEventIds: string[] = [];
+    let nextAlignmentRatio = this.#consensusRatio(blackboard);
+    let nextDebateRoundsCompleted = 0;
+
     for (let round = 2; round <= maxRounds; round += 1) {
-      await options.onPhase?.({ phase: "debate", round });
+      await options.onPhase?.({
+        phase: "debate",
+        round,
+        reason: nextDebateReason,
+        ...(nextTriggerEventIds.length ? { triggerEventIds: [...nextTriggerEventIds] } : {}),
+        alignmentRatio: nextAlignmentRatio,
+        convergenceThreshold,
+        debateRoundsCompleted: nextDebateRoundsCompleted,
+        minimumDebateRounds: minDebateRounds,
+        maxRounds,
+      });
       const snapshot = [...blackboard.events];
       const facts = await this.#facts(options, "debate", round, snapshot);
       const turns = await Promise.all(this.#agents.map(async (agent) => ({
@@ -98,17 +124,41 @@ export class CouncilOrchestrator {
       await this.#publish(blackboard, roundEvents, options);
       lastRound = round;
 
-      const convergenceReached = this.#consensusRatio(blackboard) >= convergenceThreshold;
-      const minimumReached = round - 1 >= minDebateRounds;
-      const needsPeerFollowUp = this.#roundNeedsPeerFollowUp(roundEvents);
+      const alignmentRatio = this.#consensusRatio(blackboard);
+      const debateRoundsCompleted = round - 1;
+      const minimumReached = debateRoundsCompleted >= minDebateRounds;
+      const triggerEventIds = this.#peerFollowUpEventIds(roundEvents);
+      const needsPeerFollowUp = triggerEventIds.length > 0;
+      const convergenceReached = alignmentRatio >= convergenceThreshold;
+
       if (minimumReached && convergenceReached && !needsPeerFollowUp) {
         stopReason = "stable_alignment_no_new_signal";
         break;
       }
+
+      if (round < maxRounds) {
+        if (needsPeerFollowUp) nextDebateReason = "fresh_signal_follow_up";
+        else if (!minimumReached) nextDebateReason = "minimum_debate_rounds";
+        else nextDebateReason = "alignment_not_reached";
+        nextTriggerEventIds = needsPeerFollowUp ? triggerEventIds : [];
+        nextAlignmentRatio = alignmentRatio;
+        nextDebateRoundsCompleted = debateRoundsCompleted;
+      }
     }
 
     const finalRound = lastRound + 1;
-    await options.onPhase?.({ phase: "final", round: finalRound });
+    await options.onPhase?.({
+      phase: "final",
+      round: finalRound,
+      reason: stopReason === "stable_alignment_no_new_signal"
+        ? "finalizing_stable_alignment"
+        : "finalizing_round_budget",
+      alignmentRatio: this.#consensusRatio(blackboard),
+      convergenceThreshold,
+      debateRoundsCompleted: Math.max(0, lastRound - 1),
+      minimumDebateRounds: minDebateRounds,
+      maxRounds,
+    });
     const finalSnapshot = [...blackboard.events];
     const finalFacts = await this.#facts(options, "final", finalRound, finalSnapshot);
     const finalTurns = await Promise.all(this.#agents.map(async (agent) => ({
@@ -234,20 +284,22 @@ export class CouncilOrchestrator {
     }
   }
 
-  #roundNeedsPeerFollowUp(events: readonly CouncilEvent[]): boolean {
-    return events.some((event) => {
-      switch (event.kind) {
-        case "argument":
-        case "challenge":
-        case "evidence":
-        case "revision":
-        case "question":
-        case "uncertain":
-          return true;
-        default:
-          return false;
-      }
-    });
+  #peerFollowUpEventIds(events: readonly CouncilEvent[]): string[] {
+    return events
+      .filter((event) => {
+        switch (event.kind) {
+          case "argument":
+          case "challenge":
+          case "evidence":
+          case "revision":
+          case "question":
+          case "uncertain":
+            return true;
+          default:
+            return false;
+        }
+      })
+      .map((event) => event.id);
   }
 
   #consensusRatio(blackboard: Blackboard) {
