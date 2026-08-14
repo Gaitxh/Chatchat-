@@ -168,7 +168,8 @@ for (const required of [
   "chatchat.consultation.connections.v1",
   "captureReadyBrowserConsultationProviderProof",
   'location.protocol === "chrome-extension:"',
-  "Chromium Full Room",
+  'document.documentElement.dataset.surface === "web-app"',
+  '`Chromium ${surface} · ${coarsePlatformHint(navigator.userAgent)}`',
 ]) {
   if (!gateBObserver.includes(required)) {
     throw new Error(`Current Gate B observer contract is missing: ${required}`);
