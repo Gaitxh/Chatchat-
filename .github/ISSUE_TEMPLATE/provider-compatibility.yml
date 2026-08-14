@@ -1,15 +1,17 @@
 name: Provider compatibility report
-description: Report or validate a real AI website through ChatChat's local Provider pipeline.
+description: Report a real AI website run through ChatChat's current zero-config Browser Consultation pipeline.
 title: "[Provider] "
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for testing a real Provider. Please remove account emails, cookies, tokens, private chats and sensitive screenshots before submitting.
+        Thanks for testing a real Provider in ChatChat.
 
-        ChatChat uses precise compatibility language: recognized → teachable → test-passed → council-ready → runtime-validated → officially supported.
+        Please remove account emails, cookies, tokens, private chats and sensitive screenshots before submitting anything publicly.
 
-        If you completed a current Council, the preferred evidence path is **Royal Proof Pack → COPY ISSUE MARKDOWN**. Review the generated text before posting it.
+        Current evidence language is: **recognized → auto-detected → auto-connected → protocol-ready → Gate B candidate → runtime-validated → officially supported**.
+
+        If you completed a fresh real Browser Consultation, the preferred evidence path is **Real Provider Proof → COPY GITHUB MARKDOWN**. Review the generated text before posting it.
 
   - type: input
     id: provider
@@ -24,7 +26,7 @@ body:
     id: host
     attributes:
       label: Host
-      description: Hostname only. Do not include account-specific paths/query strings.
+      description: Hostname only. Do not include account-specific paths or query strings.
       placeholder: claude.ai
     validations:
       required: true
@@ -40,8 +42,8 @@ body:
   - type: input
     id: os
     attributes:
-      label: OS
-      placeholder: macOS 15 / Windows 11 / Ubuntu 24.04
+      label: Browser / OS environment
+      placeholder: Chrome 140 · Windows 11 / Chromium · macOS 15
     validations:
       required: true
 
@@ -56,18 +58,28 @@ body:
   - type: textarea
     id: proof-pack
     attributes:
-      label: Royal Proof Pack (preferred for Hybrid/LIVE validation)
-      description: Paste the output from COPY ISSUE MARKDOWN after reviewing it. The v1 schema intentionally excludes questions, model replies, selectors and credentials.
+      label: Real Provider Proof (preferred)
+      description: Paste COPY GITHUB MARKDOWN after reviewing it. The v1 proof intentionally excludes the user proposal, model replies, event text, page mappings/selectors and credentials.
       placeholder: |
-        ## ChatChat Royal Proof Pack
-        **✅ Gate B candidate evidence**
+        ## ChatChat Real Provider Proof
+        **✅ Real Provider Gate B candidate evidence**
         ...
       render: markdown
 
   - type: dropdown
-    id: invite
+    id: recognized
     attributes:
-      label: Invite URL
+      label: Provider recognized
+      description: Did ChatChat identify the Provider host and product identity correctly?
+      options: [PASS, FAIL, NOT TESTED]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: permission
+    attributes:
+      label: Optional Provider-site permission
+      description: Did ChatChat request only the Provider origin needed for this participant?
       options: [PASS, FAIL, NOT TESTED]
     validations:
       required: true
@@ -75,40 +87,26 @@ body:
   - type: dropdown
     id: login
     attributes:
-      label: Isolated login WebView
+      label: Provider login / automatic resume
+      description: If login was required, could you sign in on the Provider page and have ChatChat continue automatically without clicking Retry?
+      options: [PASS, FAIL, NOT REQUIRED, NOT TESTED]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: autodetect
+    attributes:
+      label: Automatic page recognition
+      description: Did ChatChat identify the conversation controls without manual Teach/selector setup?
       options: [PASS, FAIL, NOT TESTED]
     validations:
       required: true
 
   - type: dropdown
-    id: health
+    id: connection
     attributes:
-      label: Provider Window Health
-      description: Does ChatChat correctly show Provider-host / external-auth / closed state?
-      options: [PASS, FAIL, NOT TESTED]
-    validations:
-      required: true
-
-  - type: dropdown
-    id: probe
-    attributes:
-      label: Metadata DOM probe
-      options: [PASS, FAIL, NOT TESTED]
-    validations:
-      required: true
-
-  - type: dropdown
-    id: teach
-    attributes:
-      label: Teach Recipe 3/3
-      options: [PASS, FAIL, NOT TESTED]
-    validations:
-      required: true
-
-  - type: dropdown
-    id: speech
-    attributes:
-      label: Test Speech
+      label: Automatic connection
+      description: Did the participant complete the automatic connection handshake?
       options: [PASS, FAIL, NOT TESTED]
     validations:
       required: true
@@ -116,32 +114,45 @@ body:
   - type: dropdown
     id: gate
     attributes:
-      label: Council Gate
+      label: Consultation Protocol Gate
+      description: Did the Provider return valid structured consultation output and become READY?
       options: [PASS, FAIL, NOT TESTED]
     validations:
       required: true
 
   - type: dropdown
-    id: fresh
+    id: provider-host
     attributes:
-      label: Fresh Council session
+      label: Provider origin healthy at consultation time
+      description: Was the participant tab still on the expected Provider origin when the real consultation completed?
       options: [PASS, FAIL, NOT TESTED]
     validations:
       required: true
 
   - type: dropdown
-    id: hybrid
+    id: real-consultation
     attributes:
-      label: Hybrid rehearsal
+      label: Fresh real Browser Consultation with 2+ distinct Provider hosts
+      description: Did sealed independent opinions, automatic consultation and final positions complete with another real Provider source?
       options: [PASS, FAIL, NOT TESTED]
     validations:
       required: true
 
   - type: dropdown
-    id: live
+    id: fallback
     attributes:
-      label: LIVE Council with a second real Provider
-      options: [PASS, FAIL, NOT TESTED]
+      label: Transport/parser fallback during the real run
+      description: A Gate B candidate should not contain uncertainty fallbacks or zero-confidence final positions.
+      options: [NONE, UNCERTAIN EVENT, ZERO-CONFIDENCE FINAL, OTHER, NOT TESTED]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: advanced-repair
+    attributes:
+      label: Was Advanced repair needed?
+      description: Manual Teach/selectors are a recovery fallback, not the normal zero-config path.
+      options: [NO, YES, NOT TESTED]
     validations:
       required: true
 
@@ -149,15 +160,15 @@ body:
     id: failure
     attributes:
       label: Failure stage / sanitized notes
-      description: Include the narrowest failure stage and sanitized error. Do not paste secrets or private chat content.
-      placeholder: "Teach Response selector no longer matches after Provider UI update..."
+      description: Include the narrowest failure stage and a sanitized error. Do not paste secrets or private chat content.
+      placeholder: "Automatic page recognition stopped finding the send control after the Provider UI update..."
 
   - type: checkboxes
     id: privacy
     attributes:
-      label: Privacy check
+      label: Privacy and scope check
       options:
-        - label: I reviewed the Proof Pack / report and removed passwords, cookies, tokens, account identifiers and private conversation content.
+        - label: I reviewed the Real Provider Proof / report and removed passwords, cookies, tokens, account identifiers and private conversation content.
           required: true
-        - label: I understand a PASS on my machine does not automatically mean the Provider is officially supported.
+        - label: I understand one successful machine/date is environment-specific evidence and does not automatically mean the Provider is officially supported.
           required: true
