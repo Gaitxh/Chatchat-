@@ -1,74 +1,91 @@
 # Provider Compatibility Matrix
 
-ChatChat deliberately separates **catalog recognition** from **runtime support evidence**.
+ChatChat deliberately separates **catalog recognition** from **real runtime evidence**.
 
-A green brand logo is not a compatibility claim.
+A Provider logo in the Full Room is not a compatibility claim. A successful URL detector is not a compatibility claim. Even one successful browser run is dated, environment-specific evidence — not permanent authority.
 
-## Vocabulary
+## Current evidence vocabulary
 
 | Level | Meaning |
 |---|---|
-| Recognized | URL maps to a known Provider identity in the built-in catalog. |
-| Teachable | A user can create a local 3/3 Composer / Send / Response recipe. |
-| Test-passed | One explicit real browser round-trip succeeds. |
-| Council-ready | The structured Council Gate succeeds. |
-| Runtime-validated | Real sealed → debate → final behavior was manually tested for a documented environment. |
-| Officially supported | Maintainers intentionally document and maintain that Provider target. |
+| Recognized | ChatChat maps the URL to a known Provider identity and clean start URL. |
+| Auto-detected | ChatChat can automatically identify a usable conversation surface in the current Provider UI. |
+| Auto-connected | The automatic connection handshake completes in the user's browser. |
+| Protocol-ready | The structured ChatChat Consultation Gate succeeds and the participant becomes READY. |
+| Gate B candidate | A fresh real consultation across 2+ distinct Provider hosts satisfies the Real Provider Proof structural rule. |
+| Runtime-validated | A maintainer reviewed a dated Gate B candidate for a documented environment. |
+| Officially supported | Maintainers intentionally document and maintain the Provider target. |
 
-These levels are cumulative evidence, not synonyms.
+These are cumulative evidence levels, not synonyms.
 
-## Built-in URL catalog
+**Teach / manual selector repair is not a compatibility level.** It remains an Advanced recovery path when automatic page recognition cannot recover from a Provider UI change.
 
-The v0.9/v1-readiness catalog recognizes these hosts so ChatChat can provide a stable identity, monogram and clean Council start URL:
+## Built-in Provider catalog
 
-| Provider | Recognized host | Generic taught Browser Council Bridge | Runtime-validated environments | Official support status |
+The current catalog recognizes these first-class Provider entry points:
+
+| Provider | Recognized host | Zero-config browser attempt | Runtime-validated environments | Official support status |
 |---|---|---|---|---|
-| ChatGPT | `chatgpt.com` | Available for local Teach/Test/Gate attempts | **No maintainer record committed yet** | Not claimed |
-| Claude | `claude.ai` | Available for local Teach/Test/Gate attempts | **No maintainer record committed yet** | Not claimed |
-| Gemini | `gemini.google.com` | Available for local Teach/Test/Gate attempts | **No maintainer record committed yet** | Not claimed |
-| DeepSeek | `chat.deepseek.com` | Available for local Teach/Test/Gate attempts | **No maintainer record committed yet** | Not claimed |
-| Yuanbao · 元宝 | `yuanbao.tencent.com` | Available for local Teach/Test/Gate attempts | **No maintainer record committed yet** | Not claimed |
-| Tongyi · 通义 | `tongyi.aliyun.com` | Available for local Teach/Test/Gate attempts | **No maintainer record committed yet** | Not claimed |
-| Grok | `grok.com` | Available for local Teach/Test/Gate attempts | **No maintainer record committed yet** | Not claimed |
+| ChatGPT | `chatgpt.com` | Automatic page recognition + connection + protocol Gate | **No maintainer-reviewed Real Provider Proof committed yet** | Not claimed |
+| Claude | `claude.ai` | Automatic page recognition + connection + protocol Gate | **No maintainer-reviewed Real Provider Proof committed yet** | Not claimed |
+| Gemini | `gemini.google.com` | Automatic page recognition + connection + protocol Gate | **No maintainer-reviewed Real Provider Proof committed yet** | Not claimed |
+| DeepSeek | `chat.deepseek.com` | Automatic page recognition + connection + protocol Gate | **No maintainer-reviewed Real Provider Proof committed yet** | Not claimed |
+| Yuanbao · 元宝 | `yuanbao.tencent.com` | Automatic page recognition + connection + protocol Gate | **No maintainer-reviewed Real Provider Proof committed yet** | Not claimed |
+| Tongyi · 通义 | `tongyi.aliyun.com` | Automatic page recognition + connection + protocol Gate | **No maintainer-reviewed Real Provider Proof committed yet** | Not claimed |
+| Grok | `grok.com` | Automatic page recognition + connection + protocol Gate | **No maintainer-reviewed Real Provider Proof committed yet** | Not claimed |
+| Qwen | `chat.qwen.ai` / `qwen.ai` | Automatic page recognition + connection + protocol Gate | **No maintainer-reviewed Real Provider Proof committed yet** | Not claimed |
 
-Recognition means ChatChat knows how to label the Provider and which catalog landing page to use when attempting a fresh Council session. It does **not** mean the current remote UI is proven compatible with the generic browser adapter.
+Recognition means ChatChat knows how to label the Provider and where to open a clean conversation. It does **not** mean the remote webpage is guaranteed to remain compatible with ChatChat's browser automation.
 
-This table should change only when there is real evidence. Do not turn a successful URL detector unit test into a Provider support badge.
+## What zero-config means
+
+For the normal Full Room path, the user should only choose the AI team and handle Provider-owned login when required.
+
+ChatChat then attempts:
+
+```text
+Provider URL
+   ↓
+optional site permission
+   ↓
+clean Provider conversation
+   ↓
+automatic page recognition
+   ↓
+automatic connection handshake
+   ↓
+structured Consultation Gate
+   ↓
+READY
+```
+
+If the Provider redirects to login, the Login Concierge explains the state. After the user signs in, ChatChat automatically resumes — no manual Retry button is required.
+
+If an existing page map becomes stale, ChatChat first retries automatic page recognition before exposing Advanced repair.
 
 ## Custom URLs
 
-Any `http/https` AI page may enter the generic flow as:
+Ordinary `http/https` AI pages can still enter the generic browser flow as a custom Provider.
 
-```text
-custom.browser
-```
+ChatChat may attempt automatic detection and connection, but arbitrary websites are not promised to work. Provider-specific behavior can break generic automation through framework input handling, shadow DOM, canvas UI, generation controls, anti-automation behavior, unusual routing, or future UI changes.
 
-That means ChatChat can attempt:
+When automatic recovery is exhausted, Advanced repair can still teach the local Composer / Send / Response mapping. That mapping stays local and is never part of public compatibility evidence.
 
-```text
-isolated WebView
-→ Teach 3/3
-→ Test Speech
-→ Council Gate
-→ healthy seat
-```
+## Real Provider Proof — preferred Gate B evidence
 
-It does **not** mean arbitrary sites will work. A site may require a provider-specific adapter for framework input events, new-chat navigation, generation detection, shadow DOM, canvas UI, anti-automation behavior or other special cases.
+A fresh real Browser Consultation can generate **Real Provider Proof** after completion.
 
-## Royal Proof Pack — preferred Gate B evidence
-
-A current real Council can generate a **Royal Proof Pack** after completion.
-
-The Proof Pack is preferred over copying screenshots or transcripts because it intentionally contains only compatibility metadata:
+The Proof Pack records only compatibility metadata such as:
 
 ```text
 Provider id + public host
-Recipe/Test/Gate/Host/Seat booleans
-Council mode
+page-map / connection / protocol / host / room booleans
+run mode
 real participant count
 round count
 event-kind counts
 final-position count
+zero-confidence final count
 consensus ratio
 minority-opinion flag
 coarse duration
@@ -79,84 +96,72 @@ environment label
 It intentionally excludes:
 
 ```text
-King's question
+user proposal
 model answers
-Blackboard text
-Teach selectors
+structured event/message text
+page mappings / selectors
 profile keys
-cookies/tokens/passwords
 account identifiers
+cookies / tokens / passwords / credentials
 ```
 
-Use **COPY ISSUE MARKDOWN** to paste the generated evidence into a Provider Compatibility Issue, or attach the JSON values after manually reviewing them.
+Use **COPY GITHUB MARKDOWN** to paste the reviewed evidence into a Provider compatibility issue, or copy the metadata-only JSON.
 
-The versioned JSON schema is:
+The versioned JSON schema remains:
 
 ```text
 schemas/gate-b-proof-v1.schema.json
 ```
 
-Full format and privacy rules: [`GATE_B_PROOF.md`](GATE_B_PROOF.md).
+Full format and truth-boundary rules: [`GATE_B_PROOF.md`](GATE_B_PROOF.md).
 
-A `gate-b-candidate` verdict is not an automatic Official Support badge. It is a compact evidence package for maintainers to review.
+### Synthetic UI evidence is not real acceptance evidence
 
-## How a row earns Runtime-Validated
+ChatChat's CI can render a deterministic `demo-only` Real Provider Proof preview to test the UI. The live observer itself refuses to generate live Gate B evidence outside the actual `chrome-extension:` runtime.
+
+A `gate-b-candidate` verdict therefore means a real browser run satisfied the structural evidence rule. It is still **not** an automatic Official Support badge.
+
+## How a Provider earns Runtime-Validated
 
 Preferred path:
 
-1. complete the Provider's local Invite/Login/Probe/Teach/Test/Gate/Seat flow;
-2. complete a current real Council;
-3. export Royal Proof Pack Markdown;
-4. review it for privacy;
-5. paste it into the GitHub **Provider compatibility report** form;
-6. add only genuinely necessary sanitized notes.
+1. Open ChatChat Full Room.
+2. Let zero-config onboarding restore or plan a diverse AI team.
+3. Grant only the requested optional Provider-site permissions.
+4. Sign in on the Provider page if requested; let ChatChat resume automatically.
+5. Confirm at least two distinct Provider sources become READY.
+6. Run one fresh real Browser Consultation.
+7. Confirm no participant fell back to uncertainty or a zero-confidence final position.
+8. Review the generated **Real Provider Proof** privately.
+9. Copy the privacy-safe GitHub Markdown.
+10. Review it once more before posting it to the Provider compatibility issue.
+11. A maintainer reviews the dated environment-specific evidence before changing the compatibility matrix.
 
-A maintainer can then add a concise dated row such as:
+A concise reviewed record can look like:
 
 ```text
 Claude · claude.ai
 ChatChat 0.9.x @ abc1234
-macOS 15.x
-Provider UI tested 2026-08-XX
-Proof Pack: gate-b-candidate
-Teach PASS · Test PASS · Gate PASS · Live PASS
+Windows 11 / Chromium
+Provider UI tested 2026-08-14
+Auto-detected ✓ · Auto-connected ✓ · Protocol-ready ✓
+Real Provider Proof: gate-b-candidate
 ```
 
-If Proof Pack export is unavailable, a manual report may still include:
+If the Provider UI later changes and breaks automatic recognition, keep the old dated evidence as historical evidence and update the current status rather than rewriting history.
 
-```text
-Provider
-host only
-ChatChat version/commit
-OS
-Provider UI date tested
-Invite
-Login
-Window Health
-Probe
-Teach 3/3
-Test Speech
-Council Gate
-Fresh Session
-Hybrid Council
-LIVE Council (if tested)
-sanitized notes
-```
+## Why the matrix stays conservative
 
-If the Provider UI later changes and breaks the recipe, keep the old dated evidence but mark current status accordingly. Compatibility with remote webpages is time-sensitive.
+ChatChat's most fun demo is several real AIs independently thinking, challenging one another, changing their minds, and reaching final positions in one browser room.
 
-## Why the matrix is intentionally conservative
+That is exactly why the compatibility page must stay boring and precise.
 
-ChatChat's most viral demo will probably be two or more real models arguing in LIVE COUNCIL.
-
-That is exactly why the compatibility page must be boring and specific.
-
-The project should be able to say both of these sentences at the same time:
+The project should be able to say both:
 
 > “This is ridiculously fun when it works.”
 
 and
 
-> “Here is exactly what we tested, on which OS, against which Provider UI date.”
+> “Here is exactly what this browser run proved, on which environment and Provider UI date.”
 
-That combination is healthier for an open-source project than pretending a constantly-changing third-party webpage is a stable API.
+That combination is much healthier than pretending constantly-changing third-party webpages are stable APIs.
