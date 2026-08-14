@@ -122,12 +122,15 @@ async function mount() {
   let plan: ProviderDetection[] = [];
   let permissionReady = false;
   let starting = false;
+  let scan: number | undefined;
 
   await refreshPlan();
 
-  const scan = window.setInterval(() => {
-    if (!starting) void refreshPlan();
-  }, 2500);
+  if (!starting) {
+    scan = window.setInterval(() => {
+      if (!starting) void refreshPlan();
+    }, 2500);
+  }
 
   button.addEventListener("click", async () => {
     if (starting || !plan.length) return;
@@ -141,7 +144,7 @@ async function mount() {
       }
       if (!granted) throw new Error(strings.denied);
       await assemble(plan, strings.failed);
-      window.clearInterval(scan);
+      clearScan();
       status.textContent = strings.done;
       window.setTimeout(() => window.location.reload(), 650);
     } catch (error) {
@@ -165,7 +168,7 @@ async function mount() {
       status.textContent = strings.working;
       try {
         await assemble(plan, strings.failed);
-        window.clearInterval(scan);
+        clearScan();
         status.textContent = strings.done;
         window.setTimeout(() => window.location.reload(), 650);
       } catch (error) {
@@ -174,6 +177,12 @@ async function mount() {
         status.textContent = error instanceof Error ? error.message : String(error);
       }
     }
+  }
+
+  function clearScan() {
+    if (scan === undefined) return;
+    window.clearInterval(scan);
+    scan = undefined;
   }
 }
 
