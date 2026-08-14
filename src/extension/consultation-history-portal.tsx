@@ -1,6 +1,7 @@
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { CouncilEvent, CouncilReport } from "../core/types.js";
+import { EvidenceHistoryStore } from "../history/evidence-history.js";
 import {
   ConsultationHistoryStore,
   createConsultationArchive,
@@ -13,6 +14,7 @@ import "./consultation-history-portal.css";
 const COMPLETE_EVENT = "chatchat:consultation-complete";
 export const OPEN_ARCHIVE_EVENT = "chatchat:consultation-open-archive";
 const store = new ConsultationHistoryStore();
+const evidenceHistory = new EvidenceHistoryStore();
 
 interface CompletionDetail {
   report: CouncilReport;
@@ -149,7 +151,7 @@ function ConsultationHistoryPortal() {
     setBusy(`delete:${sessionId}`);
     setError(null);
     try {
-      await store.delete(sessionId);
+      await Promise.all([store.delete(sessionId), evidenceHistory.delete(sessionId)]);
       if (openSessionId === sessionId) setOpenSessionId(null);
       await refresh();
     } catch (caught) {
@@ -164,7 +166,7 @@ function ConsultationHistoryPortal() {
     setBusy("clear");
     setError(null);
     try {
-      await store.clear();
+      await Promise.all([store.clear(), evidenceHistory.clear()]);
       setOpenSessionId(null);
       await refresh();
     } catch (caught) {
