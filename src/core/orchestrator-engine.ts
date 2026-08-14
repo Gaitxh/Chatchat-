@@ -46,7 +46,11 @@ export class CouncilOrchestrator {
     const sealedFacts = await this.#facts(options, "sealed", 1, []);
     const sealed = await Promise.all(this.#agents.map(async (agent) => ({
       agent,
-      contributions: await agent.respond(this.#context(agent, blackboard, sessionId, question, mode, "sealed", 1, [], sealedFacts)),
+      contributions: await this.#respond(
+        agent,
+        this.#context(agent, blackboard, sessionId, question, mode, "sealed", 1, [], sealedFacts),
+        options,
+      ),
     })));
     await this.#publish(blackboard, sealed.flatMap(({ agent, contributions }) =>
       contributions.map((item) => this.#materialize(sessionId, 1, agent.participant.id, item))), options);
@@ -59,7 +63,11 @@ export class CouncilOrchestrator {
       const facts = await this.#facts(options, "debate", round, snapshot);
       const turns = await Promise.all(this.#agents.map(async (agent) => ({
         agent,
-        contributions: await agent.respond(this.#context(agent, blackboard, sessionId, question, mode, "debate", round, snapshot, facts)),
+        contributions: await this.#respond(
+          agent,
+          this.#context(agent, blackboard, sessionId, question, mode, "debate", round, snapshot, facts),
+          options,
+        ),
       })));
       const roundEvents = turns.flatMap(({ agent, contributions }) =>
         contributions.map((item) => this.#materialize(sessionId, round, agent.participant.id, item)));
@@ -86,7 +94,11 @@ export class CouncilOrchestrator {
     const finalFacts = await this.#facts(options, "final", finalRound, finalSnapshot);
     const finalTurns = await Promise.all(this.#agents.map(async (agent) => ({
       agent,
-      contributions: await agent.respond(this.#context(agent, blackboard, sessionId, question, mode, "final", finalRound, finalSnapshot, finalFacts)),
+      contributions: await this.#respond(
+        agent,
+        this.#context(agent, blackboard, sessionId, question, mode, "final", finalRound, finalSnapshot, finalFacts),
+        options,
+      ),
     })));
     await this.#publish(blackboard, finalTurns.flatMap(({ agent, contributions }) =>
       contributions.map((item) => this.#materialize(sessionId, finalRound, agent.participant.id, item))), options);
@@ -116,6 +128,38 @@ export class CouncilOrchestrator {
       ownEvents: blackboard.forActor(agent.participant.id),
       ...(toolFacts.length ? { toolFacts } : {}),
     };
+  }
+
+  async #respond(
+    agent: CouncilAgent,
+    context: CouncilContext,
+    options: CouncilRunOptions,
+  ): Promise<readonly CouncilContribution[]> {
+    await options.onParticipantTurn?.({
+      phase: context.phase,
+      round: context.round,
+      participant: agent.participant,
+      state: "working",
+    });
+    try {
+      const contributions = await agent.respond(context);
+      await options.onParticipantTurn?.({
+        phase: context.phase,
+        round: context.round,
+        participant: agent.participant,
+        state: "completed",
+        contributionKinds: contributions.map((item) => item.kind),
+      });
+      return contributions;
+    } catch (error) {
+      await options.onParticipantTurn?.({
+        phase: context.phase,
+        round: context.round,
+        participant: agent.participant,
+        state: "failed",
+      });
+      throw error;
+    }
   }
 
   async #facts(
