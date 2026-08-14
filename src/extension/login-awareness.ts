@@ -47,8 +47,8 @@ export function deriveConnectionExperience(
   input: ConnectionExperienceInput,
 ): ConnectionExperienceState {
   if (input.connectionState === "ready") return "ready";
-  if (input.connectionState === "connecting") return "connecting";
   if (input.recovering) return "recovering";
+  if (input.connectionState === "connecting") return "connecting";
   if (input.connectionState === "idle") return "preparing";
   return likelyLoginPage(input.probe) ? "login_required" : "needs_attention";
 }
