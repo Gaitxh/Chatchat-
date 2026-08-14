@@ -97,7 +97,8 @@ export interface CouncilContext {
   question: string;
   phase: CouncilPhase;
   round: number;
-  mode: CouncilConsultationMode;
+  /** Older gate/test contexts may omit this; real runs are filled by the orchestrator. */
+  mode?: CouncilConsultationMode;
   participant: CouncilParticipant;
   publicEvents: readonly CouncilEvent[];
   ownEvents: readonly CouncilEvent[];
