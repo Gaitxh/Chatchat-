@@ -52,9 +52,6 @@ assert(
   "Synthetic showcase must offer a real-mode exit that removes the showcase query parameter.",
 );
 
-// The real product path must still send the generated consultation prompt into
-// the selected browser tab. This is intentionally checked separately from the
-// synthetic showcase so a demo fixture cannot substitute for real page I/O.
 for (const claim of [
   'new BrowserConsultationAgent(',
   'type: "RUN_SPEECH"',
@@ -65,10 +62,6 @@ for (const claim of [
   assert(panel.includes(claim), `Live provider transport path disappeared: ${claim}`);
 }
 
-// A provider turn must carry an explicit session/snapshot identity in the exact
-// prompt that is sent to the page. The audit must then distinguish parse,
-// repair, fallback and Blackboard publication instead of treating page I/O as
-// proof that a model contribution entered the meeting.
 for (const claim of [
   'SESSION_ID:',
   'PUBLIC_SNAPSHOT_EVENT_IDS_JSON:',
@@ -98,8 +91,6 @@ for (const claim of [
   assert(attendance.includes(claim), `Attendance audit model is missing: ${claim}`);
 }
 
-// The raw audit must live outside React state so consultation completion can
-// freeze the exact session even if UI rendering is mid-commit.
 for (const [label, source, claims] of [
   ["execution ledger", executionLedger, ['MAX_BUFFERED_EVENTS', 'providerExecutionAuditSnapshot', 'buffer.push(copy)']],
   ["transport ledger", transportLedger, ['MAX_BUFFERED_RECORDS', 'providerTransportAuditSnapshot', 'recordProviderTransportAudit', 'buffer.push(copy)']],
@@ -132,6 +123,7 @@ for (const claim of [
   'LOCAL · EXECUTION RECEIPT',
   'data-history-execution-audit="loaded"',
   'data-history-execution-snapshot-count',
+  'data-history-execution-published-count',
   'executionHistory.delete(sessionId)',
   'executionHistory.clear()',
 ]) {
@@ -140,12 +132,17 @@ for (const claim of [
 for (const claim of [
   'chatchat-provider-execution-history-v1',
   'data-chatchat-execution-history-persistence-showcase',
+  'data-chatchat-execution-history-replay-showcase',
   'execution.transports',
   'execution.execution',
   'record.stage === "structured_parsed"',
   'record.snapshotEventIds.length > 0',
+  'historyButton.click()',
+  'data-history-execution-audit="loaded"',
+  'data-history-execution-snapshot-count',
+  'data-history-execution-published-count',
 ]) {
-  assert(historyGuard.includes(claim), `Chromium history proof does not enforce durable execution receipts: ${claim}`);
+  assert(historyGuard.includes(claim), `Chromium history proof does not enforce durable execution receipt replay: ${claim}`);
 }
 
 for (const [label, doc] of [["English", auditDocEn], ["Chinese", auditDocZh]]) {
@@ -166,9 +163,6 @@ assert(auditDocZh.includes('Durable execution receipt'), "Chinese docs must desc
 assert(auditDocEn.includes('zero Provider calls'), "English docs must preserve archive replay no-call semantics.");
 assert(auditDocZh.includes('0 次 Provider 调用'), "Chinese docs must preserve archive replay no-call semantics.");
 
-// The showcase is known to be synthetic and deterministic. Keeping these
-// assertions makes that fact explicit instead of allowing CI fixture speech to
-// silently masquerade as third-party model inference.
 for (const claim of [
   'if (params.get("showcase") !== "consultation") return;',
   'Synthetic automatic connection passed.',
