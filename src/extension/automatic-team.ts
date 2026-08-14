@@ -2,16 +2,6 @@ import { BUILT_IN_PROVIDER_MANIFESTS, detectProviderUrl } from "../provider-sdk/
 
 export type AutomaticTeamDetection = ReturnType<typeof detectProviderUrl>;
 
-export interface AutomaticTeamBrowserTab {
-  id?: number;
-  url?: string;
-}
-
-export interface ReusableAutomaticTeamTab {
-  id: number;
-  url: string;
-}
-
 export const DEFAULT_AUTOMATIC_PROVIDER_IDS = [
   "openai-chatgpt",
   "anthropic-claude",
@@ -21,10 +11,14 @@ export const DEFAULT_AUTOMATIC_PROVIDER_IDS = [
 export const DEFAULT_AUTOMATIC_TEAM_SIZE = 3;
 
 /**
- * Keep already-open independent AI origins first. If fewer than two are present,
- * fill a small starter team automatically. Once two or more real origins are
- * already available, do not ask for extra provider permissions just to hit a
- * cosmetic team size.
+ * Keep already-open independent AI origins first when choosing the team. If fewer
+ * than two are present, fill a small starter team automatically. Once two or more
+ * real origins are already available, do not ask for extra Provider permissions
+ * just to hit a cosmetic team size.
+ *
+ * Important: discovered tabs influence team selection only. ChatChat launches a
+ * dedicated clean consultation tab for every selected Provider so it never sends
+ * handshake or consultation prompts into a user's existing AI conversation.
  */
 export function buildAutomaticTeamPlan(
   discovered: readonly AutomaticTeamDetection[],
@@ -52,26 +46,12 @@ export function buildAutomaticTeamPlan(
 }
 
 /**
- * Zero-config onboarding should reuse a user's already-open AI tab whenever the
- * tab belongs to the planned Provider origin. This keeps existing login/session
- * state, avoids duplicate tabs, and lets ChatChat close only tabs it created.
+ * A discovered Provider may be sitting inside a valuable existing conversation.
+ * Always launch from the Provider's clean start URL when one is known instead of
+ * navigating or writing into the discovered tab itself.
  */
-export function findReusableAutomaticTeamTab(
-  detection: AutomaticTeamDetection,
-  tabs: readonly AutomaticTeamBrowserTab[],
-  usedTabIds: ReadonlySet<number> = new Set<number>(),
-): ReusableAutomaticTeamTab | null {
-  for (const tab of tabs) {
-    if (!tab.id || !tab.url || usedTabIds.has(tab.id) || !/^https?:/i.test(tab.url)) continue;
-    try {
-      const current = detectProviderUrl(tab.url);
-      if (current.kind !== "known" || current.origin !== detection.origin) continue;
-      return { id: tab.id, url: current.normalizedUrl };
-    } catch {
-      // Ordinary non-provider tabs are irrelevant to automatic team assembly.
-    }
-  }
-  return null;
+export function automaticTeamLaunchUrl(detection: AutomaticTeamDetection): string {
+  return detection.manifest?.defaultUrl ?? detection.normalizedUrl;
 }
 
 export function automaticTeamPermissionDescriptor(
