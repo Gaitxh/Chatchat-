@@ -15,6 +15,8 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Assertion failed: ${message}`);
 }
 
+let counter = 0;
+
 const participants: CouncilParticipant[] = [
   { id: "a", name: "ChatGPT", provider: "test" },
   { id: "b", name: "Claude", provider: "test" },
@@ -166,7 +168,6 @@ function longMeeting(): CouncilEvent[] {
   return result;
 }
 
-let counter = 0;
 function event<T extends Omit<CouncilEvent, "sessionId" | "createdAt">>(value: T): CouncilEvent {
   return {
     ...value,
