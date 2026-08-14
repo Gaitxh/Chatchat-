@@ -5,6 +5,8 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Assertion failed: ${message}`);
 }
 
+let tick = 0;
+
 const participant: CouncilParticipant = { id: "claude", name: "Claude", provider: "test" };
 const peer: CouncilParticipant = { id: "gpt", name: "ChatGPT", provider: "test" };
 
@@ -67,7 +69,6 @@ assert((parseJsonLine(shortPrompt, "PINNED_OPEN_ISSUE_EVENT_IDS_JSON") as unknow
 console.log("✓ ChatChat pinned old issue response-opportunity prompt tests passed");
 console.log("✓ Conflict memory restores attention without turning every open issue into privileged content");
 
-let tick = 0;
 function event<T extends Omit<CouncilEvent, "sessionId" | "createdAt">>(value: T): CouncilEvent {
   return {
     ...value,
