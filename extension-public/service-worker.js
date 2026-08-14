@@ -7,20 +7,24 @@ import {
 const MAX_EVIDENCE_BYTES = 256 * 1024;
 const EVIDENCE_TIMEOUT_MS = 8_000;
 
-const enablePanelOnAction = async () => {
+const configurePrimaryAction = async () => {
   try {
-    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
   } catch (error) {
-    console.warn("ChatChat could not enable action-click side panel behavior", error);
+    console.warn("ChatChat could not configure the primary Full Room action", error);
   }
 };
 
 chrome.runtime.onInstalled.addListener(() => {
-  void enablePanelOnAction();
+  void configurePrimaryAction();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  void enablePanelOnAction();
+  void configurePrimaryAction();
+});
+
+chrome.action.onClicked.addListener(() => {
+  void openFullRoom();
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -33,6 +37,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }));
   return true;
 });
+
+async function openFullRoom() {
+  const appUrl = chrome.runtime.getURL("app/app.html");
+  try {
+    const tabs = await chrome.tabs.query({});
+    const existing = tabs.find((tab) => typeof tab.url === "string" && tab.url.startsWith(appUrl));
+    if (existing?.id) {
+      await chrome.tabs.update(existing.id, { active: true });
+      if (typeof existing.windowId === "number" && chrome.windows?.update) {
+        await chrome.windows.update(existing.windowId, { focused: true }).catch(() => undefined);
+      }
+      return;
+    }
+    await chrome.tabs.create({ url: appUrl, active: true });
+  } catch (error) {
+    console.warn("ChatChat could not open the Full Room", error);
+  }
+}
 
 async function verifyEvidenceSource(rawUrl) {
   const url = publicEvidenceUrl(rawUrl);
@@ -136,4 +158,4 @@ async function readBoundedText(response, maxBytes) {
   return { text, bytesRead, truncated };
 }
 
-void enablePanelOnAction();
+void configurePrimaryAction();

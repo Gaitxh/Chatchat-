@@ -1,5 +1,10 @@
 import { MAX_CONSULTATION_PARTICIPANTS } from "../consultation/equality.js";
 import { detectProviderUrl } from "../provider-sdk/catalog.js";
+import {
+  automaticTeamPermissionDescriptor,
+  buildAutomaticTeamPlan,
+  type AutomaticTeamDetection,
+} from "./automatic-team.js";
 import "./web-room-onboarding.css";
 
 declare const chrome: any;
@@ -25,26 +30,32 @@ interface ParticipantRecord {
 
 const COPY = {
   en: {
-    kicker: "ZERO-TOUCH SETUP",
-    title: "One click. A clean AI team.",
-    body: "ChatChat finds AI sites you already use, asks for those site permissions once, then opens a fresh conversation tab for each AI. Your existing chats stay untouched while connection and protocol checks continue automatically.",
-    button: "Auto-assemble my AI team",
-    none: "Open the AI sites you normally use and sign in. ChatChat keeps scanning this browser and will find them here.",
-    found: (count: number) => `${count} AI source${count === 1 ? "" : "s"} ready to assemble`,
-    working: "Creating clean AI conversation tabs…",
-    done: "Team created. Automatic connection is taking over…",
-    privacy: "You only choose the AI sites. Login stays with each provider.",
+    kicker: "ZERO-CONFIG START",
+    title: "Open ChatChat. The room assembles itself.",
+    body: "ChatChat uses AI sites already open in your browser first. If there are not enough, one click opens a small starter team in clean conversation tabs. Page recognition, connection checks, and consultation readiness all continue automatically.",
+    button: "Start automatic setup",
+    none: "No AI tabs are open yet. ChatChat can open a starter team for you — no setup forms or technical configuration.",
+    found: (count: number) => `${count} AI source${count === 1 ? "" : "s"} already found`,
+    plan: (names: string) => `Automatic team: ${names}`,
+    working: "Preparing clean AI conversation tabs…",
+    done: "The room is assembled. Automatic connection is taking over…",
+    privacy: "The only unavoidable first-run step is the browser's own site-permission confirmation. Provider login stays with each AI site.",
+    denied: "Site access was not granted. ChatChat cannot connect those AI pages without the browser's permission.",
+    failed: "ChatChat could not create enough clean AI conversation tabs.",
   },
   "zh-CN": {
-    kicker: "零配置召集",
-    title: "只点一次，组建一个干净的 AI 团队。",
-    body: "ChatChat 会找到你平时使用的 AI 网站，一次请求必要的站点权限，然后为每个 AI 新开一个干净会话。原来的聊天不会被拿来做握手，连通检查和协商协议验证会自动继续。",
-    button: "自动召集我的 AI 团队",
-    none: "打开你平时使用的 AI 网站并完成登录。ChatChat 会继续扫描这个浏览器，发现后会自动显示在这里。",
-    found: (count: number) => `发现 ${count} 个可以召集的 AI 来源`,
-    working: "正在创建干净的 AI 会话标签页……",
-    done: "AI 团队已创建，自动连接流程正在接管……",
-    privacy: "你只负责选择 AI 网站，登录状态仍由各个 Provider 自己管理。",
+    kicker: "零配置开始",
+    title: "打开 ChatChat，会议室自己组起来。",
+    body: "ChatChat 会优先使用浏览器里已经打开的 AI；数量不够时，只点一次就会自动打开一组干净的 AI 会话。页面识别、连接检查和协商就绪验证都会自动继续。",
+    button: "开始自动配置",
+    none: "现在还没有打开 AI 标签页。ChatChat 可以直接替你打开一组起步 AI——不用填配置表，也不用理解任何技术设置。",
+    found: (count: number) => `已经发现 ${count} 个 AI 来源`,
+    plan: (names: string) => `自动团队：${names}`,
+    working: "正在准备干净的 AI 会话标签页……",
+    done: "会议室已经组好，自动连接流程正在接管……",
+    privacy: "第一次唯一无法省掉的是浏览器自己的站点权限确认；各 AI 的登录状态仍然只留在各自网站。",
+    denied: "没有获得站点权限。浏览器不允许 ChatChat 在未授权时连接这些 AI 页面。",
+    failed: "ChatChat 没能创建足够的干净 AI 会话标签页。",
   },
 } as const;
 
@@ -57,17 +68,22 @@ async function mount() {
   const root = document.getElementById("web-onboarding-root");
   const guideRoot = document.getElementById("first-run-guide-root");
   if (!root) return;
-  const locale: Locale = navigator.language?.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
+  const locale: Locale = document.documentElement.lang.toLowerCase().startsWith("zh")
+    || navigator.language?.toLowerCase().startsWith("zh")
+    ? "zh-CN"
+    : "en";
   const strings = COPY[locale];
   const session = chrome.storage.session ?? chrome.storage.local;
   const stored = await session.get(PARTICIPANTS_KEY);
   const hasParticipants = Array.isArray(stored[PARTICIPANTS_KEY]) && stored[PARTICIPANTS_KEY].length > 0;
   if (hasParticipants) {
+    delete document.documentElement.dataset.chatchatOnboarding;
     root.hidden = true;
     if (guideRoot) guideRoot.hidden = false;
     return;
   }
 
+  document.documentElement.dataset.chatchatOnboarding = "zero-config";
   if (guideRoot) guideRoot.hidden = true;
   const card = document.createElement("section");
   card.className = "zero-touch-card";
@@ -99,36 +115,72 @@ async function mount() {
   card.append(copy, action);
   root.append(card);
 
-  let discovered = await discover();
-  renderDiscovery();
-  const scan = window.setInterval(async () => {
-    if (discovered.length) return;
-    discovered = await discover();
-    renderDiscovery();
-  }, 2500);
+  let discovered: AutomaticTeamDetection[] = [];
+  let plan: AutomaticTeamDetection[] = [];
+  let permissionReady = false;
+  let starting = false;
+  let scan: number | undefined;
+
+  await refreshPlan();
+
+  if (!starting) {
+    scan = window.setInterval(() => {
+      if (!starting) void refreshPlan();
+    }, 2500);
+  }
 
   button.addEventListener("click", async () => {
-    if (!discovered.length) {
-      discovered = await discover();
-      renderDiscovery();
-      return;
-    }
+    if (starting || !plan.length) return;
+    starting = true;
     button.disabled = true;
     status.textContent = strings.working;
     try {
-      await assemble(discovered);
-      window.clearInterval(scan);
+      let granted = permissionReady;
+      if (!granted) {
+        granted = await chrome.permissions.request(automaticTeamPermissionDescriptor(plan));
+      }
+      if (!granted) throw new Error(strings.denied);
+      await assemble(plan, strings.failed);
+      clearScan();
       status.textContent = strings.done;
-      window.setTimeout(() => window.location.reload(), 700);
+      window.setTimeout(() => window.location.reload(), 650);
     } catch (error) {
+      starting = false;
       button.disabled = false;
       status.textContent = error instanceof Error ? error.message : String(error);
     }
   });
 
-  function renderDiscovery() {
+  async function refreshPlan() {
+    discovered = await discover();
+    plan = buildAutomaticTeamPlan(discovered, MAX_CONSULTATION_PARTICIPANTS);
+    permissionReady = plan.length > 0
+      && await chrome.permissions.contains(automaticTeamPermissionDescriptor(plan));
     found.textContent = discovered.length ? strings.found(discovered.length) : strings.none;
-    button.disabled = discovered.length === 0;
+    status.textContent = plan.length ? strings.plan(plan.map((item) => item.displayName).join(" · ")) : "";
+    button.disabled = starting || plan.length < 2;
+
+    if (permissionReady && plan.length >= 2 && !starting) {
+      starting = true;
+      button.disabled = true;
+      status.textContent = strings.working;
+      try {
+        await assemble(plan, strings.failed);
+        clearScan();
+        status.textContent = strings.done;
+        window.setTimeout(() => window.location.reload(), 650);
+      } catch (error) {
+        starting = false;
+        button.disabled = false;
+        status.textContent = error instanceof Error ? error.message : String(error);
+      }
+    }
+  }
+
+  function clearScan() {
+    if (scan === undefined) return;
+    window.clearInterval(scan);
+    scan = undefined;
   }
 }
 
@@ -159,9 +211,9 @@ async function retryAfterLogin(tabId: number) {
   retry.click();
 }
 
-async function discover() {
+async function discover(): Promise<AutomaticTeamDetection[]> {
   const tabs = (await chrome.tabs.query({})) as BrowserTab[];
-  const byOrigin = new Map<string, ReturnType<typeof detectProviderUrl>>();
+  const byOrigin = new Map<string, AutomaticTeamDetection>();
   for (const tab of tabs) {
     if (!tab.id || !tab.url || !/^https?:/i.test(tab.url)) continue;
     try {
@@ -174,17 +226,10 @@ async function discover() {
   return [...byOrigin.values()].slice(0, MAX_CONSULTATION_PARTICIPANTS);
 }
 
-async function assemble(discovered: readonly ReturnType<typeof detectProviderUrl>[]) {
-  const origins = [...new Set(discovered.map((detection) => `${detection.origin}/*`))];
-  const descriptor = { origins };
-  if (!(await chrome.permissions.contains(descriptor))) {
-    const granted = await chrome.permissions.request(descriptor);
-    if (!granted) throw new Error("ChatChat needs permission for the selected AI sites before it can connect them.");
-  }
-
+async function assemble(plan: readonly AutomaticTeamDetection[], failureMessage: string) {
   const participants: ParticipantRecord[] = [];
   const connections: Record<string, { state: "idle"; automatic: true }> = {};
-  for (const detection of discovered) {
+  for (const detection of plan) {
     const startUrl = detection.manifest?.defaultUrl ?? detection.normalizedUrl;
     const fresh = await chrome.tabs.create({ url: startUrl, active: false });
     if (!fresh?.id) continue;
@@ -203,7 +248,7 @@ async function assemble(discovered: readonly ReturnType<typeof detectProviderUrl
     });
     connections[seatId] = { state: "idle", automatic: true };
   }
-  if (!participants.length) throw new Error("ChatChat could not create a clean AI conversation tab.");
+  if (participants.length < 2) throw new Error(failureMessage);
   const session = chrome.storage.session ?? chrome.storage.local;
   await session.set({ [PARTICIPANTS_KEY]: participants, [CONNECTIONS_KEY]: connections });
 }

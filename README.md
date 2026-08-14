@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/readme/chatchat-hero-minimal.svg" width="100%" alt="ChatChat — one proposal, independent minds, shared reasoning" />
 
-  <p><strong>Bring the AI tabs you already use into one local consultation.</strong><br />Ask once. Let independent AIs think alone first, then challenge claims, bring evidence, revise positions, preserve disagreement, and decide what is still worth investigating.</p>
+  <p><strong>Click ChatChat and let the Full Room assemble a local AI team around one proposal.</strong><br />Ask once. Independent AIs think alone first, then challenge claims, bring evidence, revise positions, preserve disagreement, and decide what is still worth investigating.</p>
 
   <p><em>A small, polite intellectual riot — with receipts.</em></p>
 
@@ -178,17 +178,20 @@ Arena respects `prefers-reduced-motion`. “Room heat” means interaction inten
 
 ---
 
-## Local-first by design
+## Zero-config by default
 
-For a normal user, setup should feel like:
+The Full Room is the primary product surface. A normal first run should feel like:
 
 ```text
-1 · Open the AI sites you already use
-2 · Let ChatChat connect the discovered AIs
-3 · Write one proposal
+1 · Click ChatChat
+2 · Confirm the browser's site-access prompt once, if asked
+3 · Sign in normally to any AI that needs it — ChatChat resumes by itself
+4 · Write one proposal
 ```
 
-Underneath, ChatChat attempts page discovery → a short connection handshake → the structured Consultation Gate. If an AI is on a login page, sign in normally; after the page reloads, ChatChat resumes automatically. Manual selector teaching lives under **Advanced repair**.
+If two or more known AI sources are already open, ChatChat keeps those sources and does not add extra providers just to inflate the room. If there are not enough, it prepares a small starter team automatically in clean conversation tabs. Once the required site access has been granted, later room assembly can happen with **zero setup clicks**.
+
+Underneath, ChatChat handles page recognition → connection handshake → consultation readiness automatically. The toolbar opens or focuses the **Full Room directly**. The Side Panel remains an optional compact controller. URL entry, manual page teaching, selectors and repair tools stay out of the novice path under **Advanced repair**.
 
 Provider accounts remain in their own browser tabs. ChatChat has no relay server. Evidence source checks use bounded, credential-free fetches after browser permission. Archive replay reads frozen local IndexedDB events and evidence observations with **zero automatic Provider calls and zero automatic source re-checks**.
 

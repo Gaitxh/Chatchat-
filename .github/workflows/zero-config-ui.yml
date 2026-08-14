@@ -1,0 +1,120 @@
+name: Zero-config UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: chatchat-zero-config-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zero-config-full-room:
+    name: Zero-config · fresh Full Room
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install and build production extension
+        run: |
+          npm install
+          npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Locate Chromium browser
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_BIN"
+          echo "CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
+
+      - name: Start production preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4181 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-zero-config-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4181/manifest.json >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4181/manifest.json >/dev/null
+
+      - name: Capture fresh English Full Room
+        run: |
+          URL='http://127.0.0.1:4181/app/app.html?showcase=zero-config&lang=en'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=8000 \
+            --window-size=1440,1800 \
+            --screenshot=artifacts/chatchat-zero-config-en.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=8000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-zero-config-en.html
+          test -s artifacts/chatchat-zero-config-en.png
+          grep -q 'data-chatchat-zero-config-showcase="complete"' artifacts/chatchat-zero-config-en.html
+          grep -q 'ZERO-CONFIG START' artifacts/chatchat-zero-config-en.html
+          grep -q 'Automatic team: ChatGPT · Claude · Gemini' artifacts/chatchat-zero-config-en.html
+          grep -q 'Start automatic setup' artifacts/chatchat-zero-config-en.html
+
+      - name: Capture fresh Chinese Full Room
+        run: |
+          URL='http://127.0.0.1:4181/app/app.html?showcase=zero-config&lang=zh'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=8000 \
+            --window-size=1440,1800 \
+            --screenshot=artifacts/chatchat-zero-config-zh.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=8000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-zero-config-zh.html
+          test -s artifacts/chatchat-zero-config-zh.png
+          grep -q 'data-chatchat-zero-config-showcase="complete"' artifacts/chatchat-zero-config-zh.html
+          grep -q '零配置开始' artifacts/chatchat-zero-config-zh.html
+          grep -q '自动团队：ChatGPT · Claude · Gemini' artifacts/chatchat-zero-config-zh.html
+          grep -q '开始自动配置' artifacts/chatchat-zero-config-zh.html
+
+      - name: Save preview log
+        if: always()
+        run: cp /tmp/chatchat-zero-config-preview.log artifacts/preview.log 2>/dev/null || true
+
+      - name: Upload zero-config browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-zero-config-ui
+          path: artifacts/**
+          if-no-files-found: warn
+          retention-days: 14
