@@ -66,7 +66,7 @@ The audit deliberately labels that turn **FALLBACK** even if the fallback event 
 
 `?showcase=consultation` still uses deterministic synthetic Provider speech for reproducible Chromium UI/protocol proof. The Attendance Audit is rendered there so the complete audit UI can be tested, but the page remains labeled `DEMO · SYNTHETIC` and explicitly says that third-party models did not attend.
 
-The live-deliberation Chromium guard now requires the showcase to exhibit at least one visible turn with:
+The live-deliberation Chromium guard requires the showcase to exhibit at least one visible turn with:
 
 - `published` or `repaired` state;
 - a non-zero public snapshot event count; and
@@ -74,6 +74,37 @@ The live-deliberation Chromium guard now requires the showcase to exhibit at lea
 
 That proves the audit mechanism and UI work end-to-end in production Chromium. It does **not** convert synthetic fixture speech into real Provider inference.
 
-## Data retention
+## Durable execution receipt
 
-The current Attendance Audit is a live, in-memory execution view. Meeting history already persists the structured public events separately. Persisting the execution audit itself as a durable session receipt is a natural next step, but until that storage contract is added ChatChat should not imply that transport/parse audit records survive browser restart.
+When a consultation closes, ChatChat now freezes the raw execution evidence into a local IndexedDB sidecar keyed by the same `sessionId` as the consultation archive:
+
+- every buffered Provider transport record for that session;
+- every parse / repair / fallback audit event for that session;
+- the live-versus-synthetic execution mode.
+
+The sidecar database is `chatchat-provider-execution-history-v1`. It is saved in parallel with the ordinary consultation archive and frozen Evidence history. `chatchat:consultation-history-updated` is announced only after all three persistence operations complete.
+
+The stored object is deliberately **raw audit evidence**, not a cached `12/12 verified` UI result. When history is opened, ChatChat recomputes the Provider Attendance model from:
+
+1. the frozen transport receipt;
+2. the frozen parse/repair/fallback receipt; and
+3. the frozen Blackboard events in the consultation archive.
+
+That means later UI improvements can reinterpret the same old receipt without rewriting what actually happened during the meeting.
+
+## Historical replay
+
+Consultation History now shows compact execution statistics such as verified Provider turns, repaired turns, fallback turns and failures. Opening a saved meeting expands a `LOCAL · EXECUTION RECEIPT` view with the per-seat, per-round chain and exact snapshot/published event IDs.
+
+Historical execution replay performs **zero Provider calls**. A restart cannot cause ChatChat to ask today's Provider page what supposedly happened yesterday.
+
+Old archives created before this receipt existed remain valid. They simply display that the meeting predates durable Provider execution receipts instead of inventing missing provenance.
+
+## Browser persistence proof
+
+The existing History Chromium guard now treats execution durability as part of the same product contract. It does not mark history persistence complete until it reads the exact session from both:
+
+- `chatchat-consultation-history-v1 / archives`; and
+- `chatchat-provider-execution-history-v1 / receipts`.
+
+The execution receipt must contain transport records, parse/repair records, at least one non-empty peer-visible prompt snapshot, and at least one `structured_parsed` event. This is checked from IndexedDB after the meeting completes rather than inferred from the live DOM.
