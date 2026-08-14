@@ -35,8 +35,10 @@ export function deriveLivePersuasionMoments(
   const participantById = new Map(participants.map((participant) => [participant.id, participant] as const));
 
   return graph.edges
-    .filter((edge) => edge.strength === "strong" && (edge.kind === "revision" || edge.kind === "concede"))
+    .filter((edge) => edge.strength === "strong")
     .map((edge): LivePersuasionMoment | null => {
+      if (edge.kind !== "revision" && edge.kind !== "concede") return null;
+
       const action = eventById.get(edge.sourceEventId);
       const causeId = edge.causedByEventId ?? edge.targetEventId;
       const cause = causeId ? eventById.get(causeId) : undefined;
