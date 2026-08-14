@@ -3,6 +3,7 @@ import {
   automaticTeamPermissionDescriptor,
   buildAutomaticTeamPlan,
 } from "../src/extension/automatic-team.js";
+import { createSerializedRecordMutation } from "../src/extension/serialized-record-mutation.js";
 import { detectProviderUrl } from "../src/provider-sdk/catalog.js";
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -59,5 +60,49 @@ assert(
   "Automatic assembly must launch Gemini from its clean start URL instead of writing into an existing conversation.",
 );
 
+let record: Record<string, string> = {};
+let activeStorageOperations = 0;
+let maxActiveStorageOperations = 0;
+const mutation = createSerializedRecordMutation<string>(
+  async () => {
+    activeStorageOperations += 1;
+    maxActiveStorageOperations = Math.max(maxActiveStorageOperations, activeStorageOperations);
+    await delay(3);
+    const snapshot = { ...record };
+    activeStorageOperations -= 1;
+    return snapshot;
+  },
+  async (next) => {
+    activeStorageOperations += 1;
+    maxActiveStorageOperations = Math.max(maxActiveStorageOperations, activeStorageOperations);
+    await delay(2);
+    record = { ...next };
+    activeStorageOperations -= 1;
+  },
+);
+
+await Promise.all([
+  mutation.upsert("chatgpt", "READY"),
+  mutation.upsert("claude", "READY"),
+  mutation.upsert("gemini", "READY"),
+]);
+assert(
+  Object.keys(record).sort().join(",") === "chatgpt,claude,gemini",
+  "Three providers completing at the same time must preserve all record keys instead of last-write-wins data loss.",
+);
+assert(
+  maxActiveStorageOperations === 1,
+  "Serialized record mutation must prevent overlapping read/merge/write critical sections.",
+);
+
+await mutation.merge({ deepseek: "CONNECTING", qwen: "READY" });
+await mutation.remove("deepseek");
+assert(record.qwen === "READY" && !("deepseek" in record), "Merge/remove mutations should share the same serialized record boundary.");
+
 console.log("✓ ChatChat zero-config automatic team planning tests passed");
 console.log("✓ ChatChat automatic team never hijacks an existing AI conversation");
+console.log("✓ Concurrent provider state mutations cannot overwrite sibling READY records");
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
