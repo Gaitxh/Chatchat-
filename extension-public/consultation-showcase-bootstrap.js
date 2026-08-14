@@ -369,6 +369,11 @@
             document.documentElement.dataset.chatchatLiveFloorShowcase = "complete";
             document.documentElement.dataset.chatchatResearchLanesShowcase = "complete";
           }
+          const freshAgenda = document.querySelector('.live-agenda[data-phase-reason="fresh_signal_follow_up"]');
+          const agendaTriggers = freshAgenda?.querySelectorAll(".live-agenda__trigger") ?? [];
+          if (freshAgenda && agendaTriggers.length >= 1) {
+            document.documentElement.dataset.chatchatLiveAgendaShowcase = "complete";
+          }
           if (
             document.querySelector(".consultation-event.event-evidence")
             && document.querySelector(".consultation-event.event-support")
@@ -386,7 +391,8 @@
             document.querySelector(".outcome-card") &&
             document.querySelector(".live-room-card") &&
             document.querySelector(".consultation-theater") &&
-            researchRoster && replayLaneIds.size >= 3
+            researchRoster && replayLaneIds.size >= 3 &&
+            document.documentElement.dataset.chatchatLiveAgendaShowcase === "complete"
           ) {
             document.documentElement.dataset.chatchatResearchRosterShowcase = "complete";
             document.documentElement.dataset.chatchatConsultationShowcase = "complete";
