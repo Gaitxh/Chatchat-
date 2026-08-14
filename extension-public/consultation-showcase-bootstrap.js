@@ -295,9 +295,39 @@
     }]);
   }
 
+  const ZH_MEETING_TEXT = new Map([
+    ["The differentiated capability is controlling the user's already-authenticated AI webpages locally. I would keep the extension as the product center until the browser workflow is extremely reliable.", "真正有差异化的能力，是在本地控制用户已经登录的 AI 网页。我倾向暂时把扩展保留为技术中心，直到浏览器工作流足够可靠。"],
+    ["The public Web Room should be the product people understand and share. A visible browser-extension control surface creates too much setup language for newcomers.", "真正应该被用户理解和分享的是公开的 Web Room。把浏览器扩展控制面直接暴露给新人，会带来过多配置语言和认知负担。"],
+    ["Treat the Web Room as the meeting and the extension as infrastructure. That preserves logged-in local provider access without making configuration the user's job.", "把 Web Room 当成会议本身，把扩展当成基础设施。这样既保留本地已登录 Provider 的访问能力，又不把配置工作甩给用户。"],
+    ["A Web-first interface is attractive, but how does it reach authenticated ChatGPT, Claude and Gemini sessions without pushing API keys or cross-origin setup back onto the user?", "Web-first 很吸引人，但它如何访问用户已登录的 ChatGPT、Claude 和 Gemini，同时又不把 API Key 或跨域配置重新推给用户？"],
+    ["Chrome extensions can request optional host permissions at runtime rather than demanding every provider permission up front.", "Chrome 扩展可以在运行时请求可选的站点权限，而不必在一开始就要求所有 Provider 权限。"],
+    ["This supports an architecture where the Web Room owns the experience while a narrowly-permissioned extension acts as the authenticated browser bridge.", "这支持一种架构：Web Room 负责用户体验，而一个权限收敛的扩展只承担已登录浏览器桥梁。"],
+    ["The extension may be technically unique, but why should its implementation surface define the product surface? Can the bridge remain invisible while the Web Room owns the novice experience?", "扩展在技术上可能最独特，但为什么实现层要定义产品层？能不能让桥梁隐身，让 Web Room 完整承担新手体验？"],
+    ["Which product layer should remain visible to the user, and which layer should disappear into infrastructure?", "哪些产品层应该让用户看见，哪些层应该彻底沉到基础设施里？"],
+    ["I revise from a pure Web UI position to Web + Extension. The permission model makes the split credible: the Web Room can own the understandable meeting experience while the extension quietly supplies authenticated provider access.", "我从纯 Web UI 修正为 Web + Extension。权限模型让这种分层变得可信：Web Room 负责易懂的会议体验，扩展则安静地提供已登录 Provider 的访问能力。"],
+    ["This permission evidence materially strengthens the case for hiding the extension behind the Web Room instead of exposing broad setup during onboarding.", "这条权限证据明显增强了把扩展藏到 Web Room 背后的理由，而不是在 onboarding 阶段暴露大量设置。"],
+    ["The evidence supports the browser permission mechanism, not adoption by itself. The product conclusion should remain conditional on the bridge staying reliable and genuinely zero-config.", "这条证据证明的是浏览器权限机制，并不能单独证明用户会接受这个产品。最终结论仍应以桥梁是否可靠、是否真正零配置为条件。"],
+    ["What remaining failure mode would overturn the current architecture?", "还有什么失败模式足以推翻当前架构判断？"],
+    ["Keep the extension as the technical center because authenticated browser control is the unique capability, but aggressively hide configuration and let the Web Room become the visible shell once bridge reliability is proven.", "保留扩展作为技术中心，因为已登录浏览器控制是独特能力；但应激进地隐藏配置，并在桥梁可靠性得到证明后让 Web Room 成为可见外壳。"],
+    ["The novice-facing UI should still look like one Web consultation room, not an extension settings panel.", "面向新手的界面仍然应该像一间完整的 Web 协商会议室，而不是扩展设置面板。"],
+    ["Make the Web Room the primary product experience and the extension a zero-config authenticated bridge. The meeting metaphor should stay visible; browser plumbing should disappear.", "让 Web Room 成为主要产品体验，让扩展成为零配置的已登录桥梁。会议本身应该被看见，浏览器管线应该消失。"],
+    ["Use a Web-first Consultation Room with a narrowly-permissioned extension bridge. This best separates user experience from provider-specific browser mechanics.", "采用 Web-first 的协商会议室，并配合权限收敛的扩展桥梁。这最能把用户体验与 Provider 特定的浏览器机制分开。"],
+    ["Bridge reliability and provider-page drift remain engineering risks.", "桥梁可靠性和 Provider 页面漂移仍然是工程风险。"],
+  ]);
+
+  function localizeContribution(contribution) {
+    if (locale !== "zh-CN") return contribution;
+    const next = { ...contribution };
+    if (typeof next.content === "string") next.content = ZH_MEETING_TEXT.get(next.content) ?? next.content;
+    if (typeof next.claim === "string") next.claim = ZH_MEETING_TEXT.get(next.claim) ?? next.claim;
+    if (Array.isArray(next.caveats)) next.caveats = next.caveats.map((item) => ZH_MEETING_TEXT.get(item) ?? item);
+    return next;
+  }
+
   function structured(contributions) {
+    const localizedContributions = contributions.map(localizeContribution);
     return {
-      responseText: `<CHATCHAT_COUNCIL_JSON>${JSON.stringify({ contributions })}</CHATCHAT_COUNCIL_JSON>`,
+      responseText: `<CHATCHAT_COUNCIL_JSON>${JSON.stringify({ contributions: localizedContributions })}</CHATCHAT_COUNCIL_JSON>`,
       elapsedMs: 420,
       responseCount: 1,
     };
@@ -346,11 +376,19 @@
           ) {
             document.documentElement.dataset.chatchatDeliberationStoryShowcase = "complete";
           }
+          const researchRoster = document.querySelector(".research-roster");
+          const replayLaneIds = new Set(
+            [...document.querySelectorAll("[data-research-roster-lane]")]
+              .map((node) => node.dataset.researchRosterLane)
+              .filter(Boolean),
+          );
           if (
             document.querySelector(".outcome-card") &&
             document.querySelector(".live-room-card") &&
-            document.querySelector(".consultation-theater")
+            document.querySelector(".consultation-theater") &&
+            researchRoster && replayLaneIds.size >= 3
           ) {
+            document.documentElement.dataset.chatchatResearchRosterShowcase = "complete";
             document.documentElement.dataset.chatchatConsultationShowcase = "complete";
             return;
           }

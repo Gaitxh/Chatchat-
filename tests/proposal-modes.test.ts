@@ -52,6 +52,7 @@ assert(verifyPrompt.includes("CONSULTATION_MODE: verify"), "Verify mode must be 
 assert(verifyPrompt.includes("MODE_GOAL"), "Mode goal must be visible machine-readable consultation context.");
 assert(verifyPrompt.includes("source scope") && verifyPrompt.includes("dates"), "Verify mode should actually direct attention to evidence scope and dates.");
 assert(verifyPrompt.includes("special authority"), "Mode must explicitly deny special authority to any participant.");
+assert(verifyPrompt.includes("same working language as USER_PROPOSAL_JSON"), "Participants should use the user proposal working language for substantive meeting speech.");
 
 const stressPrompt = buildProviderConsultationPrompt(context("stress_test", "a"));
 assert(stressPrompt.includes("CONSULTATION_MODE: stress_test"), "Stress Test mode must be explicit in the prompt.");
