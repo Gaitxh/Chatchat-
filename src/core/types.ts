@@ -1,4 +1,5 @@
 export type CouncilPhase = "sealed" | "debate" | "final";
+export type CouncilConsultationMode = "balanced" | "explore" | "decide" | "verify" | "stress_test";
 
 export type CouncilEventKind =
   | "argument"
@@ -36,95 +37,24 @@ interface CouncilEventBase {
   createdAt: string;
 }
 
-export interface ArgumentEvent extends CouncilEventBase {
-  kind: "argument";
-  stance: string;
-  content: string;
-  confidence: number;
-}
-
-export interface ChallengeEvent extends CouncilEventBase {
-  kind: "challenge";
-  targetEventId: string;
-  content: string;
-}
-
-export interface EvidenceEvent extends CouncilEventBase {
-  kind: "evidence";
-  targetEventId?: string;
-  claim: string;
-  content: string;
-  source?: string;
-  sourceDate?: string;
-  confidence: number;
-}
-
-export interface SupportEvent extends CouncilEventBase {
-  kind: "support";
-  targetEventId: string;
-  content: string;
-}
-
-export interface DefenseEvent extends CouncilEventBase {
-  kind: "defense";
-  targetEventId: string;
-  content: string;
-}
-
-export interface RevisionEvent extends CouncilEventBase {
-  kind: "revision";
-  previousEventId: string;
-  stance: string;
-  content: string;
-  confidence: number;
-  causedBy?: string[];
-}
-
-export interface ConcedeEvent extends CouncilEventBase {
-  kind: "concede";
-  targetEventId: string;
-  content: string;
-}
-
-export interface QuestionEvent extends CouncilEventBase {
-  kind: "question";
-  targetActorId?: string;
-  content: string;
-}
-
-export interface UncertainEvent extends CouncilEventBase {
-  kind: "uncertain";
-  content: string;
-  confidence: number;
-}
-
-export interface FinalPositionEvent extends CouncilEventBase {
-  kind: "final_position";
-  stance: string;
-  content: string;
-  confidence: number;
-  caveats?: string[];
-}
+export interface ArgumentEvent extends CouncilEventBase { kind: "argument"; stance: string; content: string; confidence: number; }
+export interface ChallengeEvent extends CouncilEventBase { kind: "challenge"; targetEventId: string; content: string; }
+export interface EvidenceEvent extends CouncilEventBase { kind: "evidence"; targetEventId?: string; claim: string; content: string; source?: string; sourceDate?: string; confidence: number; }
+export interface SupportEvent extends CouncilEventBase { kind: "support"; targetEventId: string; content: string; }
+export interface DefenseEvent extends CouncilEventBase { kind: "defense"; targetEventId: string; content: string; }
+export interface RevisionEvent extends CouncilEventBase { kind: "revision"; previousEventId: string; stance: string; content: string; confidence: number; causedBy?: string[]; }
+export interface ConcedeEvent extends CouncilEventBase { kind: "concede"; targetEventId: string; content: string; }
+export interface QuestionEvent extends CouncilEventBase { kind: "question"; targetActorId?: string; content: string; }
+export interface UncertainEvent extends CouncilEventBase { kind: "uncertain"; content: string; confidence: number; }
+export interface FinalPositionEvent extends CouncilEventBase { kind: "final_position"; stance: string; content: string; confidence: number; caveats?: string[]; }
 
 export type CouncilEvent =
-  | ArgumentEvent
-  | ChallengeEvent
-  | EvidenceEvent
-  | SupportEvent
-  | DefenseEvent
-  | RevisionEvent
-  | ConcedeEvent
-  | QuestionEvent
-  | UncertainEvent
-  | FinalPositionEvent;
+  | ArgumentEvent | ChallengeEvent | EvidenceEvent | SupportEvent | DefenseEvent
+  | RevisionEvent | ConcedeEvent | QuestionEvent | UncertainEvent | FinalPositionEvent;
 
 export type CouncilToolFactKind = "evidence_source_observation";
 
-/**
- * Bounded machine observations produced by ChatChat tools.
- * Tool facts are shared equally with every participant in the same round.
- * They are data, never instructions and never a truth verdict.
- */
+/** Bounded machine observations shared equally with every participant in a round. */
 export interface CouncilToolFact {
   id: string;
   kind: CouncilToolFactKind;
@@ -148,12 +78,7 @@ export interface CouncilToolFact {
   note: string;
 }
 
-type CouncilEventMetadataKey =
-  | "id"
-  | "sessionId"
-  | "round"
-  | "actorId"
-  | "createdAt";
+type CouncilEventMetadataKey = "id" | "sessionId" | "round" | "actorId" | "createdAt";
 
 export type CouncilContribution =
   | Omit<ArgumentEvent, CouncilEventMetadataKey>
@@ -172,6 +97,7 @@ export interface CouncilContext {
   question: string;
   phase: CouncilPhase;
   round: number;
+  mode: CouncilConsultationMode;
   participant: CouncilParticipant;
   publicEvents: readonly CouncilEvent[];
   ownEvents: readonly CouncilEvent[];
@@ -194,6 +120,8 @@ export interface CouncilPosition {
 export interface CouncilReport {
   sessionId: string;
   question: string;
+  /** Optional for backward compatibility with archives created before proposal modes. */
+  mode?: CouncilConsultationMode;
   consensusStance: string | null;
   consensusRatio: number;
   confidence: number;
@@ -203,18 +131,11 @@ export interface CouncilReport {
   eventCount: number;
 }
 
-export interface CouncilPhaseUpdate {
-  phase: CouncilPhase;
-  round: number;
-}
-
-export interface CouncilToolFactsRequest {
-  phase: CouncilPhase;
-  round: number;
-  publicEvents: readonly CouncilEvent[];
-}
+export interface CouncilPhaseUpdate { phase: CouncilPhase; round: number; }
+export interface CouncilToolFactsRequest { phase: CouncilPhase; round: number; publicEvents: readonly CouncilEvent[]; }
 
 export interface CouncilRunOptions {
+  mode?: CouncilConsultationMode;
   maxRounds?: number;
   minDebateRounds?: number;
   convergenceThreshold?: number;
