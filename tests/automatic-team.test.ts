@@ -95,6 +95,12 @@ assert(
   "Serialized record mutation must prevent overlapping read/merge/write critical sections.",
 );
 
+await mutation.defaults({ chatgpt: "IDLE", claude: "IDLE", gemini: "IDLE", deepseek: "IDLE" });
+assert(
+  record.chatgpt === "READY" && record.claude === "READY" && record.gemini === "READY" && record.deepseek === "IDLE",
+  "A stale hydration snapshot may fill missing seats but must never downgrade newer READY states.",
+);
+
 await mutation.merge({ deepseek: "CONNECTING", qwen: "READY" });
 await mutation.remove("deepseek");
 assert(record.qwen === "READY" && !("deepseek" in record), "Merge/remove mutations should share the same serialized record boundary.");
@@ -102,6 +108,7 @@ assert(record.qwen === "READY" && !("deepseek" in record), "Merge/remove mutatio
 console.log("✓ ChatChat zero-config automatic team planning tests passed");
 console.log("✓ ChatChat automatic team never hijacks an existing AI conversation");
 console.log("✓ Concurrent provider state mutations cannot overwrite sibling READY records");
+console.log("✓ Hydration defaults cannot downgrade a newer persisted provider state");
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
