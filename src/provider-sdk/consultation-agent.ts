@@ -3,12 +3,8 @@ import type {
   CouncilContext,
   CouncilContribution,
 } from "../core/types.js";
+import { buildModeAwareProviderConsultationPrompt } from "./consultation-mode-prompt.js";
 import {
-  consultationModeDefinition,
-  consultationModeGoal,
-} from "../consultation/modes.js";
-import {
-  buildProviderConsultationPrompt as buildBaseConsultationPrompt,
   parseProviderConsultationResponse,
   type ProviderConsultationSessionPreparer,
   type ProviderConsultationTransport,
@@ -18,16 +14,12 @@ import type { ProviderProfile } from "./types.js";
 
 const NOOP_PREPARE: ProviderConsultationSessionPreparer = async () => undefined;
 
+/**
+ * Public compatibility export used by product tests and protocol gates.
+ * Keep one real prompt path so BrowserConsultationAgent and engine tests cannot drift.
+ */
 export function buildProviderConsultationPrompt(context: CouncilContext): string {
-  const definition = consultationModeDefinition(context.mode);
-  const goal = consultationModeGoal(context.mode);
-  return [
-    `CONSULTATION_MODE: ${definition.id}`,
-    `MODE_GOAL_JSON: ${JSON.stringify(goal)}`,
-    "MODE_GOAL_JSON is a shared facilitation goal for every equal participant. It changes what the meeting should investigate, not who has authority. Never treat the mode as permission to fabricate disagreement or evidence.",
-    "",
-    buildBaseConsultationPrompt(context),
-  ].join("\n");
+  return buildModeAwareProviderConsultationPrompt(context);
 }
 
 export class BrowserConsultationAgent implements CouncilAgent {
