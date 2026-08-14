@@ -14,7 +14,7 @@
     "check": "npm run check:core && npm run check:web && npm run check:product",
     "check:core": "tsc -p tsconfig.json --noEmit",
     "check:web": "tsc -p tsconfig.app.json --noEmit",
-    "check:product": "node scripts/check-product-language.mjs && node scripts/check-proposal-ownership.mjs",
+    "check:product": "node scripts/check-product-language.mjs && node scripts/check-proposal-ownership.mjs && node scripts/check-readme-product-truth.mjs",
     "demo": "npm run build:core && node dist/src/demo.js",
     "test": "npm run build:core && node scripts/run-test-suite.mjs",
     "preview": "vite preview --port 1420",
