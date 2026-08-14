@@ -1,1 +1,36 @@
-(()=>{const K="chatchat.consultation.participants.v1",last=new Map();chrome.tabs.onUpdated.addListener((id,c)=>{if(c.status!=="complete"&&!c.url)return;setTimeout(()=>retry(id),1000)});async function retry(id){const s=chrome.storage.session??chrome.storage.local,v=await s.get(K),p=Array.isArray(v[K])?v[K]:[],i=p.findIndex(x=>x.tabId===id);if(i<0)return;const seat=String(p[i]?.seatId??id);if(Date.now()-(last.get(seat)??0)<8000)return;const row=[...document.querySelectorAll(".participant-row")][i];if(!row||row.classList.contains("connection-ready")||row.classList.contains("connection-connecting"))return;const b=[...document.querySelectorAll(".setup-participant .verify-button")][i];if(!(b instanceof HTMLButtonElement)||b.disabled||b.classList.contains("is-ready"))return;last.set(seat,Date.now());b.click()}})();
+(() => {
+  const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
+  const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
+  const RETRY_EVENT = "chatchat:connection-retry-requested";
+  const lastRetry = new Map();
+
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.status !== "complete" && !changeInfo.url) return;
+    setTimeout(() => void requestRetry(tabId), 1000);
+  });
+
+  async function requestRetry(tabId) {
+    const store = chrome.storage.session ?? chrome.storage.local;
+    const stored = await store.get([PARTICIPANTS_KEY, CONNECTIONS_KEY]);
+    const participants = Array.isArray(stored[PARTICIPANTS_KEY])
+      ? stored[PARTICIPANTS_KEY]
+      : [];
+    const participant = participants.find((item) => item?.tabId === tabId);
+    if (!participant?.seatId) return;
+
+    const connections = stored[CONNECTIONS_KEY] ?? {};
+    const state = connections[participant.seatId]?.state;
+    if (state === "ready" || state === "connecting") return;
+
+    const previous = lastRetry.get(participant.seatId) ?? 0;
+    if (Date.now() - previous < 8000) return;
+    lastRetry.set(participant.seatId, Date.now());
+
+    window.dispatchEvent(new CustomEvent(RETRY_EVENT, {
+      detail: {
+        seatId: participant.seatId,
+        reason: "provider-tab-loaded",
+      },
+    }));
+  }
+})();
