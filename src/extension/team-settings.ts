@@ -44,11 +44,13 @@ function install(): void {
   const syncCopy = () => {
     const locale = currentLocale();
     const copy = COPY[locale];
-    kicker.textContent = copy.kicker;
-    title.textContent = copy.title;
-    hint.textContent = copy.hint;
-    state.textContent = details.open ? copy.open : copy.closed;
-    details.setAttribute("aria-label", copy.title);
+    setText(kicker, copy.kicker);
+    setText(title, copy.title);
+    setText(hint, copy.hint);
+    setText(state, details.open ? copy.open : copy.closed);
+    if (details.getAttribute("aria-label") !== copy.title) {
+      details.setAttribute("aria-label", copy.title);
+    }
   };
 
   const syncOpenState = () => {
@@ -60,22 +62,30 @@ function install(): void {
   const mount = () => {
     const participants = document.querySelector(".consultation-app .participants-card");
     if (!(participants instanceof HTMLElement) || !participants.parentElement) {
-      root.hidden = true;
+      if (!root.hidden) root.hidden = true;
       return;
     }
 
     if (root.parentElement !== participants.parentElement || root.previousElementSibling !== participants) {
       participants.insertAdjacentElement("afterend", root);
     }
-    root.hidden = document.documentElement.dataset.chatchatOnboarding === "zero-config";
-    syncCopy();
+    const shouldHide = document.documentElement.dataset.chatchatOnboarding === "zero-config";
+    if (root.hidden !== shouldHide) root.hidden = shouldHide;
   };
 
   details.addEventListener("toggle", syncOpenState);
-  const observer = new MutationObserver(mount);
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
+
+  // Keep DOM discovery and copy/state observation separate. Rewriting text from a
+  // subtree MutationObserver can otherwise create a self-sustaining mutation loop
+  // in Chromium even when the visible copy is unchanged.
+  const pageObserver = new MutationObserver(mount);
+  pageObserver.observe(document.body, { childList: true, subtree: true });
+
+  const documentStateObserver = new MutationObserver(() => {
+    syncCopy();
+    mount();
+  });
+  documentStateObserver.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["lang", "data-chatchat-onboarding"],
   });
@@ -92,6 +102,10 @@ function ensureRoot(): HTMLElement {
   root.hidden = true;
   document.body.append(root);
   return root;
+}
+
+function setText(node: HTMLElement, value: string): void {
+  if (node.textContent !== value) node.textContent = value;
 }
 
 function currentLocale(): Locale {
