@@ -157,7 +157,7 @@ function ConsultationReceiptPortal() {
       report={completion.report}
       events={completion.events}
       verifications={verifications}
-      executionIntegrity={executionIntegrity}
+      {...(executionIntegrity ? { executionIntegrity } : {})}
       locale={locale}
       archive={archiveMode}
     />
