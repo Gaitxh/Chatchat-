@@ -1,4 +1,4 @@
-import type { CouncilReport } from "../src/core/types.js";
+import type { CouncilConsultationMode, CouncilReport } from "../src/core/types.js";
 import {
   MAX_INVESTIGATION_TRAIL_EDGES,
   createInvestigationTrailEdge,
@@ -79,7 +79,7 @@ function report(
   sessionId: string,
   question: string,
   stance: string,
-  mode: CouncilReport["mode"],
+  mode: CouncilConsultationMode,
 ): CouncilReport {
   return {
     sessionId,
