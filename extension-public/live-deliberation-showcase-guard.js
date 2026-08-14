@@ -13,12 +13,14 @@
     const challenge = stream.querySelector('.discussion-entry[data-event-kind="challenge"]');
     const evidence = stream.querySelector('.discussion-entry[data-event-kind="evidence"]');
     const revision = stream.querySelector('.discussion-entry[data-event-kind="revision"]');
+    const directReply = stream.querySelector("[data-reply-to-event]");
     const researchDesk = document.querySelector(".live-research-desk");
     const researchLane = researchDesk?.querySelector("[data-research-lane]");
     const researchEvidenceCount = researchDesk?.querySelector("[data-research-evidence-count]");
     const researchEvidence = researchDesk?.querySelector("[data-research-evidence-event]");
     const relationMap = document.querySelector(".relationship-map");
     const relationEdge = relationMap?.querySelector(".relationship-edge");
+    const replyEdge = relationMap?.querySelector(".relationship-edge.edge-reply");
     const traceButton = stream.querySelector(".discussion-entry__footer > button");
 
     if (
@@ -27,12 +29,14 @@
       && challenge
       && evidence
       && revision
+      && directReply
       && researchDesk
       && researchLane
       && researchEvidenceCount
       && researchEvidence
       && relationMap
       && relationEdge
+      && replyEdge
       && traceButton
     ) {
       document.documentElement.setAttribute(COMPLETE_ATTR, "complete");
