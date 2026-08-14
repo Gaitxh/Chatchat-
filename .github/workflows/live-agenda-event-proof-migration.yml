@@ -1,0 +1,46 @@
+name: Live Agenda Event Proof Migration
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Make Live Agenda proof event-driven
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('extension-public/consultation-showcase-bootstrap.js')
+          text = path.read_text()
+          anchor = '  const onUpdatedListeners = new Set();\n'
+          if text.count(anchor) != 1:
+              raise SystemExit('showcase listener anchor changed')
+          insertion = '''  const onUpdatedListeners = new Set();\n\n  window.addEventListener("chatchat:consultation-live", (event) => {\n    const phase = event.detail?.phase;\n    if (phase?.reason !== "fresh_signal_follow_up") return;\n    const expectedTriggerIds = Array.isArray(phase.triggerEventIds) ? phase.triggerEventIds : [];\n    document.documentElement.dataset.chatchatLiveAgendaEngineReason = "fresh_signal_follow_up";\n    let attempts = 0;\n    const verifyRenderedAgenda = () => {\n      const agenda = document.querySelector('.live-agenda[data-phase-reason="fresh_signal_follow_up"]');\n      const triggerNodes = [...(agenda?.querySelectorAll(".live-agenda__trigger") ?? [])];\n      if (agenda && triggerNodes.length >= Math.min(1, expectedTriggerIds.length || 1)) {\n        document.documentElement.dataset.chatchatLiveAgendaShowcase = "complete";\n        document.documentElement.dataset.chatchatLiveAgendaTriggerCount = String(triggerNodes.length);\n        return;\n      }\n      attempts += 1;\n      if (attempts < 40) window.setTimeout(verifyRenderedAgenda, 25);\n    };\n    window.requestAnimationFrame(verifyRenderedAgenda);\n  });\n'''
+          text = text.replace(anchor, insertion, 1)
+          if text.count('chatchatLiveAgendaEngineReason') != 1:
+              raise SystemExit('event-driven Live Agenda proof did not land exactly once')
+          path.write_text(text)
+          PY
+
+      - name: Commit source migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add extension-public/consultation-showcase-bootstrap.js
+          if git diff --cached --quiet; then
+            echo "proof already migrated"
+          else
+            git commit -m "Make Live Agenda browser proof event-driven"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          fi
