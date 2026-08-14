@@ -4,23 +4,17 @@
 
   const COMPLETE_ATTR = "data-chatchat-live-deliberation-showcase";
   const EXCHANGE_ATTR = "data-chatchat-peer-exchange-showcase";
-  let sawPeerQueued = false;
-  let sawPeerResponding = false;
-  let sawPeerAnswered = false;
 
   function inspect() {
     const stream = document.querySelector(".live-discussion-stream");
     if (!(stream instanceof HTMLElement)) return false;
 
-    sawPeerQueued ||= Boolean(document.querySelector('[data-peer-response-state="queued"]'));
-    sawPeerResponding ||= Boolean(document.querySelector('[data-peer-response-state="responding"]'));
-    sawPeerAnswered ||= Boolean(document.querySelector('[data-peer-response-state="answered"][data-peer-response-event]'));
-    if (sawPeerQueued) document.documentElement.setAttribute("data-chatchat-peer-exchange-saw-queued", "true");
-    if (sawPeerResponding) document.documentElement.setAttribute("data-chatchat-peer-exchange-saw-responding", "true");
-    if (sawPeerAnswered) document.documentElement.setAttribute("data-chatchat-peer-exchange-saw-answered", "true");
-    if (sawPeerQueued && sawPeerResponding && sawPeerAnswered) {
-      document.documentElement.setAttribute(EXCHANGE_ATTR, "complete");
-    }
+    const answeredExchange = document.querySelector('[data-peer-response-state="answered"][data-peer-response-event]');
+    const queuedStage = answeredExchange?.querySelector('[data-peer-stage="queued"]');
+    const targetTurnStage = answeredExchange?.querySelector('[data-peer-stage="responding"]');
+    const answeredStage = answeredExchange?.querySelector('[data-peer-stage="answered"]');
+    const peerLifecycleComplete = Boolean(answeredExchange && queuedStage && targetTurnStage && answeredStage);
+    if (peerLifecycleComplete) document.documentElement.setAttribute(EXCHANGE_ATTR, "complete");
 
     const sealedRound = stream.querySelector(".discussion-round--sealed");
     const debateRound = stream.querySelector(".discussion-round--debate");
@@ -44,9 +38,7 @@
       && evidence
       && revision
       && directReply
-      && sawPeerQueued
-      && sawPeerResponding
-      && sawPeerAnswered
+      && peerLifecycleComplete
       && researchDesk
       && researchLane
       && researchEvidenceCount
