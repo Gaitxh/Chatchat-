@@ -29,23 +29,49 @@ export function publicEvidenceUrl(rawUrl) {
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error("Evidence source must use http or https.");
   }
+  if (url.port) {
+    throw new Error("ChatChat evidence verification only allows the default http/https port.");
+  }
+  if (isPrivateHost(url.hostname)) {
+    throw new Error("ChatChat does not verify localhost, private-network, or non-public evidence URLs.");
+  }
   url.username = "";
   url.password = "";
-  if (isPrivateHost(url.hostname)) {
-    throw new Error("ChatChat does not verify localhost or private-network evidence URLs.");
-  }
+  url.hash = "";
   return url;
 }
 
 export function isPrivateHost(hostname) {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host === "::1") return true;
+  const host = normalizeHost(hostname);
+  if (!host) return true;
+  if (host.includes("%")) return true;
+  if (
+    host === "localhost"
+    || host.endsWith(".localhost")
+    || host.endsWith(".local")
+    || host.endsWith(".localdomain")
+    || host.endsWith(".lan")
+    || host === "home.arpa"
+    || host.endsWith(".home.arpa")
+  ) return true;
+
+  // Single-label names are ordinary intranet/service-discovery hosts, not public
+  // evidence locations. Public IPv6 literals are handled separately below.
+  if (!host.includes(".") && !host.includes(":")) return true;
+
   const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (!ipv4) return false;
-  const parts = ipv4.slice(1).map(Number);
-  if (parts.some((part) => part < 0 || part > 255)) return true;
-  const [a, b] = parts;
-  return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || a >= 224;
+  if (ipv4) {
+    const parts = ipv4.slice(1).map(Number);
+    if (parts.some((part) => part < 0 || part > 255)) return true;
+    return isNonPublicIpv4(parts);
+  }
+
+  if (host.includes(":")) {
+    const words = parseIpv6Words(host);
+    return !words || isNonPublicIpv6(words);
+  }
+
+  return false;
 }
 
 export function extractTitle(text) {
@@ -105,6 +131,94 @@ export function extractReadableText(html) {
       .replace(/<!--([\s\S]*?)-->/g, " ")
       .replace(/<[^>]+>/g, " "),
   );
+}
+
+function normalizeHost(hostname) {
+  return hostname
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.+$/, "");
+}
+
+function isNonPublicIpv4(parts) {
+  const [a, b, c] = parts;
+  return a === 0
+    || a === 10
+    || (a === 100 && b >= 64 && b <= 127)
+    || a === 127
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 0 && c === 0)
+    || (a === 192 && b === 0 && c === 2)
+    || (a === 192 && b === 168)
+    || (a === 198 && (b === 18 || b === 19))
+    || (a === 198 && b === 51 && c === 100)
+    || (a === 203 && b === 0 && c === 113)
+    || a >= 224;
+}
+
+function parseIpv6Words(host) {
+  let value = host;
+  if (value.includes("%")) return null;
+
+  // Accept a dotted IPv4 tail defensively even though URL normalisation usually
+  // converts it into hexadecimal words before this function is reached.
+  if (value.includes(".")) {
+    const lastColon = value.lastIndexOf(":");
+    if (lastColon < 0) return null;
+    const ipv4 = value.slice(lastColon + 1).match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!ipv4) return null;
+    const parts = ipv4.slice(1).map(Number);
+    if (parts.some((part) => part < 0 || part > 255)) return null;
+    const high = ((parts[0] << 8) | parts[1]).toString(16);
+    const low = ((parts[2] << 8) | parts[3]).toString(16);
+    value = `${value.slice(0, lastColon)}:${high}:${low}`;
+  }
+
+  const compression = value.indexOf("::");
+  if (compression !== -1 && value.indexOf("::", compression + 2) !== -1) return null;
+
+  const leftText = compression === -1 ? value : value.slice(0, compression);
+  const rightText = compression === -1 ? "" : value.slice(compression + 2);
+  const left = leftText ? leftText.split(":") : [];
+  const right = rightText ? rightText.split(":") : [];
+  if (compression === -1 && left.length !== 8) return null;
+  if (compression !== -1 && left.length + right.length >= 8) return null;
+
+  const parse = (part) => /^[0-9a-f]{1,4}$/i.test(part) ? Number.parseInt(part, 16) : Number.NaN;
+  const leftWords = left.map(parse);
+  const rightWords = right.map(parse);
+  if ([...leftWords, ...rightWords].some((word) => !Number.isFinite(word))) return null;
+
+  if (compression === -1) return leftWords;
+  const fill = new Array(8 - leftWords.length - rightWords.length).fill(0);
+  return [...leftWords, ...fill, ...rightWords];
+}
+
+function isNonPublicIpv6(words) {
+  if (words.length !== 8) return true;
+  if (words.every((word) => word === 0)) return true;
+  if (words.slice(0, 7).every((word) => word === 0) && words[7] === 1) return true;
+
+  const first = words[0];
+  if ((first & 0xfe00) === 0xfc00) return true; // Unique-local fc00::/7.
+  if ((first & 0xffc0) === 0xfe80) return true; // Link-local fe80::/10.
+  if ((first & 0xffc0) === 0xfec0) return true; // Deprecated site-local range.
+  if ((first & 0xff00) === 0xff00) return true; // Multicast ff00::/8.
+
+  // Documentation and transition mechanisms are not useful evidence endpoints
+  // and can encapsulate IPv4 addresses in surprising ways.
+  if (first === 0x2001 && (words[1] === 0 || words[1] === 0x0db8)) return true;
+  if (first === 0x2002) return true;
+  if (first === 0x0064 && words[1] === 0xff9b) return true;
+
+  // IPv4-compatible and IPv4-mapped forms are unnecessary for a verifier and
+  // are rejected rather than trying to infer public reachability through them.
+  if (words.slice(0, 6).every((word) => word === 0)) return true;
+  if (words.slice(0, 5).every((word) => word === 0) && words[5] === 0xffff) return true;
+
+  return false;
 }
 
 function normalizeVisibleText(value) {

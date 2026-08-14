@@ -6,6 +6,7 @@ import {
 
 const MAX_EVIDENCE_BYTES = 256 * 1024;
 const EVIDENCE_TIMEOUT_MS = 8_000;
+const REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308]);
 
 const configurePrimaryAction = async () => {
   try {
@@ -66,7 +67,9 @@ async function verifyEvidenceSource(rawUrl) {
     const response = await fetch(url.toString(), {
       method: "GET",
       credentials: "omit",
-      redirect: "follow",
+      // Never follow a redirect here. A public URL can redirect to localhost or a
+      // private network; validating only response.url after following would be too late.
+      redirect: "manual",
       cache: "no-store",
       referrerPolicy: "no-referrer",
       signal: controller.signal,
@@ -74,6 +77,10 @@ async function verifyEvidenceSource(rawUrl) {
         Accept: "text/html,text/plain,application/json,application/xml;q=0.9,*/*;q=0.4",
       },
     });
+
+    if (response.type === "opaqueredirect" || REDIRECT_STATUS_CODES.has(response.status)) {
+      throw new Error("Evidence source redirected. ChatChat does not follow redirects for safety; verify the final public URL directly.");
+    }
 
     const finalUrl = publicEvidenceUrl(response.url || url.toString());
     const contentType = (response.headers.get("content-type") ?? "").slice(0, 160);
@@ -114,13 +121,19 @@ async function verifyEvidenceSource(rawUrl) {
       state: "unavailable",
       observedAt,
       requestedUrl: url.toString(),
-      error: error?.name === "AbortError"
-        ? "Source check timed out."
-        : "Source could not be reached by the bounded verifier.",
+      error: verifierErrorMessage(error),
     };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function verifierErrorMessage(error) {
+  if (error?.name === "AbortError") return "Source check timed out.";
+  if (error instanceof Error && error.message.startsWith("Evidence source redirected.")) {
+    return error.message;
+  }
+  return "Source could not be reached by the bounded verifier.";
 }
 
 async function readBoundedText(response, maxBytes) {
