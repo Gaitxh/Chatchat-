@@ -106,6 +106,7 @@ async function refresh() {
         if (record) {
           delete recovery[participant.seatId];
           recoveryChanged = true;
+          void releaseProviderRecoveryClaim(participant.seatId);
         }
         clearRecoveryNote(row);
         continue;
@@ -123,6 +124,7 @@ async function refresh() {
         if (attempt.phase === null) {
           delete recovery[participant.seatId];
           recoveryChanged = true;
+          void releaseProviderRecoveryClaim(participant.seatId);
           clearRecoveryNote(row);
           continue;
         }
@@ -151,6 +153,14 @@ async function refresh() {
       });
 
       if (step !== "fresh_session_rediscovery") {
+        clearRecoveryNote(row);
+        continue;
+      }
+
+      const claimed = await claimProviderRecovery(participant.seatId);
+      if (!claimed) {
+        // Another ChatChat surface already owns this recovery attempt. That
+        // surface will persist the shared recovery record before navigation.
         clearRecoveryNote(row);
         continue;
       }
@@ -231,6 +241,29 @@ function clearRecoveryNote(row: HTMLElement | undefined) {
   row.querySelector<HTMLElement>(".connection-chip")?.removeAttribute("data-chatchat-self-healing");
 }
 
+async function claimProviderRecovery(seatId: string): Promise<boolean> {
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "CLAIM_PROVIDER_SELF_HEALING",
+      seatId,
+    });
+    return Boolean(response?.ok && response?.result?.claimed);
+  } catch {
+    return false;
+  }
+}
+
+async function releaseProviderRecoveryClaim(seatId: string): Promise<void> {
+  try {
+    await chrome.runtime.sendMessage({
+      type: "RELEASE_PROVIDER_SELF_HEALING",
+      seatId,
+    });
+  } catch {
+    // A service-worker restart also clears in-memory claims, so release is best-effort.
+  }
+}
+
 function normalizeRecovery(value: unknown): Record<string, RecoveryRecord> {
   if (!isRecord(value)) return {};
   const result: Record<string, RecoveryRecord> = {};
@@ -260,6 +293,7 @@ function pruneMissingParticipants(
     if (!participantIds.has(seatId)) {
       delete recovery[seatId];
       changed = true;
+      void releaseProviderRecoveryClaim(seatId);
     }
   }
   return changed;
