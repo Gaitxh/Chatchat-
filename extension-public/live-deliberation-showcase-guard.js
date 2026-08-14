@@ -13,6 +13,10 @@
     const challenge = stream.querySelector('.discussion-entry[data-event-kind="challenge"]');
     const evidence = stream.querySelector('.discussion-entry[data-event-kind="evidence"]');
     const revision = stream.querySelector('.discussion-entry[data-event-kind="revision"]');
+    const researchDesk = document.querySelector(".live-research-desk");
+    const researchLane = researchDesk?.querySelector("[data-research-lane]");
+    const researchEvidenceCount = researchDesk?.querySelector("[data-research-evidence-count]");
+    const researchEvidence = researchDesk?.querySelector("[data-research-evidence-event]");
     const relationMap = document.querySelector(".relationship-map");
     const relationEdge = relationMap?.querySelector(".relationship-edge");
     const traceButton = stream.querySelector(".discussion-entry__footer > button");
@@ -23,6 +27,10 @@
       && challenge
       && evidence
       && revision
+      && researchDesk
+      && researchLane
+      && researchEvidenceCount
+      && researchEvidence
       && relationMap
       && relationEdge
       && traceButton
@@ -39,7 +47,7 @@
       if (!inspect()) return;
       observer.disconnect();
     });
-    observer.observe(document.documentElement, { childList: true, subtree: true });
+    observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
   }
 
   if (document.readyState === "loading") {
