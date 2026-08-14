@@ -18,6 +18,7 @@ const productionFiles = [
   "src/extension/components/LiveDiscussionStream.tsx",
   "src/extension/components/LivePersuasionPulse.tsx",
   "src/extension/components/RelationshipMap.tsx",
+  "src/extension/execution-provenance.tsx",
   "src/consultation/open-issues.ts",
   "src/consultation/structured-response.ts",
   "src/consultation/reply-provenance.ts",
@@ -36,9 +37,13 @@ for (const claim of [
   "Live Persuasion",
   "replyToEventId",
   "Meeting Secretariat",
+  "LIVE PROVIDER RECEIPTS",
+  "DEMO · SYNTHETIC",
+  "Real Chromium is not the same thing as real Provider inference",
   "docs/MEETING_SECRETARIAT.md",
+  "scripts/check-execution-boundary.mjs",
 ]) {
-  assert(readmeEn.includes(claim), `English README is missing real product capability: ${claim}`);
+  assert(readmeEn.includes(claim), `English README is missing real product/evidence capability: ${claim}`);
 }
 
 for (const claim of [
@@ -49,9 +54,13 @@ for (const claim of [
   "Live Persuasion",
   "replyToEventId",
   "大会秘书处",
+  "LIVE PROVIDER RECEIPTS",
+  "DEMO · SYNTHETIC",
+  "真实 Chromium 不等于真实 Provider 推理",
   "docs/MEETING_SECRETARIAT.zh-CN.md",
+  "scripts/check-execution-boundary.mjs",
 ]) {
-  assert(readmeZh.includes(claim), `Chinese README is missing real product capability: ${claim}`);
+  assert(readmeZh.includes(claim), `Chinese README is missing real product/evidence capability: ${claim}`);
 }
 
 for (const claim of [
@@ -90,6 +99,7 @@ for (const proof of [
   'data-chatchat-live-deliberation-showcase',
   'data-chatchat-meeting-secretariat-showcase',
   'data-chatchat-live-persuasion-showcase',
+  'data-chatchat-execution-boundary-showcase',
   '[data-peer-stage="queued"]',
   '[data-peer-stage="responding"]',
   '[data-peer-stage="answered"]',
@@ -98,7 +108,7 @@ for (const proof of [
   '.live-research-desk',
   '.relationship-edge.edge-reply',
 ]) {
-  assert(browserGuard.includes(proof), `README capability is not covered by the real Chromium proof: ${proof}`);
+  assert(browserGuard.includes(proof), `README capability is not covered by the Chromium UI/protocol proof: ${proof}`);
 }
 
 for (const proof of [
@@ -108,7 +118,7 @@ for (const proof of [
   'data-persuasion-strength="strong"',
   "actual Live Floor",
 ]) {
-  assert(liveFrameProof.includes(proof), `Real live-frame demo proof is missing: ${proof}`);
+  assert(liveFrameProof.includes(proof), `Live-frame Chromium demo proof is missing: ${proof}`);
 }
 for (const artifact of [
   "chatchat-live-meeting-zh.png",
@@ -116,7 +126,7 @@ for (const artifact of [
   "Capture bilingual live meeting frame evidence",
   'data-chatchat-live-proof-showcase="complete"',
 ]) {
-  assert(ciWorkflow.includes(artifact), `CI no longer captures the real live meeting demo artifact: ${artifact}`);
+  assert(ciWorkflow.includes(artifact), `CI no longer captures the Chromium live meeting demo artifact: ${artifact}`);
 }
 
 for (const source of [readmeEn, readmeZh]) {
@@ -126,7 +136,12 @@ for (const [label, source] of [["terminal demo", terminalDemo], ["mock consultat
   assert(!/👑|\bking\b|king's|royal|\bverdict\b/i.test(source), `${label} still contains legacy hierarchical product language.`);
 }
 
-console.log("✓ README and demos map to production implementation, live Chromium proof and real live-frame screenshots");
+assert(
+  !/showcase[^\n]{0,120}(real provider inference|真实 Provider 推理)/i.test(readmeEn + "\n" + readmeZh),
+  "README must not present synthetic showcase speech as live third-party Provider inference.",
+);
+
+console.log("✓ README separates live Provider execution from synthetic Chromium UI/protocol evidence");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`README product-truth check failed: ${message}`);

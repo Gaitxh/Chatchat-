@@ -1,12 +1,29 @@
 <div align="center">
   <img src="assets/readme/chatchat-hero-minimal.svg" width="100%" alt="ChatChat — one proposal, independent minds, shared reasoning" />
 
-  <p><strong>You submit one proposal. Then let a table of AIs run the meeting.</strong><br />ChatChat assembles equal participants that think independently, split research work, challenge claims, bring evidence, ask direct questions, publish traceable replies, and revise positions. When one AI genuinely moves another, the causal trail appears live. Unresolved issues stay visible instead of being polished away.</p>
+  <p><strong>You submit one proposal. Then let a table of AIs run the meeting.</strong><br />In live mode, ChatChat sends consultation prompts to the actual AI browser tabs you are already signed into. Each participant answers independently first, then reads the same public meeting snapshot and keeps researching, challenging, answering, revising, or preserving disagreement.</p>
 
-  <p><em>Not three answers side by side. A watchable, traceable, replayable AI consultation assembly.</em></p>
+  <p><em>Not three answers side by side. A watchable, traceable, replayable consultation assembly — with visible proof that a round really reached a Provider tab.</em></p>
 
   <p><a href="README.zh-CN.md">简体中文</a> · <a href="docs/BROWSER_EXTENSION.md">Browser Extension</a> · <a href="docs/CONSULTATION_PROTOCOL.md">Protocol</a> · <a href="docs/MEETING_SECRETARIAT.md">Meeting Secretariat</a> · <a href="https://github.com/Gaitxh/Chatchat-/issues">Ideas & Issues</a></p>
 </div>
+
+---
+
+## Start with the execution boundary
+
+ChatChat now has two very different execution modes, and they **must not be confused**:
+
+| Mode | Where Provider speech comes from | Purpose |
+|---|---|---|
+| **Live mode · LIVE PROVIDER TABS** | real `BrowserConsultationAgent → RUN_SPEECH → chrome.tabs.sendMessage(tabId)` into signed-in AI tabs | answer the user's real proposal |
+| **Synthetic showcase · DEMO** | deterministic fixture under `?showcase=consultation`, including simulated tabs, READY states and meeting speech | reproducible CI / screenshots / UI and protocol evidence |
+
+**Real Chromium is not the same thing as real Provider inference.** In the CI showcase, the browser, production build, React UI, Blackboard, provenance, Live Agenda and Open Issues are genuinely running. The words attributed to the models, however, come from a deterministic test fixture — not from live ChatGPT, Claude, Gemini, DeepSeek, Grok or other third-party model sessions.
+
+Because of that, `?showcase=consultation` now always shows a prominent **SYNTHETIC SHOWCASE MODE — This is not a live AI consultation** warning. The proposal is locked to the fixed demo scenario, misleading provider-connect controls are hidden, and a synthetic prompt that no longer contains the fixed demo proposal is rejected instead of receiving the canned architecture story.
+
+Live mode shows **LIVE PROVIDER RECEIPTS**. For each real Provider tab, ChatChat exposes whether the current consultation prompt was sent, the phase and round, response size, elapsed time, and transport failure state. These receipts prove **page I/O**; they do not expose or claim access to hidden chain-of-thought.
 
 ---
 
@@ -20,15 +37,15 @@ You → Claude
 You → Gemini
 ```
 
-ChatChat now runs a different chain:
+The live ChatChat path is different:
 
 ```text
-one proposal
+one user proposal
     ↓
-automatic equal AI team + dedicated clean sessions
+real signed-in Provider tabs
     ↓
 R1 · sealed independent opinions
-    + Live Research Desk assigns distinct research missions
+    + Live Research Desk assigns research lanes
     ↓
 shared Blackboard
     + Live Agenda explains why another round exists
@@ -36,260 +53,255 @@ shared Blackboard
 challenge · evidence · question · support · defense
     ↓
 Peer Exchange Queue
-    “who directly addressed whom, and who owes a response?”
+    "who addressed whom, and who owes a response?"
     ↓
 replyToEventId / targetEventId / causedBy
-    exact provenance for replies and changed minds
     ↓
 Live Persuasion
-    only protocol-proven revision / concession is called persuasion
+    only explicit revision / concede becomes strong influence
     ↓
 Open Issues
-    “which structured concerns still have no explicit response?”
+    "what still has no structured answer?"
     ↓
-outcome · local replay · next move · shareable receipt
+outcome · local replay · next consultation · shareable receipt
 ```
 
-There is **no chair AI**, no privileged model, and no rule that turns a majority into truth. The user is the proposer; every AI is an equal participant; ChatChat coordinates the public protocol and deterministic meeting views.
+There is **no chair AI**, no privileged model, and no rule that turns a majority into truth. The user is the proposer; every AI is an equal participant; ChatChat coordinates the public protocol and deterministic views.
 
-<p align="center"><img src="assets/readme/demo-overview.svg" width="100%" alt="ChatChat real consultation meeting overview" /></p>
+<p align="center"><img src="assets/readme/demo-overview.svg" width="100%" alt="ChatChat consultation protocol and product overview" /></p>
 
-> The overview above is not a future concept mock. It only depicts capabilities that exist in production code and are covered by real Chromium product proof.
+> The overview illustrates production capabilities. It is not a screenshot of one live third-party Provider meeting. CI replays those capabilities with a synthetic Provider fixture so browser evidence remains deterministic.
 
 ---
 
-## 01 · Every AI behaves like a participant doing real work
+## 01 · Every AI has its own turn, but there is no hidden moderator
 
-The live room exposes several layers of activity, but these surfaces read public structured facts only. They do not expose or fabricate a model's private chain of thought.
+In live mode, each participant maps to a real browser Provider tab. `BrowserConsultationAgent` builds the consultation prompt for the current phase, executes `RUN_SPEECH` through the browser bridge, reads the Provider page response, and then parses it into structured events. If the first answer violates the schema, the same Provider gets one repair-format attempt; ChatChat does not invent a replacement answer.
+
+The live UI shows public protocol facts, never private reasoning traces:
 
 <table>
-<tr><td><strong>LIVE PARTICIPANTS</strong><br/>See who is independently analyzing, researching, responding, completed, or failed.</td><td><strong>Live Research Desk</strong><br/>Every AI receives a different research mission such as primary-source checks, strongest counterexamples, or implementation constraints. Different mission, equal authority.</td></tr>
-<tr><td><strong>LIVE DISCUSSION STREAM</strong><br/>Read argument / challenge / evidence / support / defense / revision / question events round by round.</td><td><strong>Peer Exchange Queue</strong><br/>Direct questions, targeted challenges, and targeted evidence cannot disappear into the room. The addressed AI receives a next-round response obligation.</td></tr>
-<tr><td><strong>LIVE PERSUASION</strong><br/>Only canonical strong influence — explicit revision.causedBy or concede — becomes “who moved whom.”</td><td><strong>RELATIONSHIP MAP</strong><br/>Support, challenge, evidence, direct replies, and changed-mind links become traceable edges.</td></tr>
-<tr><td><strong>Meeting Secretariat</strong><br/>Live Agenda says why the meeting continues; Open Issues says what still lacks an explicit structured response.</td><td><strong>CONSULTATION THEATER</strong><br/>Replay public events, changed-mind trails and exact causes after the meeting without calling Providers again.</td></tr>
+<tr><td><strong>LIVE PROVIDER RECEIPTS</strong><br/>Shows whether the real tab received the round prompt, returned a page response, how long it took, and how large the response was.</td><td><strong>Live Research Desk</strong><br/>Each AI receives a different investigation lane such as primary sources, strongest counterexample, or implementation constraints. Different work, equal authority.</td></tr>
+<tr><td><strong>LIVE DISCUSSION STREAM</strong><br/>Reads the public argument / challenge / evidence / support / defense / revision / question events round by round.</td><td><strong>Peer Exchange Queue</strong><br/>Direct questions and targeted challenges do not disappear into a wall of text.</td></tr>
+<tr><td><strong>Live Persuasion</strong><br/>Only canonical `revision.causedBy` / `concede` strong edges are shown as “who moved whom”.</td><td><strong>RELATIONSHIP MAP</strong><br/>Support, challenge, evidence, direct reply and revision edges all come from exact event IDs.</td></tr>
+<tr><td><strong>Meeting Secretariat</strong><br/>Live Agenda explains why the meeting continues; Open Issues shows unresolved structured obligations.</td><td><strong>CONSULTATION THEATER</strong><br/>Replays public events and changed-mind provenance later without calling Providers again.</td></tr>
 </table>
 
-AIs in the same batch read the same immutable public snapshot and work in parallel. A faster website gets no extra authority, and no model becomes moderator because it sounds more confident.
+Peers in one batch read the same immutable public snapshot and work in parallel. A faster website does not gain more authority.
 
 ---
 
-## 02 · One real meeting chain
+## 02 · How one AI really answers another
 
-The current Chromium showcase exercises a flow like this:
+Direct replies are not inferred from prose.
 
 ```text
-R1 · SEALED
+Claude → ChatGPT
+question event: q-123
 
-ChatGPT  → Web Room + Invisible Bridge
-Claude   → Extension-first
-Gemini   → Web Room + Invisible Bridge
-DeepSeek → Web Room + Bootstrap Fallback
-
-Research lanes
-ChatGPT  → primary sources
-Claude   → strongest counterexample
-Gemini   → implementation constraints
-DeepSeek → user failure modes
-
-        ↓
-
-R2 · OPEN CONSULTATION
-
-⚔ ChatGPT → Claude
-  “What actually requires extension-first UI rather than a Web Room + invisible bridge?”
-
-? Claude → ChatGPT
-  “If the extension becomes invisible plumbing, how should the Web Room
-   recover when ChatGPT needs the user to sign in again?”
-
-📎 Gemini → Claude's initial position
-  developer.chrome.com
-  optional host permissions / runtime permission model
-
-        ↓
-
-Live Agenda
-fresh_signal_follow_up
-“The last public batch introduced new questions / evidence that peers could not
-have seen inside that same parallel batch, so they get another response opportunity.”
-
-        ↓
-
-R3
-
-↪ ChatGPT → Claude
-  “The Web Room should expose only the recovery moment: open Provider login,
-   detect READY, then resume the same consultation automatically.”
-
-replyToEventId: Claude question event
-
-↻ Claude
-Extension-first → Web Room + Invisible Bridge
-causedBy: ChatGPT challenge + Gemini evidence
-
-LIVE PERSUASION
-Gemini / ChatGPT ──strong influence──▶ Claude revision
+next public round:
+ChatGPT → Claude
+replyToEventId: q-123
 ```
 
-A “direct answer” is not inferred from prose. `replyToEventId` must reference a real peer event in the current public snapshot. Invented IDs, self-replies, or replies in disallowed phases enter the structured repair flow.
+`replyToEventId` must refer to a real peer event in the current public snapshot. Invented IDs, self-replies or invalid-phase provenance enter the existing repair path.
 
-Persuasion is not inferred from “you are right” either. **Live Persuasion** reuses the canonical influence graph. Only explicit `revision.causedBy` or `concede` creates a strong edge; ordinary support, challenge, defense, and evidence remain interactions unless a later structured event proves they actually changed a position.
+The **Peer Exchange Queue** treats direct requests as explicit response obligations:
 
-One `Claude → ChatGPT → answer → Claude revision` chain can therefore appear simultaneously in:
+```text
+queued → target turn → answered
+```
 
-- the Live Discussion Stream reply card;
-- the Peer Exchange Queue lifecycle: `queued → target turn → answered`;
-- a Live Persuasion strong-influence card;
-- Relationship Map reply / influence edges;
-- exact public-event provenance.
-
-That is peer consultation, not several models writing past each other.
+Only exact structured provenance clears the obligation. A third party answering instead, or prose saying “I answered Claude”, does not count.
 
 ---
 
-## 03 · The room knows why another round exists
+## 03 · Persuasion needs receipts
 
-ChatChat's **Meeting Secretariat** is not a hidden moderator and not an extra AI. It is a deterministic view over the consultation protocol.
+**Live Persuasion** never decides that influence happened just because an AI wrote “good point”.
 
-**Live Agenda** reasons come directly from the orchestrator:
+Strong influence comes from canonical event relationships such as:
 
 ```text
-sealed_start                 → begin the mutually hidden first round
+revision.causedBy: [evidence-event, challenge-event]
+concede.targetEventId: peer-event
+```
+
+So a visible chain like:
+
+```text
+Gemini ── evidence ──▶ Claude
+ChatGPT ─ challenge ─▶ Claude
+                         ↓
+                 Claude revision
+```
+
+exists because Claude's own structured revision names those source events, not because the UI guessed a story.
+
+---
+
+## 04 · The meeting knows why it is still running
+
+The **Meeting Secretariat** is not a hidden chair and not another AI. It is a deterministic view over protocol state.
+
+**Live Agenda** reasons include:
+
+```text
+sealed_start                 → independent first round begins
 initial_debate               → sealed positions enter the shared snapshot
-fresh_signal_follow_up       → new question / evidence / revision needs a peer response opportunity
-minimum_debate_rounds        → the selected mode requires more public debate
-alignment_not_reached        → descriptive stance alignment remains below the threshold
-finalizing_stable_alignment  → stable alignment and no fresh peer-response signal
-finalizing_round_budget      → the hard round boundary was reached without erasing disagreement
+fresh_signal_follow_up       → new questions/evidence/revisions deserve another peer-visible round
+minimum_debate_rounds        → the selected mode requires more open debate
+alignment_not_reached        → descriptive stance alignment remains below threshold
+finalizing_stable_alignment  → debate is stable and no fresh peer-response signal remains
+finalizing_round_budget      → hard round boundary reached; disagreement remains visible
 ```
 
-For `fresh_signal_follow_up`, the Agenda carries exact `triggerEventIds`, so the user can trace “why are we still debating?” back to the original Evidence / Challenge / Question rather than trusting a post-hoc explanation.
+`fresh_signal_follow_up` carries exact `triggerEventIds`, so users can trace the reason back to the original Evidence / Challenge / Question.
 
-See the [Meeting Secretariat protocol](docs/MEETING_SECRETARIAT.md) for the exact rules.
+See [`docs/MEETING_SECRETARIAT.md`](docs/MEETING_SECRETARIAT.md).
 
 ---
 
-## 04 · Closing the meeting does not mean everything was solved
+## 05 · Closing the meeting does not mean everything was resolved
 
-**Open Issues** are derived directly from the public Blackboard event graph. ChatChat does not ask another model whether something “sounds resolved.”
-
-These can remain open:
+**Open Issues** is derived from the public Blackboard event graph:
 
 ```text
-?  direct question with no explicit response from the addressed AI
-⚔  targeted challenge with no defense / concession / revision from the claim owner
-📎 targeted evidence placed on the table but never addressed by the target participant
-≈  explicit uncertainty with no later higher-confidence structured update
+?  direct question still lacks the addressed AI's explicit reply
+⚔  targeted challenge still lacks a response from the claim owner
+📎 targeted evidence is on the board but the target has not responded
+≈  explicit uncertainty still lacks a higher-confidence revision
 ```
 
-Prose such as “I already answered Claude” does **not** discharge an issue. A third party answering on someone else's behalf does not discharge it either. The shared structured-response rules require exact provenance.
+Similar prose does not clear an issue. A third party cannot answer on someone's behalf.
 
-So a meeting may finish like this:
+A meeting may therefore honestly end like this:
 
 ```text
-Leading position: Web Room + Invisible Bridge
-Alignment: 75%
-
-Still open:
-- 1 unanswered direct question
-- 1 explicit uncertainty
-
-Meeting stopped because: round budget reached
+leading stance: A
+alignment: 75%
+stop reason: round budget
+still open: 1 direct question + 1 explicit uncertainty
 ```
 
-ChatChat leaves those gaps visible instead of hiding them behind a clean-looking consensus score.
+Majority is descriptive information, not authority.
 
 ---
 
-## 05 · Evidence can change minds without becoming authority
+## 06 · Evidence can influence a view without becoming truth
 
-When a source enters the room, ChatChat keeps different facts separate:
+ChatChat keeps different evidence facts separate:
 
 ```text
-Was the public source reachable?
-What date signal did the page expose?
+Is the source reachable?
+What date signal does the page expose?
 What bounded excerpt was observed?
-Is another participant still challenging it?
-Did a revision / concession explicitly cite it as a cause?
+Is the evidence still challenged?
+Did a revision / concede explicitly name it as a cause?
 ```
 
-The same evidence can therefore be **reachable, disputed, and influential at the same time**. `reachable` never means “claim proven.”
+The same Evidence can therefore be reachable, disputed, and influential at the same time. `reachable` never means “claim proven”.
 
-The Evidence Gap Radar still finds missing source, date, observation, dispute, and evidence-chain signals. NEXT MOVE can turn those gaps into a staged follow-up proposal, but it only fills the proposal box and suggests a mode. **Nothing auto-sends.**
+`Evidence Gap Radar` finds source, date, dispute and provenance gaps. `NEXT MOVE` can stage those gaps as the next proposal, but it never auto-sends.
 
 ---
 
-## 06 · Five meeting modes, research in every one
+## 07 · Five meeting modes, research lanes in every consultation
 
 <table>
-<tr><td><strong>◉ Balanced</strong><br/>Practical default: allow disagreement and revision, then finish.</td><td><strong>🌿 Explore</strong><br/>Keep more alternatives alive longer.</td><td><strong>⚖ Decide</strong><br/>Emphasize constraints, trade-offs, and usable recommendations.</td></tr>
-<tr><td><strong>🔎 Verify</strong><br/>Push on facts, source scope, dates, and uncertainty.</td><td><strong>🧨 Stress Test</strong><br/>Search for strongest counterexamples and failure conditions.</td><td><strong>Research mission ≠ authority</strong><br/>Different Research Lanes are division of labor, never hierarchy.</td></tr>
+<tr><td><strong>◉ Balanced</strong><br/>Allow disagreement and revision, then finish.</td><td><strong>🌿 Explore</strong><br/>Keep alternatives alive longer.</td><td><strong>⚖ Decide</strong><br/>Emphasize constraints, trade-offs and actionability.</td></tr>
+<tr><td><strong>🔎 Verify</strong><br/>Push on sources, dates and factual scope.</td><td><strong>🧨 Stress Test</strong><br/>Seek the strongest counterexample and failure conditions.</td><td><strong>Research task ≠ authority</strong><br/>A Research Lane changes what to investigate, never participant status.</td></tr>
 </table>
 
-Balanced also assigns Research Lanes. Research is a default consultation capability, not a special effect reserved for verification modes.
+Balanced mode also receives Research Lanes; research is not a special-mode decoration.
 
 ---
 
-## 07 · Take the whole meeting with you, not only the final sentence
+## 08 · How to verify that the AIs were actually called
 
-A finished consultation can generate a local **Consultation Receipt**, and **Consultation Theater** can replay saved structured events without calling Providers again.
+Live mode exposes **LIVE PROVIDER RECEIPTS**. For example:
 
-<p align="center"><img src="assets/readme/consultation-receipt-demo.svg" width="100%" alt="ChatChat local Consultation Receipt" /></p>
+```text
+LIVE · PROVIDER TABS
 
-You can inspect:
+Claude · claude.ai
+DEBATE · R2
+PROMPT SENT
+3,842 prompt chars
 
-- final positions and surviving minority views;
-- challenge / evidence / revision counts;
-- explicit evidence / challenge → revision / concession strong-influence chains;
-- who answered whom and which exact public event was referenced;
-- frozen source observations and evidence state;
-- local replay with no automatic Provider calls.
+→ RESPONSE CAPTURED
+2,917 response chars
+18.4 s
+```
 
-Copy Markdown and SVG export happen locally in the browser. ChatChat uploads nothing on its own.
+If page transport fails, the receipt shows **TRANSPORT FAILED**. Transport or structured parsing failure uses the existing uncertainty / zero-confidence fallback; it is not silently replaced by the synthetic fixture.
+
+If the top of the room says:
+
+```text
+DEMO · SYNTHETIC
+This is not a live AI consultation
+```
+
+then you are looking at a deterministic browser demo and should not use it as evidence that any third-party model researched your question.
 
 ---
 
-## Zero-config by default: users should not configure an AI meeting
+## 09 · Take the whole meeting with you
 
-The Full Room is the primary product surface. A normal first run should feel like:
+A finished consultation can produce a local **Consultation Receipt** and a **Consultation Theater** replay from saved structured events.
+
+<p align="center"><img src="assets/readme/consultation-receipt-demo.svg" width="100%" alt="ChatChat local consultation receipt" /></p>
+
+The record can show final positions, surviving minority views, challenge / evidence / revision counts, strong influence chains, exact peer replies, source observations and local Replay.
+
+Replay makes no new Provider calls. Markdown copy and SVG export happen locally in the browser.
+
+---
+
+## Zero-config by default
+
+The Full Room is the main product surface. A normal first run should feel like:
 
 ```text
 1 · Click ChatChat
-2 · Confirm site access once if the browser asks
-3 · Sign in normally to any AI that needs it — ChatChat resumes automatically
+2 · Confirm browser site access once if asked
+3 · Sign in normally to any AI that needs it; ChatChat resumes
 4 · Write one proposal
-5 · Start the consultation
+5 · Confirm the top says LIVE · PROVIDER TABS
+6 · Start the consultation
 ```
 
-If two or more known AI sources are already available, ChatChat prefers them. If the room needs more participants, it prepares a small starter team in **dedicated clean consultation tabs** instead of hijacking the user's existing private AI conversations.
+If at least two known AI sources are already open, ChatChat prefers them. If more are needed, it prepares clean dedicated sessions instead of hijacking the user's existing private AI conversations.
 
-Page recognition → connection handshake → consultation readiness → login recovery are handled automatically. The toolbar opens or focuses the Full Room directly; Side Panel remains an optional compact controller. Selectors, manual URLs, and Teach tools stay under **Advanced repair**.
-
-Provider accounts remain in their own browser tabs. ChatChat has no relay server. History and frozen evidence observations remain local; replay does not automatically call AIs again or use today's web page to rewrite yesterday's meeting.
+Provider accounts remain in their own browser tabs. ChatChat has no relay server. History and evidence snapshots remain local.
 
 ---
 
-## Real product gates
+## What the browser / protocol gates actually prove
 
-Production CI checks more than TypeScript. The bilingual real-Chromium showcase must observe, in the running product DOM:
+CI runs `?showcase=consultation` with **real Chromium + the production build + a synthetic Provider fixture**. It verifies that the following product surfaces and protocol relationships work together:
 
 ```text
 sealed Round 1
 + Live Research Desk / Research Lane
-+ challenge
-+ evidence
++ challenge / evidence / revision
 + direct reply with replyToEventId
-+ full Peer Exchange Queue answer lifecycle
++ Peer Exchange Queue lifecycle
 + Live Agenda fresh_signal_follow_up + trigger event
 + Open Issues + source event
-+ LIVE PERSUASION strong moment + exact cause/change event ids
-+ revision
++ Live Persuasion strong moment + exact cause/change event ids
 + Relationship Map reply edge
++ visible synthetic-showcase warning
++ locked demo proposal
++ synthetic provider receipt
 ```
 
-Separate **Zero-config UI, Login Concierge UI, and Real Provider Proof UI** gates also run.
+That is strong evidence for browser UI, provenance and lifecycle behavior. It **does not prove that third-party Providers generated the fixture speech inside CI**.
 
-The README and formal demo are protected by `scripts/check-readme-product-truth.mjs` and `tests/demo-output.test.mjs`: headline claims must map to production implementation, Chromium proof, and current non-hierarchical demo semantics.
+Additional workflows include **Zero-config UI, Login Concierge UI and Real Provider Proof UI**. Treat them as product-behavior gates; do not infer live third-party model reasoning from the workflow name alone.
+
+README and demos are checked by `scripts/check-readme-product-truth.mjs`, `scripts/check-execution-boundary.mjs`, and `tests/demo-output.test.mjs`.
 
 ---
 
@@ -302,7 +314,7 @@ npm ci
 npm run build:extension
 ```
 
-Open `chrome://extensions` or `edge://extensions`, enable **Developer mode**, choose **Load unpacked**, and select `dist-extension/`.
+Open `chrome://extensions` or `edge://extensions`, enable Developer mode, choose **Load unpacked**, and load `dist-extension/`.
 
 ```bash
 npm run check
@@ -310,6 +322,8 @@ npm test
 npm run demo
 npm run dev:web
 ```
+
+For live use, do not keep `?showcase=consultation` in the URL. If you see `DEMO · SYNTHETIC`, use **Exit demo for live provider mode**.
 
 See the [Browser Extension guide](docs/BROWSER_EXTENSION.md), [Consultation Protocol](docs/CONSULTATION_PROTOCOL.md), and [Meeting Secretariat](docs/MEETING_SECRETARIAT.md).
 
@@ -319,4 +333,4 @@ See the [Browser Extension guide](docs/BROWSER_EXTENSION.md), [Consultation Prot
 
 ChatChat is created and independently maintained by **Gaitxh**, with product ideation, interface and visual design, implementation, debugging, testing, and documentation assistance from **OpenAI's ChatGPT and Codex**.
 
-<div align="center"><strong>One proposal. Independent minds. Shared reasoning.</strong><br /><sub>It can get noisy, positions can move, disagreement can survive — but relationships must be provable and majority is never authority.</sub></div>
+<div align="center"><strong>One proposal. Independent minds. Shared reasoning.</strong><br /><sub>A real browser does not make fixture speech real Provider inference; live Provider calls need live tab transport receipts.</sub></div>
