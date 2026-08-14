@@ -1,24 +1,19 @@
 import { MAX_CONSULTATION_PARTICIPANTS } from "../consultation/equality.js";
+import { detectProviderUrl } from "../provider-sdk/catalog.js";
 import {
-  BUILT_IN_PROVIDER_MANIFESTS,
-  detectProviderUrl,
-} from "../provider-sdk/catalog.js";
+  automaticTeamPermissionDescriptor,
+  buildAutomaticTeamPlan,
+  type AutomaticTeamDetection,
+} from "./automatic-team.js";
 import "./web-room-onboarding.css";
 
 declare const chrome: any;
 
 const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
 const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
-const STARTER_PROVIDER_IDS = [
-  "openai-chatgpt",
-  "anthropic-claude",
-  "google-gemini",
-] as const;
-const STARTER_TEAM_SIZE = 3;
 const resumeCooldown = new Map<string, number>();
 type Locale = "en" | "zh-CN";
 
-type ProviderDetection = ReturnType<typeof detectProviderUrl>;
 interface BrowserTab { id?: number; url?: string; title?: string; }
 interface ParticipantRecord {
   seatId: string;
@@ -118,8 +113,8 @@ async function mount() {
   card.append(copy, action);
   root.append(card);
 
-  let discovered: ProviderDetection[] = [];
-  let plan: ProviderDetection[] = [];
+  let discovered: AutomaticTeamDetection[] = [];
+  let plan: AutomaticTeamDetection[] = [];
   let permissionReady = false;
   let starting = false;
   let scan: number | undefined;
@@ -140,7 +135,7 @@ async function mount() {
     try {
       let granted = permissionReady;
       if (!granted) {
-        granted = await chrome.permissions.request(permissionDescriptor(plan));
+        granted = await chrome.permissions.request(automaticTeamPermissionDescriptor(plan));
       }
       if (!granted) throw new Error(strings.denied);
       await assemble(plan, strings.failed);
@@ -156,8 +151,9 @@ async function mount() {
 
   async function refreshPlan() {
     discovered = await discover();
-    plan = buildAssemblyPlan(discovered);
-    permissionReady = plan.length > 0 && await chrome.permissions.contains(permissionDescriptor(plan));
+    plan = buildAutomaticTeamPlan(discovered, MAX_CONSULTATION_PARTICIPANTS);
+    permissionReady = plan.length > 0
+      && await chrome.permissions.contains(automaticTeamPermissionDescriptor(plan));
     found.textContent = discovered.length ? strings.found(discovered.length) : strings.none;
     status.textContent = plan.length ? strings.plan(plan.map((item) => item.displayName).join(" · ")) : "";
     button.disabled = starting || plan.length < 2;
@@ -213,9 +209,9 @@ async function retryAfterLogin(tabId: number) {
   retry.click();
 }
 
-async function discover(): Promise<ProviderDetection[]> {
+async function discover(): Promise<AutomaticTeamDetection[]> {
   const tabs = (await chrome.tabs.query({})) as BrowserTab[];
-  const byOrigin = new Map<string, ProviderDetection>();
+  const byOrigin = new Map<string, AutomaticTeamDetection>();
   for (const tab of tabs) {
     if (!tab.id || !tab.url || !/^https?:/i.test(tab.url)) continue;
     try {
@@ -228,26 +224,7 @@ async function discover(): Promise<ProviderDetection[]> {
   return [...byOrigin.values()].slice(0, MAX_CONSULTATION_PARTICIPANTS);
 }
 
-function buildAssemblyPlan(discovered: readonly ProviderDetection[]): ProviderDetection[] {
-  const byOrigin = new Map(discovered.map((item) => [item.origin, item]));
-  if (byOrigin.size >= 2) return [...byOrigin.values()].slice(0, MAX_CONSULTATION_PARTICIPANTS);
-
-  for (const providerId of STARTER_PROVIDER_IDS) {
-    if (byOrigin.size >= STARTER_TEAM_SIZE) break;
-    const manifest = BUILT_IN_PROVIDER_MANIFESTS.find((item) => item.providerId === providerId);
-    if (!manifest) continue;
-    const detection = detectProviderUrl(manifest.defaultUrl);
-    if (!byOrigin.has(detection.origin)) byOrigin.set(detection.origin, detection);
-  }
-
-  return [...byOrigin.values()].slice(0, MAX_CONSULTATION_PARTICIPANTS);
-}
-
-function permissionDescriptor(plan: readonly ProviderDetection[]) {
-  return { origins: [...new Set(plan.map((detection) => `${detection.origin}/*`))] };
-}
-
-async function assemble(plan: readonly ProviderDetection[], failureMessage: string) {
+async function assemble(plan: readonly AutomaticTeamDetection[], failureMessage: string) {
   const participants: ParticipantRecord[] = [];
   const connections: Record<string, { state: "idle"; automatic: true }> = {};
   for (const detection of plan) {
