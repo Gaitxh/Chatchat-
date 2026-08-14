@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   login-concierge:
-    name: Login Concierge · provider waiting for sign-in
+    name: Login Concierge · sign-in and automatic resume
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -105,6 +105,60 @@ jobs:
           grep -q '去 Claude 完成登录' artifacts/chatchat-login-concierge-zh.html
           grep -q '不用回来点重试' artifacts/chatchat-login-concierge-zh.html
           grep -q '>去登录<' artifacts/chatchat-login-concierge-zh.html
+
+      - name: Prove English login resumes to READY without retry click
+        run: |
+          URL='http://127.0.0.1:4182/app/app.html?showcase=login-concierge&journey=resume&lang=en'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=16000 \
+            --window-size=1440,1800 \
+            --screenshot=artifacts/chatchat-login-resumed-en.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=16000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-login-resumed-en.html
+          test -s artifacts/chatchat-login-resumed-en.png
+          grep -q 'data-chatchat-login-journey-prompt="complete"' artifacts/chatchat-login-resumed-en.html
+          grep -q 'data-chatchat-login-journey-connecting="complete"' artifacts/chatchat-login-resumed-en.html
+          grep -q 'data-chatchat-login-resume-showcase="complete"' artifacts/chatchat-login-resumed-en.html
+          grep -q 'participant-row connection-ready is-ready' artifacts/chatchat-login-resumed-en.html
+
+      - name: Prove Chinese login resumes to READY without retry click
+        run: |
+          URL='http://127.0.0.1:4182/app/app.html?showcase=login-concierge&journey=resume&lang=zh'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=16000 \
+            --window-size=1440,1800 \
+            --screenshot=artifacts/chatchat-login-resumed-zh.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=16000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-login-resumed-zh.html
+          test -s artifacts/chatchat-login-resumed-zh.png
+          grep -q 'data-chatchat-login-journey-prompt="complete"' artifacts/chatchat-login-resumed-zh.html
+          grep -q 'data-chatchat-login-journey-connecting="complete"' artifacts/chatchat-login-resumed-zh.html
+          grep -q 'data-chatchat-login-resume-showcase="complete"' artifacts/chatchat-login-resumed-zh.html
+          grep -q 'participant-row connection-ready is-ready' artifacts/chatchat-login-resumed-zh.html
 
       - name: Save preview log
         if: always()
