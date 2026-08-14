@@ -59,10 +59,14 @@ export class CouncilOrchestrator {
         agent,
         contributions: await agent.respond(this.#context(agent, blackboard, sessionId, question, mode, "debate", round, snapshot, facts)),
       })));
-      await this.#publish(blackboard, turns.flatMap(({ agent, contributions }) =>
-        contributions.map((item) => this.#materialize(sessionId, round, agent.participant.id, item))), options);
+      const roundEvents = turns.flatMap(({ agent, contributions }) =>
+        contributions.map((item) => this.#materialize(sessionId, round, agent.participant.id, item)));
+      await this.#publish(blackboard, roundEvents, options);
       lastRound = round;
-      if (round - 1 >= minDebateRounds && this.#consensusRatio(blackboard) >= convergenceThreshold) break;
+
+      const eligibleToConverge = round - 1 >= minDebateRounds
+        && this.#consensusRatio(blackboard) >= convergenceThreshold;
+      if (eligibleToConverge && !this.#roundNeedsPeerResponse(roundEvents)) break;
     }
 
     const finalRound = lastRound + 1;
@@ -127,6 +131,15 @@ export class CouncilOrchestrator {
       blackboard.publish(event);
       await options.onEvent?.(event);
     }
+  }
+
+  #roundNeedsPeerResponse(events: readonly CouncilEvent[]): boolean {
+    return events.some((event) =>
+      event.kind === "challenge"
+      || event.kind === "evidence"
+      || event.kind === "revision"
+      || event.kind === "question"
+      || event.kind === "uncertain");
   }
 
   #consensusRatio(blackboard: Blackboard) {
