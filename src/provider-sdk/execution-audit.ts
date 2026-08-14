@@ -1,4 +1,5 @@
 import type { CouncilContext, CouncilEventKind } from "../core/types.js";
+import { selectProviderContextEvents } from "./context-selection.js";
 import type { ProviderProfile } from "./types.js";
 
 export const PROVIDER_EXECUTION_AUDIT_EVENT = "chatchat:provider-execution-audit";
@@ -20,6 +21,8 @@ export interface ProviderExecutionAuditEvent {
   round: number;
   stage: ProviderExecutionAuditStage;
   snapshotEventIds: readonly string[];
+  pinnedOpenIssueEventIds?: readonly string[];
+  latestRoundEventIds?: readonly string[];
   attempt?: 1 | 2;
   contributionKinds?: readonly CouncilEventKind[];
   error?: string;
@@ -59,6 +62,7 @@ export function providerAuditBase(
   profile: ProviderProfile,
   context: CouncilContext,
 ): Omit<ProviderExecutionAuditEvent, "stage" | "observedAt"> {
+  const selection = selectProviderContextEvents(context.publicEvents);
   return {
     sessionId: context.sessionId,
     actorId: context.participant.id,
@@ -66,7 +70,9 @@ export function providerAuditBase(
     providerName: profile.displayName,
     phase: context.phase,
     round: context.round,
-    snapshotEventIds: context.publicEvents.map((event) => event.id),
+    snapshotEventIds: selection.events.map((event) => event.id),
+    ...(selection.pinnedEventIds.length ? { pinnedOpenIssueEventIds: [...selection.pinnedEventIds] } : {}),
+    ...(selection.latestRoundEventIds.length ? { latestRoundEventIds: [...selection.latestRoundEventIds] } : {}),
   };
 }
 
@@ -74,6 +80,8 @@ export function cloneProviderExecutionAudit(event: ProviderExecutionAuditEvent):
   return {
     ...event,
     snapshotEventIds: [...event.snapshotEventIds],
+    ...(event.pinnedOpenIssueEventIds ? { pinnedOpenIssueEventIds: [...event.pinnedOpenIssueEventIds] } : {}),
+    ...(event.latestRoundEventIds ? { latestRoundEventIds: [...event.latestRoundEventIds] } : {}),
     ...(event.contributionKinds ? { contributionKinds: [...event.contributionKinds] } : {}),
   };
 }
