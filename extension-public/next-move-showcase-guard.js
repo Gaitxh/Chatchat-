@@ -2,22 +2,19 @@
   const params = new URLSearchParams(location.search);
   if (params.get("showcase") !== "consultation") return;
 
-  function enforce() {
+  function check() {
     const root = document.documentElement;
-    const sidePanelDone = root.dataset.chatchatConsultationShowcase === "complete";
-    const fullRoomDone = root.dataset.chatchatRoomShowcase === "complete";
-    if (!sidePanelDone && !fullRoomDone) return;
-    if (document.querySelector(".next-move-board")) return;
-    if (sidePanelDone) root.dataset.chatchatConsultationShowcase = "failed-next-move";
-    if (fullRoomDone) root.dataset.chatchatRoomShowcase = "failed-next-move";
+    if (!document.querySelector(".next-move-board")) return;
+    root.dataset.chatchatNextMoveShowcase = "complete";
+    observer.disconnect();
   }
 
-  new MutationObserver(enforce).observe(document.documentElement, {
+  const observer = new MutationObserver(check);
+  observer.observe(document.documentElement, {
     attributes: true,
-    attributeFilter: [
-      "data-chatchat-consultation-showcase",
-      "data-chatchat-room-showcase",
-    ],
+    childList: true,
+    subtree: true,
   });
-  window.addEventListener("DOMContentLoaded", enforce, { once: true });
+  window.addEventListener("DOMContentLoaded", check, { once: true });
+  check();
 })();

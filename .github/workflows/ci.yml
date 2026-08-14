@@ -102,6 +102,11 @@ jobs:
             "$URL" > artifacts/chatchat-consultation-zh.html
           test -s artifacts/chatchat-consultation-zh.png
           grep -q 'data-chatchat-consultation-showcase="complete"' artifacts/chatchat-consultation-zh.html
+          grep -q 'data-chatchat-evidence-radar-showcase="complete"' artifacts/chatchat-consultation-zh.html
+          grep -q 'data-chatchat-next-move-showcase="complete"' artifacts/chatchat-consultation-zh.html
+          grep -q 'data-chatchat-proposal-mode-showcase="complete"' artifacts/chatchat-consultation-zh.html
+          grep -q 'data-chatchat-consultation-receipt-showcase="complete"' artifacts/chatchat-consultation-zh.html
+          grep -q 'data-chatchat-investigation-trail-showcase="complete"' artifacts/chatchat-consultation-zh.html
           grep -q '用户发起提案' artifacts/chatchat-consultation-zh.html
           grep -q '平等 AI 参与者' artifacts/chatchat-consultation-zh.html
           grep -q '没有议长' artifacts/chatchat-consultation-zh.html
@@ -135,6 +140,11 @@ jobs:
             "$URL" > artifacts/chatchat-consultation-en.html
           test -s artifacts/chatchat-consultation-en.png
           grep -q 'data-chatchat-consultation-showcase="complete"' artifacts/chatchat-consultation-en.html
+          grep -q 'data-chatchat-evidence-radar-showcase="complete"' artifacts/chatchat-consultation-en.html
+          grep -q 'data-chatchat-next-move-showcase="complete"' artifacts/chatchat-consultation-en.html
+          grep -q 'data-chatchat-proposal-mode-showcase="complete"' artifacts/chatchat-consultation-en.html
+          grep -q 'data-chatchat-consultation-receipt-showcase="complete"' artifacts/chatchat-consultation-en.html
+          grep -q 'data-chatchat-investigation-trail-showcase="complete"' artifacts/chatchat-consultation-en.html
           grep -q 'Propose once' artifacts/chatchat-consultation-en.html
           grep -q 'Equal AI participants' artifacts/chatchat-consultation-en.html
           grep -qi 'no chair' artifacts/chatchat-consultation-en.html
@@ -169,6 +179,11 @@ jobs:
             "$URL" > artifacts/chatchat-room-zh.html
           test -s artifacts/chatchat-room-zh.png
           grep -q 'data-chatchat-room-showcase="complete"' artifacts/chatchat-room-zh.html
+          grep -q 'data-chatchat-evidence-radar-showcase="complete"' artifacts/chatchat-room-zh.html
+          grep -q 'data-chatchat-next-move-showcase="complete"' artifacts/chatchat-room-zh.html
+          grep -q 'data-chatchat-proposal-mode-showcase="complete"' artifacts/chatchat-room-zh.html
+          grep -q 'data-chatchat-consultation-receipt-showcase="complete"' artifacts/chatchat-room-zh.html
+          grep -q 'data-chatchat-investigation-trail-showcase="complete"' artifacts/chatchat-room-zh.html
           grep -q '协商记录' artifacts/chatchat-room-zh.html
           grep -q 'history-entry' artifacts/chatchat-room-zh.html
           grep -q 'INDEXEDDB · LOCAL' artifacts/chatchat-room-zh.html
@@ -198,6 +213,11 @@ jobs:
             "$URL" > artifacts/chatchat-room-en.html
           test -s artifacts/chatchat-room-en.png
           grep -q 'data-chatchat-room-showcase="complete"' artifacts/chatchat-room-en.html
+          grep -q 'data-chatchat-evidence-radar-showcase="complete"' artifacts/chatchat-room-en.html
+          grep -q 'data-chatchat-next-move-showcase="complete"' artifacts/chatchat-room-en.html
+          grep -q 'data-chatchat-proposal-mode-showcase="complete"' artifacts/chatchat-room-en.html
+          grep -q 'data-chatchat-consultation-receipt-showcase="complete"' artifacts/chatchat-room-en.html
+          grep -q 'data-chatchat-investigation-trail-showcase="complete"' artifacts/chatchat-room-en.html
           grep -q 'CONSULTATION HISTORY' artifacts/chatchat-room-en.html
           grep -q 'history-entry' artifacts/chatchat-room-en.html
           grep -q 'INDEXEDDB · LOCAL' artifacts/chatchat-room-en.html
