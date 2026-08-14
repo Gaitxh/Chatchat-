@@ -58,4 +58,16 @@ assert(
   "A page that already exposes a composer should not be treated as login just because it has an account control.",
 );
 
+assert(
+  classifyLoginState({
+    expectedOrigin: "https://example-ai.test",
+    currentUrl: "https://example-ai.test/chat",
+    title: "Example AI · Sign in for sync",
+    passwordInputs: 0,
+    loginControls: 1,
+    composerCandidates: 1,
+  }) === "not_login",
+  "Optional sign-in chrome must never hide an already usable same-origin AI composer.",
+);
+
 console.log("✓ ChatChat login-state classification tests passed");
