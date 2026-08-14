@@ -7,6 +7,7 @@
   const ARCHIVES = "archives";
   const EXECUTION_DB_NAME = "chatchat-provider-execution-history-v1";
   const EXECUTION_STORE = "receipts";
+  const HAS_HISTORY_UI = Boolean(document.getElementById("consultation-history-root"));
   let checking = false;
 
   window.addEventListener(HISTORY_UPDATED_EVENT, (event) => {
@@ -58,6 +59,15 @@
       }
 
       document.documentElement.dataset.chatchatExecutionHistoryPersistenceShowcase = "complete";
+
+      // Side Panel intentionally has no Consultation History UI. It still has to
+      // prove exact-session archive + execution receipt durability. Full Room
+      // owns historical replay and therefore carries the stronger UI reopen gate.
+      if (!HAS_HISTORY_UI) {
+        document.documentElement.dataset.chatchatExecutionHistoryReplayShowcase = "not-applicable";
+        document.documentElement.dataset.chatchatHistoryPersistenceShowcase = "complete";
+        return;
+      }
 
       const historyButton = await waitForElement(() => document.querySelector(".history-entry-main"));
       historyButton.click();
