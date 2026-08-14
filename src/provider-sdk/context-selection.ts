@@ -85,10 +85,10 @@ export function selectProviderContextEvents(
   }
 
   const remaining = Math.max(0, maxEvents - protectedLatest.size - pinned.size);
-  const ordinaryRecent = publicEvents
-    .filter((event) => !pinned.has(event.id) && !protectedLatest.has(event.id))
-    .slice(-remaining)
-    .map((event) => event.id);
+  const ordinaryCandidates = publicEvents.filter((event) => !pinned.has(event.id) && !protectedLatest.has(event.id));
+  const ordinaryRecent = remaining > 0
+    ? ordinaryCandidates.slice(-remaining).map((event) => event.id)
+    : [];
   const recent = [...ordinaryRecent, ...latestRoundEventIds]
     .sort((a, b) => (indexById.get(a) ?? 0) - (indexById.get(b) ?? 0));
   const selectedIds = new Set([...pinned, ...recent]);
