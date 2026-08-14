@@ -4,8 +4,38 @@
 
   const COMPLETE_ATTR = "data-chatchat-live-deliberation-showcase";
   const EXCHANGE_ATTR = "data-chatchat-peer-exchange-showcase";
+  const AGENDA_ATTR = "data-chatchat-agenda-showcase";
+  const OPEN_ISSUES_ATTR = "data-chatchat-open-issues-showcase";
+  const SECRETARIAT_ATTR = "data-chatchat-meeting-secretariat-showcase";
+  let sawFreshSignalAgenda = false;
+  let sawOpenIssue = false;
+
+  function markComplete(attribute) {
+    if (document.documentElement.getAttribute(attribute) === "complete") return;
+    document.documentElement.setAttribute(attribute, "complete");
+  }
 
   function inspect() {
+    // Agenda and Open Issues are phase-transition UI. Observe them before any
+    // unrelated live-surface requirement so a real transient render is not
+    // discarded merely because another React subtree commits one tick later.
+    const agenda = document.querySelector('[data-phase-reason="fresh_signal_follow_up"]');
+    const agendaTrigger = agenda?.querySelector("[data-agenda-trigger-event]");
+    if (agenda && agendaTrigger) {
+      sawFreshSignalAgenda = true;
+      markComplete(AGENDA_ATTR);
+    }
+
+    const openIssues = document.querySelector(".open-issues-radar.has-open-issues");
+    const openIssue = openIssues?.querySelector("[data-open-issue-event]");
+    if (openIssues && openIssue) {
+      sawOpenIssue = true;
+      markComplete(OPEN_ISSUES_ATTR);
+    }
+
+    const secretariatComplete = sawFreshSignalAgenda && sawOpenIssue;
+    if (secretariatComplete) markComplete(SECRETARIAT_ATTR);
+
     const stream = document.querySelector(".live-discussion-stream");
     if (!(stream instanceof HTMLElement)) return false;
 
@@ -14,7 +44,7 @@
     const targetTurnStage = answeredExchange?.querySelector('[data-peer-stage="responding"]');
     const answeredStage = answeredExchange?.querySelector('[data-peer-stage="answered"]');
     const peerLifecycleComplete = Boolean(answeredExchange && queuedStage && targetTurnStage && answeredStage);
-    if (peerLifecycleComplete) document.documentElement.setAttribute(EXCHANGE_ATTR, "complete");
+    if (peerLifecycleComplete) markComplete(EXCHANGE_ATTR);
 
     const sealedRound = stream.querySelector(".discussion-round--sealed");
     const debateRound = stream.querySelector(".discussion-round--debate");
@@ -39,6 +69,7 @@
       && revision
       && directReply
       && peerLifecycleComplete
+      && secretariatComplete
       && researchDesk
       && researchLane
       && researchEvidenceCount
@@ -48,7 +79,7 @@
       && replyEdge
       && traceButton
     ) {
-      document.documentElement.setAttribute(COMPLETE_ATTR, "complete");
+      markComplete(COMPLETE_ATTR);
       return true;
     }
     return false;
