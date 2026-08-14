@@ -39,7 +39,7 @@ const COPY = {
     source: "source",
     explicitReasons: "explicit reasons",
     viewTrace: "trace event",
-    repliedTo: "Replying to",
+    repliedTo: "Direct reply to",
     event: "event",
     round: "Round {round}",
     actions: "public actions",
@@ -61,7 +61,7 @@ const COPY = {
     source: "来源",
     explicitReasons: "明确改口原因",
     viewTrace: "查看原始事件",
-    repliedTo: "正在回应",
+    repliedTo: "直接回应",
     event: "事件",
     round: "第 {round} 轮",
     actions: "条公开动作",
@@ -199,6 +199,17 @@ function DiscussionCard({
         </div>
         <small>R{event.round}</small>
       </div>
+
+      {entry.replyToEventId && entry.replyToActorName ? (
+        <div className="discussion-relation discussion-relation--reply" data-reply-to-event={entry.replyToEventId}>
+          <b>↪</b>
+          <div>
+            <strong>{copy.repliedTo} {entry.replyToActorName}</strong>
+            {entry.replyToExcerpt ? <q>{entry.replyToExcerpt}</q> : null}
+          </div>
+          <button type="button" onClick={() => onFocusEvent(entry.replyToEventId!)} aria-label={copy.viewTrace}>↗</button>
+        </div>
+      ) : null}
 
       {relationship ? (
         <div className="discussion-relation">

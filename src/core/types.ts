@@ -44,15 +44,20 @@ interface CouncilEventBase {
   createdAt: string;
 }
 
-export interface ArgumentEvent extends CouncilEventBase { kind: "argument"; stance: string; content: string; confidence: number; }
+/** Optional only on speech kinds that otherwise have no exact peer-event target. Old archives remain valid without it. */
+interface CouncilPeerReply {
+  replyToEventId?: string;
+}
+
+export interface ArgumentEvent extends CouncilEventBase, CouncilPeerReply { kind: "argument"; stance: string; content: string; confidence: number; }
 export interface ChallengeEvent extends CouncilEventBase { kind: "challenge"; targetEventId: string; content: string; }
-export interface EvidenceEvent extends CouncilEventBase { kind: "evidence"; targetEventId?: string; claim: string; content: string; source?: string; sourceDate?: string; confidence: number; }
+export interface EvidenceEvent extends CouncilEventBase, CouncilPeerReply { kind: "evidence"; targetEventId?: string; claim: string; content: string; source?: string; sourceDate?: string; confidence: number; }
 export interface SupportEvent extends CouncilEventBase { kind: "support"; targetEventId: string; content: string; }
 export interface DefenseEvent extends CouncilEventBase { kind: "defense"; targetEventId: string; content: string; }
 export interface RevisionEvent extends CouncilEventBase { kind: "revision"; previousEventId: string; stance: string; content: string; confidence: number; causedBy?: string[]; }
 export interface ConcedeEvent extends CouncilEventBase { kind: "concede"; targetEventId: string; content: string; }
-export interface QuestionEvent extends CouncilEventBase { kind: "question"; targetActorId?: string; content: string; }
-export interface UncertainEvent extends CouncilEventBase { kind: "uncertain"; content: string; confidence: number; }
+export interface QuestionEvent extends CouncilEventBase, CouncilPeerReply { kind: "question"; targetActorId?: string; content: string; }
+export interface UncertainEvent extends CouncilEventBase, CouncilPeerReply { kind: "uncertain"; content: string; confidence: number; }
 export interface FinalPositionEvent extends CouncilEventBase { kind: "final_position"; stance: string; content: string; confidence: number; caveats?: string[]; }
 
 export type CouncilEvent =

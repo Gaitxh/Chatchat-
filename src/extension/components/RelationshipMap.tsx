@@ -3,6 +3,7 @@ import type { CouncilEvent } from "../../core/types.js";
 import type { Locale } from "../../i18n/index.js";
 import { deriveRelationshipGraph, type RelationshipEdge, type RelationshipKind } from "../../theater/relationship-map.js";
 import "./relationship-map.css";
+import "./explicit-peer-replies.css";
 
 export function RelationshipMap({ participants, events, locale }: {
   participants: readonly { id: string; name: string }[];
@@ -20,7 +21,7 @@ export function RelationshipMap({ participants, events, locale }: {
     : { kicker:"RELATIONSHIP MAP", title:"Who is pushing whom?", body:"Only explicit structured event references create links. Prose mentions do not.", empty:"No explicit cross-participant relationship yet." };
 
   return <div className="relationship-map">
-    <div className="relationship-map__heading"><div><span>{copy.kicker}</span><h4>{copy.title}</h4><p>{copy.body}</p></div><div className="relationship-map__legend"><span>⚔</span><span>🤝</span><span>📎</span><span>↻</span></div></div>
+    <div className="relationship-map__heading"><div><span>{copy.kicker}</span><h4>{copy.title}</h4><p>{copy.body}</p></div><div className="relationship-map__legend"><span>↪</span><span>⚔</span><span>🤝</span><span>📎</span><span>↻</span></div></div>
     {graph.edges.length ? <>
       <div className="relationship-stage">
         <svg viewBox="0 0 100 100" aria-hidden="true">
@@ -41,12 +42,12 @@ export function RelationshipMap({ participants, events, locale }: {
   </div>;
 }
 
-const KINDS: RelationshipKind[]=["challenge","support","defense","question","concede","evidence","influence","evidence_influence"];
+const KINDS: RelationshipKind[]=["reply","challenge","support","defense","question","concede","evidence","influence","evidence_influence"];
 interface Point{x:number;y:number}
 function layout(count:number):Point[]{if(count<=2)return[{x:23,y:50},{x:77,y:50}].slice(0,count);if(count===3)return[{x:50,y:16},{x:82,y:72},{x:18,y:72}];if(count===4)return[{x:50,y:13},{x:86,y:50},{x:50,y:87},{x:14,y:50}];return Array.from({length:count},(_,i)=>{const a=-Math.PI/2+Math.PI*2*i/count;return{x:50+Math.cos(a)*37,y:50+Math.sin(a)*37}})}
 function curvedPath(from:Point,to:Point,edge:RelationshipEdge):string{const dx=to.x-from.x,dy=to.y-from.y,len=Math.max(1,Math.hypot(dx,dy)),ux=dx/len,uy=dy/len;const s={x:from.x+ux*10,y:from.y+uy*10},e={x:to.x-ux*11,y:to.y-uy*11};const bend=6*(edge.fromActorId.localeCompare(edge.toActorId)<0?1:-1);const m={x:(s.x+e.x)/2-uy*bend,y:(s.y+e.y)/2+ux*bend};return`M ${s.x} ${s.y} Q ${m.x} ${m.y} ${e.x} ${e.y}`}
-function edgeIcon(kind:RelationshipKind){if(kind==="challenge")return"⚔";if(kind==="support")return"🤝";if(kind==="evidence"||kind==="evidence_influence")return"📎";if(kind==="influence")return"↻";if(kind==="question")return"?";if(kind==="concede")return"🏳";return"•"}
-function edgeLabel(kind:RelationshipKind,locale:Locale){const zh=locale==="zh-CN";if(kind==="challenge")return zh?"质疑":"challenge";if(kind==="support")return zh?"支持":"support";if(kind==="evidence")return zh?"证据":"evidence";if(kind==="evidence_influence"||kind==="influence")return zh?"触发改口":"changed a view";if(kind==="question")return zh?"追问":"question";return zh?"互动":"interaction"}
+function edgeIcon(kind:RelationshipKind){if(kind==="reply")return"↪";if(kind==="challenge")return"⚔";if(kind==="support")return"🤝";if(kind==="evidence"||kind==="evidence_influence")return"📎";if(kind==="influence")return"↻";if(kind==="question")return"?";if(kind==="concede")return"🏳";return"•"}
+function edgeLabel(kind:RelationshipKind,locale:Locale){const zh=locale==="zh-CN";if(kind==="reply")return zh?"直接回应":"direct reply";if(kind==="challenge")return zh?"质疑":"challenge";if(kind==="support")return zh?"支持":"support";if(kind==="evidence")return zh?"证据":"evidence";if(kind==="evidence_influence"||kind==="influence")return zh?"触发改口":"changed a view";if(kind==="question")return zh?"追问":"question";return zh?"互动":"interaction"}
 function nameOf(ps:readonly{id:string;name:string}[],id:string){return ps.find((p)=>p.id===id)?.name??id}
 function nodeSignal(stats:ReturnType<typeof deriveRelationshipGraph>["nodes"][number]|undefined){if(!stats)return"···";return[stats.revisionsMade?`↻${stats.revisionsMade}`:"",stats.evidenceSubmitted?`📎${stats.evidenceSubmitted}`:"",stats.challengesSent?`⚔${stats.challengesSent}`:""].filter(Boolean).join(" ")||"···"}
 function monogram(name:string){if(/deepseek/i.test(name))return"D";if(/gemini/i.test(name))return"Gm";if(/claude/i.test(name))return"C";if(/qwen|通义/i.test(name))return"Q";if(/gpt/i.test(name))return"G";return name.slice(0,2).toUpperCase()}

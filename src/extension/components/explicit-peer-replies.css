@@ -1,0 +1,29 @@
+.discussion-relation--reply {
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  border: 1px solid rgba(119, 159, 211, .14);
+  background: rgba(79, 120, 171, .08);
+}
+
+.discussion-relation--reply > b {
+  color: #9bc0ec;
+  background: rgba(91, 143, 204, .11);
+}
+
+.discussion-relation--reply > button {
+  align-self: center;
+  border: 0;
+  background: transparent;
+  color: #7ea5d2;
+  font-size: 7px;
+  cursor: pointer;
+}
+
+.edge-reply {
+  stroke: #7f9fc8;
+  fill: #7f9fc8;
+}
+
+.relationship-edge.edge-reply {
+  fill: none;
+  stroke-dasharray: 4 2;
+}

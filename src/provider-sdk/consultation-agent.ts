@@ -3,6 +3,7 @@ import type {
   CouncilContext,
   CouncilContribution,
 } from "../core/types.js";
+import { attachExplicitPeerReplies } from "../consultation/reply-provenance.js";
 import { buildModeAwareProviderConsultationPrompt } from "./consultation-mode-prompt.js";
 import {
   parseProviderConsultationResponse,
@@ -20,6 +21,15 @@ const NOOP_PREPARE: ProviderConsultationSessionPreparer = async () => undefined;
  */
 export function buildProviderConsultationPrompt(context: CouncilContext): string {
   return buildModeAwareProviderConsultationPrompt(context);
+}
+
+/** Real provider parse path: base schema validation first, then optional peer-reply provenance. */
+export function parseProviderConsultationTurn(
+  raw: string,
+  context: CouncilContext,
+): readonly CouncilContribution[] {
+  const parsed = parseProviderConsultationResponse(raw, context);
+  return attachExplicitPeerReplies(raw, context, parsed);
 }
 
 export class BrowserConsultationAgent implements CouncilAgent {
@@ -81,7 +91,7 @@ async function runConsultationTurn(
   const prompt = buildProviderConsultationPrompt(context);
   const first = await transport(profile, recipe, prompt);
   try {
-    return parseProviderConsultationResponse(first.responseText, context);
+    return parseProviderConsultationTurn(first.responseText, context);
   } catch (firstError) {
     const repairPrompt = [
       prompt,
@@ -92,7 +102,7 @@ async function runConsultationTurn(
     ].join("\n");
     const second = await transport(profile, recipe, repairPrompt);
     try {
-      return parseProviderConsultationResponse(second.responseText, context);
+      return parseProviderConsultationTurn(second.responseText, context);
     } catch (secondError) {
       throw new Error(
         `Structured consultation output failed twice. First: ${errorMessage(firstError)} Second: ${errorMessage(secondError)}`,

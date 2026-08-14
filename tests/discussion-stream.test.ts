@@ -41,17 +41,22 @@ const events: CouncilEvent[] = [
     targetActorId: "gpt", content: "How should login recovery work?", createdAt: "2026-08-14T00:00:06Z",
   },
   {
-    id: "gpt-final", sessionId: "session", round: 4, actorId: "gpt", kind: "final_position",
+    id: "gpt-answer", sessionId: "session", round: 4, actorId: "gpt", kind: "argument",
+    stance: "Ship web-first", content: "Login recovery should resume automatically after the provider becomes ready.", confidence: .86,
+    replyToEventId: "gemini-question", createdAt: "2026-08-14T00:00:07Z",
+  },
+  {
+    id: "gpt-final", sessionId: "session", round: 5, actorId: "gpt", kind: "final_position",
     stance: "Ship web-first", content: "Final: web-first, invisible bridge.", confidence: .9,
-    createdAt: "2026-08-14T00:00:07Z",
+    createdAt: "2026-08-14T00:00:08Z",
   },
 ];
 
 const model = buildDiscussionStream(participants, events);
 assert(model.eventCount === events.length, "Every public structured event should become one discussion entry.");
-assert(model.rounds.length === 4, "The discussion should preserve all four public rounds.");
+assert(model.rounds.length === 5, "The discussion should preserve all five public rounds.");
 assert(model.rounds[0]?.phase === "sealed", "Round 1 must remain visibly identified as the sealed independent round.");
-assert(model.rounds[3]?.phase === "final", "A final-position round must be labeled final.");
+assert(model.rounds[4]?.phase === "final", "A final-position round must be labeled final.");
 
 const challenge = model.rounds[1]?.entries.find((entry) => entry.id === "gpt-challenge");
 assert(challenge?.targetActorName === "Claude", "Challenge target must come from targetEventId provenance.");
@@ -70,13 +75,20 @@ assert(revision?.causes[0]?.kind === "evidence", "Revision causes should preserv
 const question = model.rounds[2]?.entries.find((entry) => entry.id === "gemini-question");
 assert(question?.targetActorName === "ChatGPT", "Direct questions should use explicit targetActorId provenance.");
 
+const answer = model.rounds[3]?.entries.find((entry) => entry.id === "gpt-answer");
+assert(answer?.replyToEventId === "gemini-question", "Direct answer must keep the exact explicit reply event id.");
+assert(answer?.replyToActorName === "Gemini", "Direct answer must resolve the peer identity from the referenced public event.");
+assert(answer?.replyToExcerpt === "How should login recovery work?", "Direct answer must show a bounded excerpt from the exact question it answers.");
+
 const proseOnly: CouncilEvent[] = [{
   id: "prose", sessionId: "session-2", round: 1, actorId: "gpt", kind: "argument",
-  stance: "Maybe", content: "I disagree with Claude and Gemini.", confidence: .5,
+  stance: "Maybe", content: "I am answering Claude: this is a reply to your point.", confidence: .5,
   createdAt: "2026-08-14T00:01:00Z",
 }];
 const proseModel = buildDiscussionStream(participants, proseOnly);
 assert(!proseModel.rounds[0]?.entries[0]?.targetActorName, "Names mentioned in prose must never fabricate a relationship.");
+assert(!proseModel.rounds[0]?.entries[0]?.replyToActorName, "Reply language in prose must never fabricate a direct reply edge.");
 assert(proseModel.rounds[0]?.entries[0]?.causes.length === 0, "Prose alone must never fabricate persuasion causes.");
 
 console.log("✓ ChatChat traceable live discussion stream tests passed");
+console.log("✓ Explicit direct replies render as real peer threads while prose-only reply claims remain inert");

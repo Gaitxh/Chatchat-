@@ -4,6 +4,7 @@ import type {
 } from "../core/types.js";
 
 export type RelationshipKind =
+  | "reply"
   | "challenge"
   | "support"
   | "defense"
@@ -52,6 +53,21 @@ export function deriveRelationshipGraph(
     byId.set(event.id, event);
     if (!participantIds.has(event.actorId)) continue;
     const actorStats = stats.get(event.actorId)!;
+
+    const replyToEventId = explicitReplyEventId(event);
+    if (replyToEventId) {
+      const replyTarget = byId.get(replyToEventId);
+      if (replyTarget && participantIds.has(replyTarget.actorId) && replyTarget.actorId !== event.actorId) {
+        addEdge(edges, {
+          kind: "reply",
+          fromActorId: event.actorId,
+          toActorId: replyTarget.actorId,
+          eventId: event.id,
+          extraEventId: replyTarget.id,
+          round: event.round,
+        });
+      }
+    }
 
     if (event.kind === "challenge") {
       actorStats.challengesSent += 1;
@@ -120,6 +136,18 @@ export function deriveRelationshipGraph(
     edges: [...edges.values()].sort((a, b) => b.latestRound - a.latestRound || b.count - a.count),
     nodes: [...stats.values()],
   };
+}
+
+function explicitReplyEventId(event: CouncilEvent): string | undefined {
+  switch (event.kind) {
+    case "argument":
+    case "evidence":
+    case "question":
+    case "uncertain":
+      return event.replyToEventId;
+    default:
+      return undefined;
+  }
 }
 
 function addTargetEventEdge(
