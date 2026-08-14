@@ -29,6 +29,8 @@ for (const claim of [
   "data-conflict-thread",
   "data-conflict-anchor-event",
   "data-conflict-status",
+  "data-conflict-movement",
+  "data-conflict-movement-count",
   "data-conflict-count-kind",
   "data-conflict-open-event",
   "data-conflict-external-cause",
@@ -60,19 +62,20 @@ for (const [label, html] of [["Full Room", app], ["Side Panel", sidepanel]]) {
 
 for (const claim of [
   "data-chatchat-conflict-board-showcase",
-  'data-conflict-status="position_changed"',
+  'data-conflict-movement="revision"',
   'data-conflict-count-kind="challenge"',
   'data-conflict-count-kind="evidence"',
   'data-conflict-count-kind="revision"',
   'data-conflict-status="open"',
   "data-conflict-open-event",
+  "Movement and",
   "sawConflictChange",
   "sawOpenConflict",
 ]) {
   assert(guard.includes(claim), `Chromium live proof no longer enforces Conflict Board semantics: ${claim}`);
 }
 
-console.log("✓ Conflict Board is event-anchored, non-semantic and required by Chromium live proof");
+console.log("✓ Conflict Board is event-anchored, preserves simultaneous movement/open issues, and is required by Chromium proof");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`Conflict Board check failed: ${message}`);
