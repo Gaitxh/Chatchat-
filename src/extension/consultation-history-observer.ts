@@ -42,7 +42,7 @@ async function saveCompleted(report: CouncilReport, events: readonly CouncilEven
       historyStore.save(createConsultationArchive(report, events)),
       evidenceHistory.save(report.sessionId, evidenceSnapshot),
     ]);
-    announceConsultationHistoryUpdated();
+    announceConsultationHistoryUpdated(report.sessionId);
   } catch (caught) {
     // History is a local durability feature. A persistence failure must never
     // turn a completed consultation into a failed consultation.
