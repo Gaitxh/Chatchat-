@@ -59,10 +59,20 @@ export class CouncilOrchestrator {
         agent,
         contributions: await agent.respond(this.#context(agent, blackboard, sessionId, question, mode, "debate", round, snapshot, facts)),
       })));
-      await this.#publish(blackboard, turns.flatMap(({ agent, contributions }) =>
-        contributions.map((item) => this.#materialize(sessionId, round, agent.participant.id, item))), options);
+      const roundEvents = turns.flatMap(({ agent, contributions }) =>
+        contributions.map((item) => this.#materialize(sessionId, round, agent.participant.id, item)));
+      await this.#publish(blackboard, roundEvents, options);
       lastRound = round;
-      if (round - 1 >= minDebateRounds && this.#consensusRatio(blackboard) >= convergenceThreshold) break;
+
+      const convergenceReached = this.#consensusRatio(blackboard) >= convergenceThreshold;
+      const minimumReached = round - 1 >= minDebateRounds;
+      // Every participant in this batch responded to the same immutable pre-round
+      // snapshot. If the batch itself introduces a new claim, challenge, evidence,
+      // revision, question, or uncertainty, peers have not seen that information yet.
+      // A numerical majority must not gain the power to end deliberation before one
+      // follow-up batch can inspect the new signal.
+      const needsPeerFollowUp = this.#roundNeedsPeerFollowUp(roundEvents);
+      if (minimumReached && convergenceReached && !needsPeerFollowUp) break;
     }
 
     const finalRound = lastRound + 1;
@@ -127,6 +137,22 @@ export class CouncilOrchestrator {
       blackboard.publish(event);
       await options.onEvent?.(event);
     }
+  }
+
+  #roundNeedsPeerFollowUp(events: readonly CouncilEvent[]): boolean {
+    return events.some((event) => {
+      switch (event.kind) {
+        case "argument":
+        case "challenge":
+        case "evidence":
+        case "revision":
+        case "question":
+        case "uncertain":
+          return true;
+        default:
+          return false;
+      }
+    });
   }
 
   #consensusRatio(blackboard: Blackboard) {
