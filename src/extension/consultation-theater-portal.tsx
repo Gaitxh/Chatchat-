@@ -13,8 +13,10 @@ import type {
 import type { ConsultationArchive } from "../history/consultation-history.js";
 import { normalizeLocale, type Locale } from "../i18n/index.js";
 import { ConsultationTheater } from "./components/ConsultationTheater.js";
+import { LiveDiscussionStream } from "./components/LiveDiscussionStream.js";
 import { LiveMoments } from "./components/LiveMoments.js";
 import { LiveParticipantFloor } from "./components/LiveParticipantFloor.js";
+import { RelationshipMap } from "./components/RelationshipMap.js";
 import { ResearchRoster } from "./components/ResearchRoster.js";
 import {
   CONSULTATION_FOCUS_EVENT,
@@ -159,6 +161,10 @@ function ConsultationTheaterPortal() {
   if (!completion && !live) return null;
 
   if (!completion && live) {
+    const liveParticipants = live.participants.map((participant) => ({
+      id: participant.id,
+      name: participant.name,
+    }));
     return (
       <div className="consultation-theater-portal">
         <LiveParticipantFloor
@@ -168,12 +174,23 @@ function ConsultationTheaterPortal() {
           activities={live.activities}
           locale={locale}
         />
+        <LiveDiscussionStream
+          participants={live.participants}
+          events={live.events}
+          phase={live.phase}
+          locale={locale}
+          onFocusEvent={setSelectedEventId}
+        />
         {live.events.length ? (
           <LiveMoments
-            participants={live.participants.map((participant) => ({
-              id: participant.id,
-              name: participant.name,
-            }))}
+            participants={liveParticipants}
+            events={live.events}
+            locale={locale}
+          />
+        ) : null}
+        {live.events.length ? (
+          <RelationshipMap
+            participants={liveParticipants}
             events={live.events}
             locale={locale}
           />
