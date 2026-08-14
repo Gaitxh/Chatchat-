@@ -8,6 +8,7 @@ import type {
 } from "../../core/types.js";
 import { researchLaneDefinition } from "../../consultation/research-lanes.js";
 import type { Locale } from "../../i18n/index.js";
+import { LiveAgenda } from "./LiveAgenda.js";
 import "./live-participant-floor.css";
 
 interface LiveParticipantFloorProps {
@@ -119,6 +120,7 @@ export function LiveParticipantFloor({
         </div>
       </header>
 
+      <LiveAgenda phase={phase} events={events} participants={participants} locale={locale} />
       <RoundRail phase={phase} events={events} counts={roundCounts} locale={locale} />
 
       <div className="live-participant-grid">
