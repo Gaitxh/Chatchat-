@@ -9,7 +9,6 @@ declare const chrome: any;
 const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
 const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
 const RECOVERY_KEY = "chatchat.provider-self-healing.v1";
-const RECOVERY_TTL_MS = 10 * 60 * 1000;
 const MARKER = "__chatchatProviderSelfHealingV1";
 
 type MarkedWindow = Window & { [MARKER]?: true };
@@ -84,7 +83,8 @@ async function refresh() {
       : {};
     const recovery = normalizeRecovery(state[RECOVERY_KEY]);
     const rows = [...document.querySelectorAll<HTMLElement>(".participant-row")];
-    let recoveryChanged = pruneExpired(recovery);
+    const participantIds = new Set(participants.map((participant) => participant.seatId));
+    let recoveryChanged = pruneMissingParticipants(recovery, participantIds);
 
     for (let index = 0; index < participants.length; index += 1) {
       const participant = participants[index]!;
@@ -192,12 +192,13 @@ function normalizeRecovery(value: unknown): Record<string, RecoveryRecord> {
   })) as Record<string, RecoveryRecord>;
 }
 
-function pruneExpired(recovery: Record<string, RecoveryRecord>): boolean {
+function pruneMissingParticipants(
+  recovery: Record<string, RecoveryRecord>,
+  participantIds: ReadonlySet<string>,
+): boolean {
   let changed = false;
-  const now = Date.now();
-  for (const [seatId, record] of Object.entries(recovery)) {
-    const started = Date.parse(record.startedAt);
-    if (!Number.isFinite(started) || now - started > RECOVERY_TTL_MS) {
+  for (const seatId of Object.keys(recovery)) {
+    if (!participantIds.has(seatId)) {
       delete recovery[seatId];
       changed = true;
     }
