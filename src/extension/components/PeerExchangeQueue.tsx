@@ -43,6 +43,10 @@ const COPY = {
     traceRequest: "trace request",
     traceResponse: "trace response",
     round: "R{round}",
+    stepQueued: "Queued",
+    stepTargetTurn: "Target turn",
+    stepAnswered: "Answered",
+    stepUnresolved: "Unresolved",
   },
   "zh-CN": {
     eyebrow: "点名回应队列",
@@ -68,6 +72,10 @@ const COPY = {
     traceRequest: "溯源问题",
     traceResponse: "溯源回答",
     round: "第 {round} 轮",
+    stepQueued: "已排队",
+    stepTargetTurn: "目标 AI 接手",
+    stepAnswered: "已明确回答",
+    stepUnresolved: "仍未解决",
   },
 } as const;
 
@@ -139,6 +147,8 @@ function ExchangeCard({
         <em>{copy.round.replace("{round}", String(item.requestRound))}</em>
       </div>
 
+      <ExchangeProgress item={item} locale={locale} />
+
       <div className="peer-exchange-request">
         <span>{meta.icon} {meta.label}</span>
         <p>{item.requestContent}</p>
@@ -159,6 +169,33 @@ function ExchangeCard({
         </div>
       )}
     </article>
+  );
+}
+
+function ExchangeProgress({ item, locale }: { item: PeerExchangeItem; locale: Locale }) {
+  const copy = COPY[locale];
+  const targetTurnState = item.state === "responding"
+    ? "active"
+    : item.state === "answered"
+      ? "done"
+      : item.state === "turn_failed"
+        ? "failed"
+        : item.state === "unresolved"
+          ? "stopped"
+          : "pending";
+  const answerState = item.state === "answered"
+    ? "done"
+    : item.state === "unresolved"
+      ? "failed"
+      : "pending";
+  return (
+    <div className="peer-exchange-progress" aria-label={statusLabel(item.state, locale)}>
+      <span className="is-done" data-peer-stage="queued"><i>1</i><b>{copy.stepQueued}</b><small>R{item.requestRound}</small></span>
+      <em aria-hidden="true">→</em>
+      <span className={`is-${targetTurnState}`} data-peer-stage="responding"><i>2</i><b>{copy.stepTargetTurn}</b><small>{item.responseRound ? `R${item.responseRound}` : "···"}</small></span>
+      <em aria-hidden="true">→</em>
+      <span className={`is-${answerState}`} data-peer-stage="answered"><i>3</i><b>{item.state === "unresolved" ? copy.stepUnresolved : copy.stepAnswered}</b><small>{item.responseRound ? `R${item.responseRound}` : "···"}</small></span>
+    </div>
   );
 }
 
