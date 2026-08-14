@@ -1,6 +1,8 @@
 export interface SerializedRecordMutation<T> {
   upsert(key: string, value: T): Promise<Record<string, T>>;
   merge(values: Readonly<Record<string, T>>): Promise<Record<string, T>>;
+  /** Fill missing keys without allowing a stale hydration snapshot to overwrite newer persisted state. */
+  defaults(values: Readonly<Record<string, T>>): Promise<Record<string, T>>;
   remove(key: string): Promise<Record<string, T>>;
   replace(values: Readonly<Record<string, T>>): Promise<Record<string, T>>;
 }
@@ -30,6 +32,14 @@ export function createSerializedRecordMutation<T>(
       return run(async () => {
         const current = await read();
         const next = { ...current, ...values };
+        await write(next);
+        return next;
+      });
+    },
+    defaults(values) {
+      return run(async () => {
+        const current = await read();
+        const next = { ...values, ...current };
         await write(next);
         return next;
       });
