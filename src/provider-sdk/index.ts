@@ -5,7 +5,15 @@ import type { ProviderProfileStore } from "./types.js";
 
 export * from "./catalog.js";
 export * from "./consultation-agent.js";
-export * from "./consultation-protocol.js";
+export {
+  buildProviderConsultationPrompt as buildBaseProviderConsultationPrompt,
+  parseProviderConsultationResponse,
+} from "./consultation-protocol.js";
+export type {
+  ProviderConsultationSessionPreparer,
+  ProviderConsultationTransport,
+  ProviderConsultationTransportResult,
+} from "./consultation-protocol.js";
 export * from "./council-agent.js";
 export * from "./council-parser.js";
 export * from "./fresh-session.js";
