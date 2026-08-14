@@ -36,6 +36,13 @@ jobs:
           ! grep -q 'findReusableAutomaticTeamTab' src/extension/web-room-onboarding.tsx
           ! grep -q 'findReusableAutomaticTeamTab' src/extension/automatic-team.ts
 
+      - name: Enforce live zero-config transition
+        run: |
+          grep -q 'announceAutomaticTeamAssembled' src/extension/web-room-onboarding.tsx
+          grep -q 'AUTOMATIC_TEAM_ASSEMBLED_EVENT' src/extension/consultation-panel.tsx
+          ! grep -q 'location.reload' src/extension/web-room-onboarding.tsx
+          ! grep -q 'window.location.reload' src/extension/web-room-onboarding.tsx
+
       - name: Install CJK screenshot fonts
         run: |
           sudo apt-get update
@@ -79,6 +86,7 @@ jobs:
             --disable-gpu \
             --run-all-compositor-stages-before-draw \
             --virtual-time-budget=8000 \
+            --window-size=1440,1800 \
             --dump-dom \
             "$URL" > artifacts/chatchat-zero-config-en.html
           test -s artifacts/chatchat-zero-config-en.png
@@ -109,6 +117,7 @@ jobs:
             --disable-gpu \
             --run-all-compositor-stages-before-draw \
             --virtual-time-budget=8000 \
+            --window-size=1440,1800 \
             --dump-dom \
             "$URL" > artifacts/chatchat-zero-config-zh.html
           test -s artifacts/chatchat-zero-config-zh.png
@@ -119,6 +128,66 @@ jobs:
           grep -q '不会往你原来的聊天里塞握手或协商内容' artifacts/chatchat-zero-config-zh.html
           grep -q '你原来的 AI 对话不会被改动' artifacts/chatchat-zero-config-zh.html
           ! grep -q '开始自动配置' artifacts/chatchat-zero-config-zh.html
+
+      - name: Prove English room assembles live without reload
+        run: |
+          URL='http://127.0.0.1:4181/app/app.html?showcase=zero-config&journey=assemble&lang=en'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=18000 \
+            --window-size=1440,2200 \
+            --screenshot=artifacts/chatchat-zero-config-assembled-en.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=18000 \
+            --window-size=1440,2200 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-zero-config-assembled-en.html
+          test -s artifacts/chatchat-zero-config-assembled-en.png
+          grep -q 'data-chatchat-zero-config-assembly="complete"' artifacts/chatchat-zero-config-assembled-en.html
+          grep -q 'data-chatchat-zero-config-draft-preserved="complete"' artifacts/chatchat-zero-config-assembled-en.html
+          grep -q 'data-chatchat-zero-config-legacy-guide="suppressed"' artifacts/chatchat-zero-config-assembled-en.html
+          grep -q 'data-chatchat-zero-config-full-room-restored="complete"' artifacts/chatchat-zero-config-assembled-en.html
+          grep -q 'participant-row connection-ready is-ready' artifacts/chatchat-zero-config-assembled-en.html
+          grep -q 'This user draft must survive automatic room assembly unchanged.' artifacts/chatchat-zero-config-assembled-en.html
+
+      - name: Prove Chinese room assembles live without reload
+        run: |
+          URL='http://127.0.0.1:4181/app/app.html?showcase=zero-config&journey=assemble&lang=zh'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=18000 \
+            --window-size=1440,2200 \
+            --screenshot=artifacts/chatchat-zero-config-assembled-zh.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=18000 \
+            --window-size=1440,2200 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-zero-config-assembled-zh.html
+          test -s artifacts/chatchat-zero-config-assembled-zh.png
+          grep -q 'data-chatchat-zero-config-assembly="complete"' artifacts/chatchat-zero-config-assembled-zh.html
+          grep -q 'data-chatchat-zero-config-draft-preserved="complete"' artifacts/chatchat-zero-config-assembled-zh.html
+          grep -q 'data-chatchat-zero-config-legacy-guide="suppressed"' artifacts/chatchat-zero-config-assembled-zh.html
+          grep -q 'data-chatchat-zero-config-full-room-restored="complete"' artifacts/chatchat-zero-config-assembled-zh.html
+          grep -q 'participant-row connection-ready is-ready' artifacts/chatchat-zero-config-assembled-zh.html
+          grep -q '这段用户草稿必须在会议室自动组建后原样保留。' artifacts/chatchat-zero-config-assembled-zh.html
 
       - name: Save preview log
         if: always()

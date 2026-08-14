@@ -1,6 +1,14 @@
 /* Full Room first-run should prioritize one job: write a proposal while the AI room assembles. */
+html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] .consultation-header,
 html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] .consultation-hero {
   display: none !important;
+}
+
+/* When first-run chrome disappears, implicit grid tracks must not stretch to fill
+ * the viewport and leave a large dead zone above the proposal. */
+html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] .consultation-app {
+  align-content: start;
+  padding-top: 8px;
 }
 
 html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] .proposal-footer > span {

@@ -6,6 +6,7 @@ import {
   buildAutomaticTeamPlan,
   type AutomaticTeamDetection,
 } from "./automatic-team.js";
+import { announceAutomaticTeamAssembled } from "./automatic-team-wire.js";
 import { requestConnectionRetry } from "./connection-retry-wire.js";
 import "./web-room-onboarding.css";
 
@@ -74,6 +75,7 @@ async function mount() {
   const root = document.getElementById("web-onboarding-root");
   const guideRoot = document.getElementById("first-run-guide-root");
   if (!root) return;
+  const onboardingRoot = root;
   const locale: Locale = document.documentElement.lang.toLowerCase().startsWith("zh")
     || navigator.language?.toLowerCase().startsWith("zh")
     ? "zh-CN"
@@ -83,9 +85,7 @@ async function mount() {
   const stored = await session.get(PARTICIPANTS_KEY);
   const hasParticipants = Array.isArray(stored[PARTICIPANTS_KEY]) && stored[PARTICIPANTS_KEY].length > 0;
   if (hasParticipants) {
-    delete document.documentElement.dataset.chatchatOnboarding;
-    root.hidden = true;
-    if (guideRoot) guideRoot.hidden = false;
+    finishOnboarding();
     return;
   }
 
@@ -119,7 +119,7 @@ async function mount() {
   const status = document.createElement("em");
   action.append(found, button, status);
   card.append(copy, action);
-  root.append(card);
+  onboardingRoot.append(card);
 
   let discovered: AutomaticTeamDetection[] = [];
   let plan: AutomaticTeamDetection[] = [];
@@ -147,9 +147,7 @@ async function mount() {
       }
       if (!granted) throw new Error(strings.denied);
       await assemble(plan, strings.failed);
-      clearScan();
-      status.textContent = strings.done;
-      window.setTimeout(() => window.location.reload(), 650);
+      completeAssembly();
     } catch (error) {
       starting = false;
       button.disabled = false;
@@ -172,9 +170,7 @@ async function mount() {
       status.textContent = strings.working;
       try {
         await assemble(plan, strings.failed);
-        clearScan();
-        status.textContent = strings.done;
-        window.setTimeout(() => window.location.reload(), 650);
+        completeAssembly();
       } catch (error) {
         starting = false;
         button.disabled = false;
@@ -183,10 +179,23 @@ async function mount() {
     }
   }
 
+  function completeAssembly() {
+    clearScan();
+    status.textContent = strings.done;
+    announceAutomaticTeamAssembled();
+    finishOnboarding();
+  }
+
   function clearScan() {
     if (scan === undefined) return;
     window.clearInterval(scan);
     scan = undefined;
+  }
+
+  function finishOnboarding() {
+    delete document.documentElement.dataset.chatchatOnboarding;
+    onboardingRoot.hidden = true;
+    if (guideRoot) guideRoot.hidden = false;
   }
 }
 

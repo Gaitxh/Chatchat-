@@ -163,4 +163,11 @@ function stateLabel(state: GuideState["rows"][number]["state"], copy: typeof COP
 
 const root = document.getElementById("first-run-guide-root");
 if (!root) throw new Error("ChatChat first-run guide root is missing.");
-createRoot(root).render(<StrictMode><FirstRunGuide /></StrictMode>);
+
+if (document.documentElement.dataset.surface === "web-app") {
+  // The Full Room now has a zero-config Launch Lobby. Rendering the legacy guide
+  // here would create a second onboarding immediately after assembly completes.
+  root.hidden = true;
+} else {
+  createRoot(root).render(<StrictMode><FirstRunGuide /></StrictMode>);
+}
