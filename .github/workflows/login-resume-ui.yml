@@ -1,0 +1,111 @@
+name: Login-aware automatic resume UI
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "extension/**"
+      - "extension-public/**"
+      - "src/extension/**"
+      - "tests/login-awareness.test.ts"
+      - "package.json"
+      - ".github/workflows/login-resume-ui.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "extension/**"
+      - "extension-public/**"
+      - "src/extension/**"
+      - "tests/login-awareness.test.ts"
+      - "package.json"
+      - ".github/workflows/login-resume-ui.yml"
+
+jobs:
+  login-resume-evidence:
+    name: Full Room · login to READY
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm install
+
+      - name: Build Browser Extension
+        run: npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Locate Chromium browser
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_BIN"
+          echo "CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
+
+      - name: Start production extension preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4182 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-login-resume-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4182/manifest.json >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4182/manifest.json >/dev/null
+
+      - name: Capture Chinese sign-in-required state
+        run: |
+          URL='http://127.0.0.1:4182/app/app.html?showcase=login-resume&journey=login&lang=zh'
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --run-all-compositor-stages-before-draw --virtual-time-budget=7000 --window-size=1440,1900 --screenshot=artifacts/chatchat-login-required-zh.png "$URL"
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --run-all-compositor-stages-before-draw --virtual-time-budget=7000 --dump-dom "$URL" > artifacts/chatchat-login-required-zh.html
+          test -s artifacts/chatchat-login-required-zh.png
+          grep -q 'data-chatchat-login-required-showcase="complete"' artifacts/chatchat-login-required-zh.html
+          grep -q '需要登录' artifacts/chatchat-login-required-zh.html
+          grep -q '打开 ChatGPT 完成登录' artifacts/chatchat-login-required-zh.html
+          grep -q '密码只交给 Provider' artifacts/chatchat-login-required-zh.html
+
+      - name: Capture English sign-in-required state
+        run: |
+          URL='http://127.0.0.1:4182/app/app.html?showcase=login-resume&journey=login&lang=en'
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --run-all-compositor-stages-before-draw --virtual-time-budget=7000 --window-size=1440,1900 --screenshot=artifacts/chatchat-login-required-en.png "$URL"
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --run-all-compositor-stages-before-draw --virtual-time-budget=7000 --dump-dom "$URL" > artifacts/chatchat-login-required-en.html
+          test -s artifacts/chatchat-login-required-en.png
+          grep -q 'data-chatchat-login-required-showcase="complete"' artifacts/chatchat-login-required-en.html
+          grep -q 'Sign in required' artifacts/chatchat-login-required-en.html
+          grep -q 'Open ChatGPT to sign in' artifacts/chatchat-login-required-en.html
+          grep -q 'Your password stays with the provider' artifacts/chatchat-login-required-en.html
+
+      - name: Verify Chinese automatic login resume journey
+        run: |
+          URL='http://127.0.0.1:4182/app/app.html?showcase=login-resume&journey=auto&lang=zh'
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --run-all-compositor-stages-before-draw --virtual-time-budget=13000 --dump-dom "$URL" > artifacts/chatchat-login-resume-zh.html
+          grep -q 'data-chatchat-login-required-showcase="complete"' artifacts/chatchat-login-resume-zh.html
+          grep -q 'data-chatchat-login-recovering-showcase="complete"' artifacts/chatchat-login-resume-zh.html
+          grep -q 'data-chatchat-login-resume-showcase="complete"' artifacts/chatchat-login-resume-zh.html
+
+      - name: Verify English automatic login resume journey
+        run: |
+          URL='http://127.0.0.1:4182/app/app.html?showcase=login-resume&journey=auto&lang=en'
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --run-all-compositor-stages-before-draw --virtual-time-budget=13000 --dump-dom "$URL" > artifacts/chatchat-login-resume-en.html
+          grep -q 'data-chatchat-login-required-showcase="complete"' artifacts/chatchat-login-resume-en.html
+          grep -q 'data-chatchat-login-recovering-showcase="complete"' artifacts/chatchat-login-resume-en.html
+          grep -q 'data-chatchat-login-resume-showcase="complete"' artifacts/chatchat-login-resume-en.html
+
+      - name: Upload login-resume product evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-login-aware-autoresume
+          path: artifacts/**
+          if-no-files-found: warn
+          retention-days: 14
