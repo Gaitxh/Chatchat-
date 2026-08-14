@@ -11,6 +11,10 @@ import type { ConsultationArchive } from "../history/consultation-history.js";
 import { normalizeLocale, type Locale } from "../i18n/index.js";
 import { ConsultationTheater } from "./components/ConsultationTheater.js";
 import { LiveMoments } from "./components/LiveMoments.js";
+import {
+  CONSULTATION_FOCUS_EVENT,
+  type ConsultationFocusDetail,
+} from "./provenance-wire.js";
 import "./consultation-theater-portal.css";
 
 const LIVE_EVENT = "chatchat:consultation-live";
@@ -70,13 +74,26 @@ function ConsultationTheaterPortal() {
       setArchiveMode(true);
       setSelectedEventId(null);
     };
+    const onFocus = (event: Event) => {
+      const detail = (event as CustomEvent<ConsultationFocusDetail>).detail;
+      if (!detail?.eventId) return;
+      setSelectedEventId(detail.eventId);
+      window.setTimeout(() => {
+        document.querySelector(".event-provenance")?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
+      }, 0);
+    };
     window.addEventListener(LIVE_EVENT, onLive);
     window.addEventListener(COMPLETE_EVENT, onComplete);
     window.addEventListener(OPEN_ARCHIVE_EVENT, onArchive);
+    window.addEventListener(CONSULTATION_FOCUS_EVENT, onFocus);
     return () => {
       window.removeEventListener(LIVE_EVENT, onLive);
       window.removeEventListener(COMPLETE_EVENT, onComplete);
       window.removeEventListener(OPEN_ARCHIVE_EVENT, onArchive);
+      window.removeEventListener(CONSULTATION_FOCUS_EVENT, onFocus);
     };
   }, []);
 
@@ -107,10 +124,10 @@ function ConsultationTheaterPortal() {
     }
   }, [completion, live?.events.length]);
 
-  const selectedEvent = useMemo(
-    () => completion?.events.find((event) => event.id === selectedEventId) ?? null,
-    [completion, selectedEventId],
-  );
+  const selectedEvent = useMemo(() => {
+    const availableEvents = completion?.events ?? live?.events ?? [];
+    return availableEvents.find((event) => event.id === selectedEventId) ?? null;
+  }, [completion, live, selectedEventId]);
 
   if (!completion && !live?.events.length) return null;
 
@@ -125,6 +142,14 @@ function ConsultationTheaterPortal() {
           events={live.events}
           locale={locale}
         />
+        {selectedEvent ? (
+          <EventProvenanceDetail
+            event={selectedEvent}
+            participants={live.participants}
+            locale={locale}
+            onClose={() => setSelectedEventId(null)}
+          />
+        ) : null}
       </div>
     );
   }
@@ -149,7 +174,7 @@ function ConsultationTheaterPortal() {
       {selectedEvent ? (
         <EventProvenanceDetail
           event={selectedEvent}
-          report={completion.report}
+          participants={participants}
           locale={locale}
           onClose={() => setSelectedEventId(null)}
         />
@@ -160,16 +185,16 @@ function ConsultationTheaterPortal() {
 
 function EventProvenanceDetail({
   event,
-  report,
+  participants,
   locale,
   onClose,
 }: {
   event: CouncilEvent;
-  report: CouncilReport;
+  participants: readonly CouncilParticipant[];
   locale: Locale;
   onClose(): void;
 }) {
-  const participant = report.positions.find((position) => position.participant.id === event.actorId)?.participant;
+  const participant = participants.find((item) => item.id === event.actorId);
   const copy = locale === "zh-CN"
     ? {
         eyebrow: "原始事件",
