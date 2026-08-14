@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   zero-config-full-room:
-    name: Zero-config · fresh Full Room
+    name: Zero-config / Room Keeper · Full Room
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -105,6 +105,60 @@ jobs:
           grep -q '零配置开始' artifacts/chatchat-zero-config-zh.html
           grep -q '自动团队：ChatGPT · Claude · Gemini' artifacts/chatchat-zero-config-zh.html
           grep -q '开始自动配置' artifacts/chatchat-zero-config-zh.html
+
+      - name: Capture English Room Keeper recovery
+        run: |
+          URL='http://127.0.0.1:4181/app/app.html?showcase=room-keeper&lang=en'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=9000 \
+            --window-size=1440,1800 \
+            --screenshot=artifacts/chatchat-room-keeper-en.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=9000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-room-keeper-en.html
+          test -s artifacts/chatchat-room-keeper-en.png
+          grep -q 'data-chatchat-room-keeper-showcase="complete"' artifacts/chatchat-room-keeper-en.html
+          grep -q 'ROOM KEEPER' artifacts/chatchat-room-keeper-en.html
+          grep -q '1 live participant preserved' artifacts/chatchat-room-keeper-en.html
+          grep -q 'Restore the room' artifacts/chatchat-room-keeper-en.html
+
+      - name: Capture Chinese Room Keeper recovery
+        run: |
+          URL='http://127.0.0.1:4181/app/app.html?showcase=room-keeper&lang=zh'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=9000 \
+            --window-size=1440,1800 \
+            --screenshot=artifacts/chatchat-room-keeper-zh.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=9000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-room-keeper-zh.html
+          test -s artifacts/chatchat-room-keeper-zh.png
+          grep -q 'data-chatchat-room-keeper-showcase="complete"' artifacts/chatchat-room-keeper-zh.html
+          grep -q '会议室管家' artifacts/chatchat-room-keeper-zh.html
+          grep -q '保留 1 位仍在线的参与者' artifacts/chatchat-room-keeper-zh.html
+          grep -q '自动恢复会议室' artifacts/chatchat-room-keeper-zh.html
 
       - name: Save preview log
         if: always()
