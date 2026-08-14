@@ -101,7 +101,7 @@ async function participantNeedsLogin(participant: ParticipantRecord): Promise<bo
   const inspection = await inspectProviderPage(participant.tabId, participant.origin);
   if (!inspection) return false;
   inspectionCache.set(participant.seatId, {
-    url: inspection.currentUrl,
+    url: currentUrl,
     state: inspection.loginState,
     at: Date.now(),
   });
