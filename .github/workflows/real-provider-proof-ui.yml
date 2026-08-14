@@ -25,7 +25,7 @@ jobs:
 
       - name: Install and build production extension
         run: |
-          npm install
+          npm ci
           npm run check
           npm test
           npm run build:extension
