@@ -48,7 +48,7 @@ function install() {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["class"],
+    attributeFilter: ["class", "lang"],
   });
   chrome.tabs?.onUpdated?.addListener?.(() => queueRefresh());
   chrome.storage?.onChanged?.addListener?.((changes: Record<string, unknown>) => {
@@ -159,14 +159,23 @@ async function refresh() {
 function decorateRecovering(row: HTMLElement | undefined, providerName: string) {
   if (!row) return;
   row.classList.add("connection-self-healing");
+  row.setAttribute("aria-busy", "true");
+
+  const locale: Locale = document.documentElement.lang.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
+  const chip = row.querySelector<HTMLElement>(".connection-chip");
+  if (chip) {
+    chip.dataset.chatchatSelfHealing = "true";
+    chip.textContent = locale === "zh-CN" ? "自动修复中" : "SELF-HEALING";
+  }
+
   let note = row.querySelector<HTMLDivElement>(".self-healing-note");
   if (!note) {
     note = document.createElement("div");
     note.className = "self-healing-note";
+    note.setAttribute("role", "status");
     note.append(document.createElement("strong"), document.createElement("span"));
     row.querySelector(".participant-main")?.append(note);
   }
-  const locale: Locale = document.documentElement.lang.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
   const title = note.querySelector("strong");
   const body = note.querySelector("span");
   if (locale === "zh-CN") {
@@ -181,7 +190,9 @@ function decorateRecovering(row: HTMLElement | undefined, providerName: string) 
 function clearRecoveryNote(row: HTMLElement | undefined) {
   if (!row) return;
   row.classList.remove("connection-self-healing");
+  row.removeAttribute("aria-busy");
   row.querySelector(".self-healing-note")?.remove();
+  row.querySelector<HTMLElement>(".connection-chip")?.removeAttribute("data-chatchat-self-healing");
 }
 
 function normalizeRecovery(value: unknown): Record<string, RecoveryRecord> {
