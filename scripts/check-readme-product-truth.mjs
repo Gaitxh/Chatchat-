@@ -7,6 +7,8 @@ const terminalDemo = fs.readFileSync("src/demo.ts", "utf8");
 const mockCouncil = fs.readFileSync("src/providers/mock-council.ts", "utf8");
 const formatter = fs.readFileSync("src/core/format.ts", "utf8");
 const browserGuard = fs.readFileSync("extension-public/live-deliberation-showcase-guard.js", "utf8");
+const liveFrameProof = fs.readFileSync("extension-public/live-meeting-frame-showcase.js", "utf8");
+const ciWorkflow = fs.readFileSync(".github/workflows/ci.yml", "utf8");
 
 const productionFiles = [
   "src/extension/components/LiveAgenda.tsx",
@@ -60,6 +62,7 @@ for (const claim of [
   "DIRECT REPLY",
   "LIVE PERSUASION",
   "EXPLICIT REVISION",
+  "REAL PRODUCT PROOF",
 ]) {
   assert(demoArt.includes(claim), `README demo no longer mirrors the real meeting: ${claim}`);
 }
@@ -98,6 +101,24 @@ for (const proof of [
   assert(browserGuard.includes(proof), `README capability is not covered by the real Chromium proof: ${proof}`);
 }
 
+for (const proof of [
+  'params.get("live-proof") !== "persuasion"',
+  'data-chatchat-live-proof-showcase',
+  'data-chatchat-live-proof-frame',
+  'data-persuasion-strength="strong"',
+  "actual Live Floor",
+]) {
+  assert(liveFrameProof.includes(proof), `Real live-frame demo proof is missing: ${proof}`);
+}
+for (const artifact of [
+  "chatchat-live-meeting-zh.png",
+  "chatchat-live-meeting-en.png",
+  "Capture bilingual live meeting frame evidence",
+  'data-chatchat-live-proof-showcase="complete"',
+]) {
+  assert(ciWorkflow.includes(artifact), `CI no longer captures the real live meeting demo artifact: ${artifact}`);
+}
+
 for (const source of [readmeEn, readmeZh]) {
   assert(!/chair AI decides|议长 AI 决定|majority becomes authority|多数意见成为权威/i.test(source), "README must not introduce hierarchical meeting semantics.");
 }
@@ -105,7 +126,7 @@ for (const [label, source] of [["terminal demo", terminalDemo], ["mock consultat
   assert(!/👑|\bking\b|king's|royal|\bverdict\b/i.test(source), `${label} still contains legacy hierarchical product language.`);
 }
 
-console.log("✓ README and demos map to production implementation and Chromium meeting proof");
+console.log("✓ README and demos map to production implementation, live Chromium proof and real live-frame screenshots");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`README product-truth check failed: ${message}`);
