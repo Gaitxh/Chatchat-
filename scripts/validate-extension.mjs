@@ -14,6 +14,7 @@ assert(!manifest.host_permissions, "Install-time host_permissions are forbidden.
 assert(Array.isArray(manifest.optional_host_permissions) && manifest.optional_host_permissions.length > 0, "Provider access must remain optional.");
 assert(manifest.side_panel?.default_path, "Compact Side Panel compatibility entry is required.");
 assert(manifest.action && !manifest.action.default_popup, "Toolbar action must be available for direct Full Room launch.");
+assert(manifest.background?.type === "module", "Background service worker must remain a module because local helpers are imported.");
 
 const sidePath = path.join(root, manifest.side_panel.default_path);
 const serviceWorkerPath = path.join(root, manifest.background.service_worker);
@@ -30,9 +31,15 @@ assert(!/open-web-room\.js/.test(side), "Side Panel must not be a mandatory tram
 assert(/chrome\.action\.onClicked\.addListener/.test(serviceWorker), "Toolbar action must open the primary Full Room directly.");
 assert(/openPanelOnActionClick:\s*false/.test(serviceWorker), "Toolbar action must not be captured by Side Panel behavior.");
 assert(/app\/app\.html/.test(serviceWorker), "Toolbar action must target the extension-local Full Room.");
+assert(/CLAIM_PROVIDER_SELF_HEALING/.test(serviceWorker), "Production service worker must coordinate Provider self-healing claims.");
+assert(/RELEASE_PROVIDER_SELF_HEALING/.test(serviceWorker), "Production service worker must release Provider self-healing claims after recovery lifecycle completion.");
 assert(/consultation-history-observer/.test(sourceSide), "Side Panel source entry must mount the shared consultation persistence observer.");
 assert(/consultation-history-observer/.test(sourceApp), "Full Room source entry must mount the shared consultation persistence observer.");
 assert(!/royal-onboarding|summon-house|committee-house|sidepanel\.tsx/.test(side), "Legacy House/Royal UI must not load.");
+
+for (const specifier of localModuleImports(serviceWorker)) {
+  assertFile(path.resolve(path.dirname(serviceWorkerPath), specifier));
+}
 
 const js = walk(root).filter((file) => file.endsWith(".js"));
 assert(js.some((file) => fs.readFileSync(file, "utf8").includes("__chatchatConsultationHistoryObserverV1")), "Production extension bundle must contain the shared consultation persistence observer.");
@@ -43,6 +50,10 @@ for (const file of js) {
 }
 
 console.log(`✓ ChatChat zero-config Full Room extension validated (${js.length} JS files)`);
+
+function localModuleImports(source) {
+  return [...source.matchAll(/\bfrom\s+["'](\.\/.+?)["']/g)].map((match) => match[1]);
+}
 
 function assertFile(file) {
   assert(fs.existsSync(file) && fs.statSync(file).size > 0, `Missing extension artifact: ${rel(file)}`);
