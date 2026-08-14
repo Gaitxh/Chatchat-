@@ -1,5 +1,6 @@
 import type { CouncilContext, CouncilConsultationMode } from "../src/core/types.js";
 import { consultationModeRunPolicy } from "../src/consultation/mode-policy.js";
+import { applyConsultationModePolicy } from "../src/consultation/mode-options.js";
 import {
   CONSULTATION_MODES,
   consultationModeDefinition,
@@ -23,6 +24,16 @@ assert(balanced.maxRounds === 3 && balanced.minDebateRounds === 1 && balanced.co
 assert(explore.minDebateRounds === 2 && explore.convergenceThreshold === 1, "Explore mode should resist premature convergence.");
 assert(verify.minDebateRounds === 2 && verify.convergenceThreshold === 0.9, "Verify mode should demand deeper evidence discussion.");
 assert(stress.maxRounds === 4 && stress.minDebateRounds === 2, "Stress Test should allow the deepest public challenge cycle.");
+
+const overridden = applyConsultationModePolicy("stress_test", {
+  maxRounds: 3,
+  minDebateRounds: 1,
+  convergenceThreshold: 0.75,
+});
+assert(overridden.mode === "stress_test", "Browser mode capability must make the selected mode explicit in CouncilRunOptions.");
+assert(overridden.maxRounds === 4, "Stress Test must override the old browser hard-coded maxRounds value.");
+assert(overridden.minDebateRounds === 2, "Stress Test must override the old browser hard-coded minimum debate rounds.");
+assert(overridden.convergenceThreshold === 0.9, "Stress Test must override the old browser hard-coded convergence threshold.");
 
 const verifyPrompt = buildProviderConsultationPrompt(context("verify", "a"));
 assert(verifyPrompt.includes("CONSULTATION_MODE: verify"), "Verify mode must be explicit in every participant prompt.");
