@@ -4,8 +4,13 @@ import type {
   CouncilParticipantTurnUpdate,
   CouncilPhaseUpdate,
 } from "../core/types.js";
+import {
+  directPeerRequestTarget,
+  explicitlyAnswersRequest,
+  type DirectPeerRequestKind,
+} from "../consultation/structured-response.js";
 
-export type PeerExchangeRequestKind = "question" | "challenge" | "evidence";
+export type PeerExchangeRequestKind = DirectPeerRequestKind;
 export type PeerExchangeState = "queued" | "responding" | "answered" | "turn_failed" | "unresolved";
 
 export interface PeerExchangeItem {
@@ -51,13 +56,13 @@ export function buildPeerExchangeModel(
   const items: PeerExchangeItem[] = [];
 
   for (const request of events) {
-    const target = requestTarget(request, eventById);
+    const target = directPeerRequestTarget(request, eventById);
     if (!target || target.actorId === request.actorId) continue;
     if (!participantById.has(request.actorId) || !participantById.has(target.actorId)) continue;
 
     const requestIndex = eventIndex.get(request.id) ?? -1;
     const response = events.slice(requestIndex + 1).find((candidate) =>
-      candidate.actorId === target.actorId && explicitlyAnswers(candidate, request.id),
+      candidate.actorId === target.actorId && explicitlyAnswersRequest(candidate, request.id),
     );
     const state = response
       ? "answered"
@@ -97,35 +102,6 @@ export function buildPeerExchangeModel(
     answeredCount: items.filter((item) => item.state === "answered").length,
     unresolvedCount: items.filter((item) => item.state === "unresolved").length,
   };
-}
-
-function requestTarget(
-  event: CouncilEvent,
-  eventById: ReadonlyMap<string, CouncilEvent>,
-): { kind: PeerExchangeRequestKind; actorId: string; targetEventId?: string } | null {
-  if (event.kind === "question" && event.targetActorId) {
-    return { kind: "question", actorId: event.targetActorId };
-  }
-  if ((event.kind === "challenge" || event.kind === "evidence") && event.targetEventId) {
-    const targetEvent = eventById.get(event.targetEventId);
-    if (!targetEvent) return null;
-    return { kind: event.kind, actorId: targetEvent.actorId, targetEventId: targetEvent.id };
-  }
-  return null;
-}
-
-function explicitlyAnswers(event: CouncilEvent, requestEventId: string): boolean {
-  if (
-    (event.kind === "argument" || event.kind === "evidence" || event.kind === "question" || event.kind === "uncertain")
-    && event.replyToEventId === requestEventId
-  ) return true;
-
-  if (
-    (event.kind === "defense" || event.kind === "concede" || event.kind === "evidence")
-    && event.targetEventId === requestEventId
-  ) return true;
-
-  return event.kind === "revision" && (event.causedBy ?? []).includes(requestEventId);
 }
 
 function derivePendingState(
