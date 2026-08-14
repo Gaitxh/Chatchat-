@@ -10,9 +10,6 @@ export interface ProviderPageSignals {
 
 export interface ProviderPageInspection extends ProviderPageSignals {
   tabId: number;
-  expectedOrigin: string;
-  currentUrl: string;
-  title: string;
   onExpectedOrigin: boolean;
   loginState: LoginState;
 }
@@ -25,8 +22,10 @@ const EMPTY_SIGNALS: ProviderPageSignals = {
 
 /**
  * Inspect only bounded, derived page metadata needed for connection recovery.
- * No prompt text, model response, sidebar/chat history, account identifier,
- * cookie, token or credential value is returned.
+ * Raw URL/title are used transiently inside this classifier and are not
+ * returned to recovery/concierge callers. No prompt text, model response,
+ * sidebar/chat history, account identifier, cookie, token or credential value
+ * is returned.
  */
 export async function inspectProviderPage(
   tabId: number,
@@ -49,9 +48,6 @@ export async function inspectProviderPage(
 
   return {
     tabId,
-    expectedOrigin,
-    currentUrl,
-    title,
     onExpectedOrigin,
     ...signals,
     loginState: classifyLoginState({
