@@ -131,8 +131,8 @@ for (const claim of [
 }
 for (const claim of [
   'chatchat-provider-execution-history-v1',
-  'data-chatchat-execution-history-persistence-showcase',
-  'data-chatchat-execution-history-replay-showcase',
+  'chatchatExecutionHistoryPersistenceShowcase',
+  'chatchatExecutionHistoryReplayShowcase',
   'execution.transports',
   'execution.execution',
   'record.stage === "structured_parsed"',
