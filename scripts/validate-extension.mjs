@@ -11,11 +11,15 @@ assert(Array.isArray(manifest.optional_host_permissions)&&manifest.optional_host
 assert(manifest.side_panel?.default_path,"Compact Side Panel compatibility entry is required.");
 assertFile(path.join(root,manifest.side_panel.default_path)); assertFile(path.join(root,manifest.background.service_worker)); assertFile(path.join(root,"content-script.js"));
 const app=fs.readFileSync(appPath,"utf8"), side=fs.readFileSync(path.join(root,manifest.side_panel.default_path),"utf8"), launcher=fs.readFileSync(launcherPath,"utf8");
+const sourceApp=fs.readFileSync(path.resolve("app/app.html"),"utf8"), sourceSide=fs.readFileSync(path.resolve("extension/sidepanel.html"),"utf8");
 assert(/AI Consultation Room/.test(app)&&/web-app/.test(app),"Full-page Web Room identity is missing.");
 assert(/open-web-room\.js/.test(side),"Side Panel must route normal launches to the Web Room.");
 assert(/app\/app\.html/.test(launcher)&&/chrome-extension/.test(launcher),"Launcher must target the extension-local Web Room and stay inert in HTTP showcases.");
+assert(/consultation-history-observer/.test(sourceSide),"Side Panel source entry must mount the shared consultation persistence observer.");
+assert(/consultation-history-observer/.test(sourceApp),"Full Room source entry must mount the shared consultation persistence observer.");
 assert(!/royal-onboarding|summon-house|committee-house|sidepanel\.tsx/.test(side),"Legacy House/Royal UI must not load.");
 const js=walk(root).filter((file)=>file.endsWith(".js"));
+assert(js.some((file)=>fs.readFileSync(file,"utf8").includes("__chatchatConsultationHistoryObserverV1")),"Production extension bundle must contain the shared consultation persistence observer.");
 for(const file of js){const source=fs.readFileSync(file,"utf8");assert(!/\beval\s*\(/.test(source),`${rel(file)} contains eval().`);assert(!/new\s+Function\s*\(/.test(source),`${rel(file)} contains new Function().`)}
 console.log(`✓ ChatChat full-page Web Room extension validated (${js.length} JS files)`);
 function assertFile(file){assert(fs.existsSync(file)&&fs.statSync(file).size>0,`Missing extension artifact: ${rel(file)}`)}

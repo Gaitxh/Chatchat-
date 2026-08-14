@@ -5,6 +5,7 @@ import type { InvestigationTrailEdge } from "../history/investigation-trail.js";
 import { normalizeLocale, type Locale } from "../i18n/index.js";
 import { InvestigationTrail } from "./components/InvestigationTrail.js";
 import { BrowserInvestigationTrailStore } from "./investigation-trail-store.js";
+import { CONSULTATION_HISTORY_UPDATED_EVENT } from "./history-wire.js";
 import {
   announceInvestigationTrailUpdated,
   INVESTIGATION_TRAIL_UPDATED_EVENT,
@@ -27,28 +28,14 @@ function InvestigationTrailPortal() {
     const refreshSoon = () => queueRefreshBurst();
     window.addEventListener(INVESTIGATION_TRAIL_UPDATED_EVENT, refreshSoon);
     window.addEventListener(COMPLETE_EVENT, refreshSoon);
-
-    const historyObserver = new MutationObserver(() => queueRefresh());
-    const observeHistory = () => {
-      const historyRoot = document.getElementById("consultation-history-root");
-      if (!historyRoot) return false;
-      historyObserver.observe(historyRoot, { childList: true, subtree: true });
-      return true;
-    };
-    if (!observeHistory()) {
-      const pageObserver = new MutationObserver(() => {
-        if (observeHistory()) pageObserver.disconnect();
-      });
-      pageObserver.observe(document.body, { childList: true, subtree: true });
-      window.setTimeout(() => pageObserver.disconnect(), 15_000);
-    }
+    window.addEventListener(CONSULTATION_HISTORY_UPDATED_EVENT, refreshSoon);
 
     return () => {
       for (const timer of refreshTimersRef.current) window.clearTimeout(timer);
       refreshTimersRef.current = [];
-      historyObserver.disconnect();
       window.removeEventListener(INVESTIGATION_TRAIL_UPDATED_EVENT, refreshSoon);
       window.removeEventListener(COMPLETE_EVENT, refreshSoon);
+      window.removeEventListener(CONSULTATION_HISTORY_UPDATED_EVENT, refreshSoon);
     };
   }, []);
 

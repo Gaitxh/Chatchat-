@@ -1,32 +1,24 @@
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { CouncilEvent, CouncilReport } from "../core/types.js";
 import {
   deriveEvidenceLedger,
-  EVIDENCE_VERIFICATIONS_STORAGE_KEY,
   type EvidenceVerificationSnapshot,
 } from "../evidence/evidence-ledger.js";
 import { EvidenceHistoryStore } from "../history/evidence-history.js";
 import {
   ConsultationHistoryStore,
-  createConsultationArchive,
   type ConsultationArchive,
   type ConsultationHistorySummary,
 } from "../history/consultation-history.js";
 import { normalizeLocale, type Locale } from "../i18n/index.js";
+import {
+  announceConsultationHistoryUpdated,
+  CONSULTATION_HISTORY_UPDATED_EVENT,
+} from "./history-wire.js";
 import "./consultation-history-portal.css";
-
-declare const chrome: any;
-
-const COMPLETE_EVENT = "chatchat:consultation-complete";
 export const OPEN_ARCHIVE_EVENT = "chatchat:consultation-open-archive";
 const store = new ConsultationHistoryStore();
 const evidenceHistory = new EvidenceHistoryStore();
-
-interface CompletionDetail {
-  report: CouncilReport;
-  events: CouncilEvent[];
-}
 
 export interface OpenArchiveDetail {
   archive: ConsultationArchive;
@@ -108,6 +100,8 @@ function ConsultationHistoryPortal() {
 
   useEffect(() => {
     void refresh();
+    const onHistoryUpdated = () => void refresh();
+    window.addEventListener(CONSULTATION_HISTORY_UPDATED_EVENT, onHistoryUpdated);
     const languageObserver = new MutationObserver(() => {
       setLocale(normalizeLocale(document.documentElement.lang));
     });
@@ -116,15 +110,9 @@ function ConsultationHistoryPortal() {
       attributeFilter: ["lang"],
     });
 
-    const onComplete = (event: Event) => {
-      const detail = (event as CustomEvent<CompletionDetail>).detail;
-      if (!detail?.report || !Array.isArray(detail.events)) return;
-      void saveCompleted(detail.report, detail.events);
-    };
-    window.addEventListener(COMPLETE_EVENT, onComplete);
     return () => {
       languageObserver.disconnect();
-      window.removeEventListener(COMPLETE_EVENT, onComplete);
+      window.removeEventListener(CONSULTATION_HISTORY_UPDATED_EVENT, onHistoryUpdated);
     };
   }, []);
 
@@ -165,19 +153,6 @@ function ConsultationHistoryPortal() {
     }
   }
 
-  async function saveCompleted(report: CouncilReport, events: CouncilEvent[]) {
-    try {
-      const evidenceSnapshot = await currentEvidenceSnapshot(events);
-      await Promise.all([
-        store.save(createConsultationArchive(report, events)),
-        evidenceHistory.save(report.sessionId, evidenceSnapshot),
-      ]);
-      await refresh();
-    } catch (caught) {
-      setError(message(caught));
-    }
-  }
-
   async function openArchive(sessionId: string) {
     setBusy(`open:${sessionId}`);
     setError(null);
@@ -204,6 +179,7 @@ function ConsultationHistoryPortal() {
     try {
       await Promise.all([store.delete(sessionId), evidenceHistory.delete(sessionId)]);
       if (openSessionId === sessionId) setOpenSessionId(null);
+      announceConsultationHistoryUpdated();
       await refresh();
     } catch (caught) {
       setError(message(caught));
@@ -219,6 +195,7 @@ function ConsultationHistoryPortal() {
     try {
       await Promise.all([store.clear(), evidenceHistory.clear()]);
       setOpenSessionId(null);
+      announceConsultationHistoryUpdated();
       await refresh();
     } catch (caught) {
       setError(message(caught));
@@ -278,17 +255,6 @@ function ConsultationHistoryPortal() {
   );
 }
 
-async function currentEvidenceSnapshot(
-  events: readonly CouncilEvent[],
-): Promise<Record<string, EvidenceVerificationSnapshot>> {
-  if (typeof chrome === "undefined" || !chrome.storage) return {};
-  const storeArea = chrome.storage.session ?? chrome.storage.local;
-  const stored = await storeArea.get(EVIDENCE_VERIFICATIONS_STORAGE_KEY);
-  const all = normalizeVerifications(stored[EVIDENCE_VERIFICATIONS_STORAGE_KEY]);
-  const eventIds = new Set(events.filter((event) => event.kind === "evidence").map((event) => event.id));
-  return Object.fromEntries(Object.entries(all).filter(([eventId]) => eventIds.has(eventId)));
-}
-
 function deriveStoryStats(
   archive: ConsultationArchive,
   verifications: Readonly<Record<string, EvidenceVerificationSnapshot>>,
@@ -314,12 +280,6 @@ function emptyStoryStats(): HistoryStoryStats {
     disputedEvidence: 0,
     influentialEvidence: 0,
   };
-}
-
-function normalizeVerifications(value: unknown): Record<string, EvidenceVerificationSnapshot> {
-  return value && typeof value === "object"
-    ? value as Record<string, EvidenceVerificationSnapshot>
-    : {};
 }
 
 function formatDate(value: string, locale: Locale): string {
