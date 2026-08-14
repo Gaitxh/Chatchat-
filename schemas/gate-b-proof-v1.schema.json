@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chatchat.local/schemas/gate-b-proof-v1.schema.json",
-  "title": "ChatChat Gate B Proof Pack v1",
+  "title": "ChatChat Real Provider Proof v1",
   "type": "object",
   "additionalProperties": false,
   "required": [
