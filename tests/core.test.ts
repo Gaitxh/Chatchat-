@@ -4,6 +4,7 @@ import type {
   CouncilAgent,
   CouncilContext,
   CouncilContribution,
+  CouncilEventKind,
   CouncilPhaseUpdate,
 } from "../src/core/types.js";
 
@@ -109,4 +110,100 @@ assert(
   "Orchestrator should expose deterministic phase lifecycle updates.",
 );
 
+const stablePhases: CouncilPhaseUpdate[] = [];
+await new CouncilOrchestrator([
+  agent("stable-1", "A", "A"),
+  agent("stable-2", "A", "A"),
+  agent("stable-3", "A", "A"),
+]).run("stable convergence", {
+  maxRounds: 3,
+  minDebateRounds: 1,
+  convergenceThreshold: 0.75,
+  onPhase: (update) => stablePhases.push(update),
+});
+assert(
+  stablePhases.map(({ phase, round }) => `${phase}:${round}`).join(",") ===
+    "sealed:1,debate:2,final:3",
+  "Aligned participants with no fresh unresolved signal should still be allowed to converge early.",
+);
+
+for (const kind of ["challenge", "evidence", "revision", "question", "uncertain"] as const) {
+  await assertFreshSignalGetsResponseRound(kind);
+}
+
 console.log("✓ ChatChat council-core tests passed");
+console.log("✓ Fresh challenge/evidence/revision/question/uncertainty cannot be closed by alignment before peers can respond");
+
+async function assertFreshSignalGetsResponseRound(
+  kind: Extract<CouncilEventKind, "challenge" | "evidence" | "revision" | "question" | "uncertain">,
+) {
+  const phases: CouncilPhaseUpdate[] = [];
+  let signalVisibleInNextRound = false;
+
+  const agents = ["signal-1", "signal-2", "signal-3"].map((id, index): CouncilAgent => ({
+    participant: { id: `${kind}-${id}`, name: `${kind}-${id}`, provider: "test" },
+    async respond(context): Promise<readonly CouncilContribution[]> {
+      if (context.phase === "sealed") {
+        return [{ kind: "argument", stance: "A", content: "Aligned initial position", confidence: 0.8 }];
+      }
+      if (context.phase === "debate" && context.round === 2 && index === 0) {
+        return [freshSignal(kind, context)];
+      }
+      if (context.phase === "debate" && context.round === 3) {
+        signalVisibleInNextRound ||= context.publicEvents.some((event) => event.kind === kind && event.round === 2);
+        return [];
+      }
+      if (context.phase === "debate") return [];
+      return [{ kind: "final_position", stance: "A", content: "Final A", confidence: 0.85 }];
+    },
+  }));
+
+  await new CouncilOrchestrator(agents).run(`fresh ${kind}`, {
+    maxRounds: 3,
+    minDebateRounds: 1,
+    convergenceThreshold: 0.75,
+    onPhase: (update) => phases.push(update),
+  });
+
+  assert(
+    phases.map(({ phase, round }) => `${phase}:${round}`).join(",") ===
+      "sealed:1,debate:2,debate:3,final:4",
+    `A fresh ${kind} must receive another public debate round even when stance alignment already exceeds the threshold.`,
+  );
+  assert(signalVisibleInNextRound, `Peers must actually receive the fresh ${kind} in the next debate snapshot.`);
+}
+
+function freshSignal(
+  kind: Extract<CouncilEventKind, "challenge" | "evidence" | "revision" | "question" | "uncertain">,
+  context: CouncilContext,
+): CouncilContribution {
+  if (kind === "challenge") {
+    const peer = context.publicEvents.find((event) => event.actorId !== context.participant.id);
+    if (!peer) throw new Error("Challenge test requires a peer event.");
+    return { kind, targetEventId: peer.id, content: "Fresh challenge requires a response." };
+  }
+  if (kind === "evidence") {
+    return {
+      kind,
+      claim: "Fresh evidence",
+      content: "A new evidence item entered the shared room.",
+      source: "https://example.com/evidence",
+      confidence: 0.9,
+    };
+  }
+  if (kind === "revision") {
+    const own = context.ownEvents.find((event) => event.kind === "argument");
+    if (!own) throw new Error("Revision test requires an own prior argument.");
+    return {
+      kind,
+      previousEventId: own.id,
+      stance: "A",
+      content: "I revised the reasoning while keeping the same normalized stance.",
+      confidence: 0.9,
+    };
+  }
+  if (kind === "question") {
+    return { kind, content: "A fresh open question remains unanswered." };
+  }
+  return { kind, content: "Material uncertainty remains unresolved.", confidence: 0 };
+}
