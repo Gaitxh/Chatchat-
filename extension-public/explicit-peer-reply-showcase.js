@@ -36,6 +36,10 @@
       );
       if (!directQuestion?.id) return response;
 
+      // Real provider turns take visible time. Preserve a tiny asynchronous window in
+      // the synthetic browser proof so the live UI can render the explicit "working"
+      // lifecycle before the structured answer arrives.
+      await delay(180);
       envelope.contributions.push({
         kind: "argument",
         stance: "Web + Extension",
@@ -84,5 +88,9 @@
 
   function match(value, pattern) {
     return value.match(pattern)?.[1] ?? null;
+  }
+
+  function delay(milliseconds) {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 })();
