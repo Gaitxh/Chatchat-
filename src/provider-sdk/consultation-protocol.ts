@@ -226,58 +226,50 @@ function allowedKindsForPhase(phase: CouncilContext["phase"]): readonly string[]
 
 function phaseSchema(phase: CouncilContext["phase"]): string {
   if (phase === "sealed") {
-    return [
-      "SEALED schema examples:",
-      '{"kind":"argument","stance":"short label","content":"independent analysis","confidence":0.74}',
-      '{"kind":"uncertain","content":"what is missing","confidence":0.45}',
-    ].join("\n");
+    return 'SEALED schema examples: {"kind":"argument","stance":"...","content":"...","confidence":0.72} or {"kind":"uncertain","content":"...","confidence":0.35}';
   }
   if (phase === "final") {
-    return 'FINAL schema: {"kind":"final_position","stance":"short label","content":"your final position in your own words","confidence":0.81,"caveats":["optional caveat"]}';
+    return 'FINAL schema: {"kind":"final_position","stance":"...","content":"...","confidence":0.8,"caveats":["..."]}';
   }
-  return [
-    "DEBATE schemas:",
-    '{"kind":"argument","stance":"short label","content":"new point","confidence":0.72}',
-    '{"kind":"challenge","targetEventId":"event id","content":"specific challenge"}',
-    '{"kind":"evidence","targetEventId":"optional event id","claim":"what it supports","content":"evidence and relevance","source":"optional source URL/name","sourceDate":"optional source date","confidence":0.82}',
-    '{"kind":"support","targetEventId":"event id","content":"what you support and why"}',
-    '{"kind":"defense","targetEventId":"event id","content":"response to challenge"}',
-    '{"kind":"revision","previousEventId":"your prior event id","stance":"new short label","content":"what changed and why","confidence":0.77,"causedBy":["optional event ids"]}',
-    '{"kind":"concede","targetEventId":"event id","content":"what you concede"}',
-    '{"kind":"question","targetActorId":"optional actor id","content":"question for the room or a peer"}',
-    '{"kind":"uncertain","content":"unresolved uncertainty","confidence":0.42}',
-  ].join("\n");
+  return 'CONSULTATION kinds include argument, challenge{targetEventId,content}, evidence{targetEventId?,claim,content,source?,sourceDate?,confidence}, support/defense/concede{targetEventId,content}, revision{previousEventId,stance,content,confidence,causedBy?}, question{targetActorId?,content}, uncertain{content,confidence}.';
 }
 
 function compactEvent(event: CouncilEvent): Record<string, unknown> {
   const base: Record<string, unknown> = {
     id: event.id,
-    round: event.round,
     actorId: event.actorId,
+    round: event.round,
     kind: event.kind,
   };
-  if (event.kind === "argument" || event.kind === "revision" || event.kind === "final_position") {
-    base.stance = truncate(event.stance, 300);
-    base.content = truncate(event.content, MAX_EVENT_TEXT);
-    base.confidence = event.confidence;
-  } else if (event.kind === "evidence") {
-    base.claim = truncate(event.claim, 500);
-    base.content = truncate(event.content, MAX_EVENT_TEXT);
-    if (event.source) base.source = truncate(event.source, 500);
-    if (event.sourceDate) base.sourceDate = truncate(event.sourceDate, 180);
-    if (event.targetEventId) base.targetEventId = event.targetEventId;
-    base.confidence = event.confidence;
-  } else {
-    base.content = truncate(event.content, MAX_EVENT_TEXT);
+  switch (event.kind) {
+    case "argument":
+    case "revision":
+    case "final_position":
+      return { ...base, stance: event.stance, confidence: event.confidence, content: clipped(event.content) };
+    case "challenge":
+    case "support":
+    case "defense":
+    case "concede":
+      return { ...base, targetEventId: event.targetEventId, content: clipped(event.content) };
+    case "evidence":
+      return {
+        ...base,
+        ...(event.targetEventId ? { targetEventId: event.targetEventId } : {}),
+        claim: clipped(event.claim),
+        content: clipped(event.content),
+        ...(event.source ? { source: clipped(event.source) } : {}),
+        ...(event.sourceDate ? { sourceDate: event.sourceDate } : {}),
+        confidence: event.confidence,
+      };
+    case "question":
+      return {
+        ...base,
+        ...(event.targetActorId ? { targetActorId: event.targetActorId } : {}),
+        content: clipped(event.content),
+      };
+    case "uncertain":
+      return { ...base, content: clipped(event.content), confidence: event.confidence };
   }
-  if ("targetEventId" in event && event.targetEventId) base.targetEventId = event.targetEventId;
-  if (event.kind === "question" && event.targetActorId) base.targetActorId = event.targetActorId;
-  if (event.kind === "revision") {
-    base.previousEventId = event.previousEventId;
-    if (event.causedBy?.length) base.causedBy = [...event.causedBy];
-  }
-  if ("replyToEventId" in event && event.replyToEventId) base.replyToEventId = event.replyToEventId;
-  return base;
 }
 
 function compactToolFact(fact: CouncilToolFact): Record<string, unknown> {
@@ -287,48 +279,51 @@ function compactToolFact(fact: CouncilToolFact): Record<string, unknown> {
     relatedEventId: fact.relatedEventId,
     observedAt: fact.observedAt,
     sourceState: fact.sourceState,
-    ...(fact.claim ? { claim: truncate(fact.claim, MAX_TOOL_TEXT) } : {}),
-    ...(fact.sourceUrl ? { sourceUrl: truncate(fact.sourceUrl, 500) } : {}),
-    ...(fact.sourceHost ? { sourceHost: truncate(fact.sourceHost, 240) } : {}),
-    ...(fact.finalUrl ? { finalUrl: truncate(fact.finalUrl, 500) } : {}),
-    ...(fact.statusCode != null ? { statusCode: fact.statusCode } : {}),
-    ...(fact.title ? { title: truncate(fact.title, 350) } : {}),
-    ...(fact.description ? { description: truncate(fact.description, MAX_TOOL_TEXT) } : {}),
-    ...(fact.excerpt ? { excerpt: truncate(fact.excerpt, MAX_TOOL_TEXT) } : {}),
+    ...(fact.claim ? { claim: toolClipped(fact.claim) } : {}),
+    ...(fact.sourceHost ? { sourceHost: fact.sourceHost } : {}),
+    ...(fact.finalUrl ? { finalUrl: toolClipped(fact.finalUrl) } : {}),
+    ...(typeof fact.statusCode === "number" ? { statusCode: fact.statusCode } : {}),
+    ...(fact.title ? { title: toolClipped(fact.title) } : {}),
+    ...(fact.description ? { description: toolClipped(fact.description) } : {}),
+    ...(fact.excerpt ? { excerpt: toolClipped(fact.excerpt) } : {}),
     ...(fact.pageDate ? { pageDate: fact.pageDate } : {}),
     ...(fact.pageDateKind ? { pageDateKind: fact.pageDateKind } : {}),
-    ...(fact.sourceAgeDays != null ? { sourceAgeDays: fact.sourceAgeDays } : {}),
+    ...(typeof fact.sourceAgeDays === "number" ? { sourceAgeDays: fact.sourceAgeDays } : {}),
     ...(fact.contentFingerprint ? { contentFingerprint: fact.contentFingerprint } : {}),
-    ...(fact.textCharacters != null ? { textCharacters: fact.textCharacters } : {}),
-    ...(fact.truncated != null ? { truncated: fact.truncated } : {}),
-    note: truncate(fact.note, MAX_TOOL_TEXT),
+    ...(typeof fact.textCharacters === "number" ? { textCharacters: fact.textCharacters } : {}),
+    ...(fact.truncated ? { truncated: true } : {}),
+    note: toolClipped(fact.note),
   };
 }
 
 function extractJsonEnvelope(raw: string): string {
-  const open = raw.indexOf(OPEN_MARKER);
-  const close = raw.indexOf(CLOSE_MARKER);
-  if (open < 0 || close < 0 || close <= open) {
-    throw new Error("Consultation response did not include the required CHATCHAT_COUNCIL_JSON markers.");
-  }
-  return raw.slice(open + OPEN_MARKER.length, close).trim();
+  const trimmed = raw.trim();
+  const start = trimmed.indexOf(OPEN_MARKER);
+  const end = trimmed.indexOf(CLOSE_MARKER);
+  if (start >= 0 && end > start) return trimmed.slice(start + OPEN_MARKER.length, end).trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fenced?.[1]) return fenced[1].trim();
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) return trimmed;
+  throw new Error("Consultation response did not contain the ChatChat JSON envelope.");
 }
 
 function record(value: unknown, label: string): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object.`);
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${label} must be an object.`);
+  }
   return value as Record<string, unknown>;
 }
 
-function text(value: unknown, field: string, max: number): string {
-  if (typeof value !== "string" || !value.trim()) throw new Error(`${field} must be a non-empty string.`);
-  const normalized = value.trim();
-  if (normalized.length > max) throw new Error(`${field} is too long.`);
-  return normalized;
+function text(value: unknown, label: string, max: number): string {
+  if (typeof value !== "string" || !value.trim()) throw new Error(`${label} must be a non-empty string.`);
+  const result = value.trim();
+  if (result.length > max) throw new Error(`${label} exceeds ${max} characters.`);
+  return result;
 }
 
-function optionalText(value: unknown, field: string, max: number): string | undefined {
-  if (value == null || value === "") return undefined;
-  return text(value, field, max);
+function optionalText(value: unknown, label: string, max: number): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  return text(value, label, max);
 }
 
 function confidence(value: unknown): number {
@@ -338,32 +333,46 @@ function confidence(value: unknown): number {
   return value;
 }
 
-function eventReference(value: unknown, events: ReadonlyMap<string, CouncilEvent>, field: string): string {
-  const id = text(value, field, 240);
-  if (!events.has(id)) throw new Error(`${field} must reference an event visible in the consultation context.`);
+function eventReference(value: unknown, events: ReadonlyMap<string, CouncilEvent>, label: string): string {
+  const id = text(value, label, 240);
+  if (!events.has(id)) throw new Error(`${label} references an unknown consultation event.`);
   return id;
 }
 
-function optionalEventReference(value: unknown, events: ReadonlyMap<string, CouncilEvent>, field: string): string | undefined {
-  if (value == null || value === "") return undefined;
-  return eventReference(value, events, field);
+function optionalEventReference(
+  value: unknown,
+  events: ReadonlyMap<string, CouncilEvent>,
+  label: string,
+): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  return eventReference(value, events, label);
 }
 
-function optionalEventReferences(value: unknown, events: ReadonlyMap<string, CouncilEvent>, field: string): string[] | undefined {
-  if (value == null) return undefined;
-  if (!Array.isArray(value) || value.length > 12) throw new Error(`${field} must be an array of visible event ids.`);
-  const ids = value.map((item) => eventReference(item, events, field));
-  return ids.length ? ids : undefined;
+function optionalEventReferences(
+  value: unknown,
+  events: ReadonlyMap<string, CouncilEvent>,
+  label: string,
+): string[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value) || value.length > 8) throw new Error(`${label} must be an array with at most 8 event ids.`);
+  return value.map((item) => eventReference(item, events, label));
 }
 
-function optionalTextArray(value: unknown, field: string, maxItems: number, maxText: number): string[] | undefined {
-  if (value == null) return undefined;
-  if (!Array.isArray(value) || value.length > maxItems) throw new Error(`${field} must be an array with at most ${maxItems} items.`);
-  const values = value.map((item) => text(item, field, maxText));
-  return values.length ? values : undefined;
+function optionalTextArray(
+  value: unknown,
+  label: string,
+  maxItems: number,
+  maxText: number,
+): string[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value) || value.length > maxItems) throw new Error(`${label} must contain at most ${maxItems} items.`);
+  return value.map((item) => text(item, label, maxText));
 }
 
-function truncate(value: string, max: number): string {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  return normalized.length <= max ? normalized : `${normalized.slice(0, max)}…`;
+function clipped(value: string): string {
+  return value.length <= MAX_EVENT_TEXT ? value : `${value.slice(0, MAX_EVENT_TEXT)}…`;
+}
+
+function toolClipped(value: string): string {
+  return value.length <= MAX_TOOL_TEXT ? value : `${value.slice(0, MAX_TOOL_TEXT)}…`;
 }
