@@ -9,6 +9,7 @@ import type {
 import { researchLaneDefinition } from "../../consultation/research-lanes.js";
 import type { Locale } from "../../i18n/index.js";
 import { CONSULTATION_FOCUS_EVENT } from "../provenance-wire.js";
+import { LivePersuasionPulse } from "./LivePersuasionPulse.js";
 import { PeerExchangeQueue } from "./PeerExchangeQueue.js";
 import "./live-participant-floor.css";
 
@@ -137,6 +138,8 @@ export function LiveParticipantFloor({
       </div>
 
       <div className="live-floor-proof-note">⌁ {copy.eventBacked}</div>
+
+      <LivePersuasionPulse participants={participants} events={events} locale={locale} />
 
       <div className="live-evidence-desk">
         <div className="live-evidence-desk__heading">
