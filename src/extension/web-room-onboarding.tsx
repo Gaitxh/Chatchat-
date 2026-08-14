@@ -32,9 +32,9 @@ const COPY = {
   en: {
     kicker: "ZERO-CONFIG START",
     title: "Open ChatChat. The room assembles itself.",
-    body: "ChatChat uses AI sites already open in your browser first. If there are not enough, one click can open a small starter team in clean conversation tabs. Page detection, connection checks, recipe creation, and protocol verification continue automatically.",
+    body: "ChatChat uses AI sites already open in your browser first. If there are not enough, one click opens a small starter team in clean conversation tabs. Page recognition, connection checks, and consultation readiness all continue automatically.",
     button: "Start automatic setup",
-    none: "No AI tabs are open yet. ChatChat can open a starter team for you — no URLs, selectors, or adapter setup.",
+    none: "No AI tabs are open yet. ChatChat can open a starter team for you — no setup forms or technical configuration.",
     found: (count: number) => `${count} AI source${count === 1 ? "" : "s"} already found`,
     plan: (names: string) => `Automatic team: ${names}`,
     working: "Preparing clean AI conversation tabs…",
@@ -46,9 +46,9 @@ const COPY = {
   "zh-CN": {
     kicker: "零配置开始",
     title: "打开 ChatChat，会议室自己组起来。",
-    body: "ChatChat 会优先使用浏览器里已经打开的 AI；数量不够时，只点一次就会自动打开一组干净的 AI 会话。页面识别、连接检查、Recipe 生成和协商协议验证都会自动继续。",
+    body: "ChatChat 会优先使用浏览器里已经打开的 AI；数量不够时，只点一次就会自动打开一组干净的 AI 会话。页面识别、连接检查和协商就绪验证都会自动继续。",
     button: "开始自动配置",
-    none: "现在还没有打开 AI 标签页。ChatChat 可以直接替你打开一组起步 AI——不用填 URL，不用配 selector，也不用理解 adapter。",
+    none: "现在还没有打开 AI 标签页。ChatChat 可以直接替你打开一组起步 AI——不用填配置表，也不用理解任何技术设置。",
     found: (count: number) => `已经发现 ${count} 个 AI 来源`,
     plan: (names: string) => `自动团队：${names}`,
     working: "正在准备干净的 AI 会话标签页……",
