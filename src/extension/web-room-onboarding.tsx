@@ -9,6 +9,7 @@ declare const chrome: any;
 
 const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
 const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
+const LOCALE_KEY = "chatchat.locale.v1";
 const STARTER_PROVIDER_IDS = ["openai-chatgpt", "anthropic-claude", "google-gemini"] as const;
 const resumeCooldown = new Map<string, number>();
 type Locale = "en" | "zh-CN";
@@ -67,7 +68,13 @@ async function mount() {
   const root = document.getElementById("web-onboarding-root");
   const guideRoot = document.getElementById("first-run-guide-root");
   if (!root) return;
-  const locale: Locale = document.documentElement.lang === "zh-CN" || navigator.language?.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
+  const localeStore = await chrome.storage.local.get(LOCALE_KEY);
+  const savedLocale = localeStore[LOCALE_KEY];
+  const locale: Locale = savedLocale === "zh-CN" || savedLocale === "en"
+    ? savedLocale
+    : document.documentElement.lang === "zh-CN" || navigator.language?.toLowerCase().startsWith("zh")
+      ? "zh-CN"
+      : "en";
   const strings = COPY[locale];
   const session = chrome.storage.session ?? chrome.storage.local;
   const stored = await session.get(PARTICIPANTS_KEY);
