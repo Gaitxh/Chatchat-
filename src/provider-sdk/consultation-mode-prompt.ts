@@ -1,5 +1,6 @@
 import type { CouncilContext } from "../core/types.js";
 import { consultationModeDefinition } from "../consultation/modes.js";
+import { directPeerInboxPromptBlock } from "../consultation/peer-inbox.js";
 import { researchLaneDefinition } from "../consultation/research-lanes.js";
 import { buildProviderConsultationPrompt } from "./consultation-protocol.js";
 
@@ -21,6 +22,7 @@ export function buildModeAwareProviderConsultationPrompt(context: CouncilContext
         "END_CHATCHAT_EQUAL_RESEARCH_LANE",
       ]
     : [];
+  const peerInboxBlock = directPeerInboxPromptBlock(context);
 
   return [
     "CHATCHAT_SHARED_MEETING_OBJECTIVE",
@@ -34,6 +36,7 @@ export function buildModeAwareProviderConsultationPrompt(context: CouncilContext
       : "Follow the meeting objective while remaining willing to agree, revise, concede, or remain uncertain when warranted.",
     "END_CHATCHAT_SHARED_MEETING_OBJECTIVE",
     ...researchLaneBlock,
+    ...peerInboxBlock,
     "",
     buildProviderConsultationPrompt(context),
   ].join("\n");
