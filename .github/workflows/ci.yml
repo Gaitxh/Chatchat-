@@ -127,7 +127,7 @@ jobs:
             --chrome "$CHROME_BIN" \
             --url 'http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=zh' \
             --width 1440 --height 1800 --wait-ms 22000 \
-            --ready-selector 'html[data-chatchat-final-position-floor-showcase="complete"]' \
+            --ready-selector 'html[data-chatchat-final-position-floor-showcase="complete"][data-chatchat-history-persistence-showcase="complete"]' \
             --focus-selector '[data-final-position-floor="explicit-final-submissions"]' \
             --screenshot artifacts/chatchat-final-position-floor-zh.png \
             --dom artifacts/chatchat-final-position-floor-zh.html
@@ -135,7 +135,7 @@ jobs:
             --chrome "$CHROME_BIN" \
             --url 'http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=en' \
             --width 1440 --height 1800 --wait-ms 22000 \
-            --ready-selector 'html[data-chatchat-final-position-floor-showcase="complete"]' \
+            --ready-selector 'html[data-chatchat-final-position-floor-showcase="complete"][data-chatchat-history-persistence-showcase="complete"]' \
             --focus-selector '[data-final-position-floor="explicit-final-submissions"]' \
             --screenshot artifacts/chatchat-final-position-floor-en.png \
             --dom artifacts/chatchat-final-position-floor-en.html
