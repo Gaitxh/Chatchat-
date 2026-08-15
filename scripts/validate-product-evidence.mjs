@@ -1,0 +1,121 @@
+import fs from "node:fs";
+
+const artifactDir = process.argv[2] ?? "artifacts";
+const manifestPath = process.argv[3] ?? "dist-extension/manifest.json";
+
+const pages = {
+  sideZh: read("chatchat-consultation-zh.html"),
+  sideEn: read("chatchat-consultation-en.html"),
+  roomZh: read("chatchat-room-zh.html"),
+  roomEn: read("chatchat-room-en.html"),
+  liveZh: read("chatchat-live-meeting-zh.html"),
+  liveEn: read("chatchat-live-meeting-en.html"),
+};
+const manifest = fs.readFileSync(manifestPath, "utf8");
+
+for (const [label, html] of [["Chinese Side Panel", pages.sideZh], ["English Side Panel", pages.sideEn]]) {
+  requireAll(label, html, [
+    'data-chatchat-consultation-showcase="complete"',
+    'data-chatchat-live-floor-showcase="complete"',
+    'data-chatchat-live-deliberation-showcase="complete"',
+    'data-chatchat-deliberation-story-showcase="complete"',
+    'data-chatchat-evidence-radar-showcase="complete"',
+    'data-chatchat-next-move-showcase="complete"',
+    'data-chatchat-proposal-mode-showcase="complete"',
+    'data-chatchat-consultation-receipt-showcase="complete"',
+    'data-chatchat-investigation-trail-storage-showcase="complete"',
+    'data-chatchat-investigation-trail-showcase="complete"',
+    'data-chatchat-history-persistence-showcase="complete"',
+    'data-chatchat-conflict-board-showcase="complete"',
+    'data-chatchat-conflict-resolution-showcase="complete"',
+    'data-chatchat-stance-fronts-showcase="complete"',
+    'data-stance-front-state="current"',
+    'data-stance-front-state="vacated"',
+    'data-stance-movement-event=',
+    'data-stance-movement-cause=',
+    'data-stance-uncommitted="explicit-none"',
+  ]);
+}
+requireAll("Chinese Side Panel", pages.sideZh, [
+  "用户发起提案", "平等 AI 参与者", "没有议长", "协商结果", "协商剧场", "明确发生的立场修正", "明示立场战线", "Claude", "Web + Extension", "Browser Extension",
+]);
+requireAll("English Side Panel", pages.sideEn, [
+  "Propose once", "Equal AI participants", "CONSULTATION OUTCOME", "CONSULTATION THEATER", "Explicit revisions", "Who changed what", "EXPLICIT STANCE FRONTS", "Claude", "Web + Extension", "Browser Extension",
+]);
+assert(/no chair/i.test(pages.sideEn), "English Side Panel must preserve no-chair language.");
+
+for (const [label, html] of [["Chinese Full Room", pages.roomZh], ["English Full Room", pages.roomEn]]) {
+  requireAll(label, html, [
+    'data-chatchat-room-showcase="complete"',
+    'data-chatchat-live-floor-showcase="complete"',
+    'data-chatchat-live-deliberation-showcase="complete"',
+    'data-chatchat-deliberation-story-showcase="complete"',
+    'data-chatchat-evidence-radar-showcase="complete"',
+    'data-chatchat-next-move-showcase="complete"',
+    'data-chatchat-proposal-mode-showcase="complete"',
+    'data-chatchat-consultation-receipt-showcase="complete"',
+    'data-chatchat-investigation-trail-storage-showcase="complete"',
+    'data-chatchat-investigation-trail-showcase="complete"',
+    'data-chatchat-history-persistence-showcase="complete"',
+    'data-chatchat-conflict-board-showcase="complete"',
+    'data-chatchat-conflict-resolution-showcase="complete"',
+    'data-chatchat-stance-fronts-showcase="complete"',
+    'data-stance-front-state="current"',
+    'data-stance-front-state="vacated"',
+    'data-stance-movement-event=',
+    'data-stance-uncommitted="explicit-none"',
+    'data-meeting-integrity-state="verified"',
+    'data-history-execution-audit="loaded"',
+  ]);
+}
+requireAll("Chinese Full Room", pages.roomZh, ["协商记录", "history-entry", "INDEXEDDB · LOCAL", "协商剧场", "AI 关系战场", "明示立场战线", "LOCAL · EXECUTION RECEIPT"]);
+requireAll("English Full Room", pages.roomEn, ["CONSULTATION HISTORY", "history-entry", "INDEXEDDB · LOCAL", "CONSULTATION THEATER", "RELATIONSHIP MAP", "EXPLICIT STANCE FRONTS", "LOCAL · EXECUTION RECEIPT"]);
+
+requireAll("Chinese live meeting frame", pages.liveZh, [
+  'data-chatchat-live-proof-showcase="complete"',
+  'data-chatchat-live-proof-frame="persuasion"',
+  'data-persuasion-strength="strong"',
+  'data-persuasion-cause-event=',
+  'data-persuasion-action-event=',
+  "AI 大会正在发生",
+  "实时说服",
+  "观点正在移动",
+]);
+requireAll("English live meeting frame", pages.liveEn, [
+  'data-chatchat-live-proof-showcase="complete"',
+  'data-chatchat-live-proof-frame="persuasion"',
+  'data-persuasion-strength="strong"',
+  'data-persuasion-cause-event=',
+  'data-persuasion-action-event=',
+  "The AI assembly is happening now",
+  "LIVE PERSUASION",
+  "Positions are moving",
+]);
+
+for (const [label, html] of Object.entries({ sideZh: pages.sideZh, sideEn: pages.sideEn, roomZh: pages.roomZh, roomEn: pages.roomEn })) {
+  for (const forbidden of ["KING'S COMMAND", "AI HOUSE", "HOUSE VERDICT", "众议院", "COUNCIL THEATER", "议会剧场"]) {
+    assert(!html.includes(forbidden), `${label} contains forbidden legacy product language: ${forbidden}`);
+  }
+  assert(!/Delegation/i.test(html), `${label} contains legacy delegation language.`);
+}
+
+requireAll("manifest", manifest, ["ChatChat — AI Consultation", "optional_host_permissions"]);
+assert(!manifest.includes("AI Council"), "Manifest must not regress to AI Council product language.");
+assert(!manifest.includes("Parliament"), "Manifest must not regress to Parliament product language.");
+assert(fs.existsSync("dist-extension/app/app.html"), "Full Room build output is missing.");
+
+console.log("✓ bilingual Chromium DOM evidence preserves consultation, conflict, stance-front, execution-integrity and history contracts");
+
+function read(name) {
+  const path = `${artifactDir}/${name}`;
+  assert(fs.existsSync(path), `Missing product evidence file: ${path}`);
+  return fs.readFileSync(path, "utf8");
+}
+
+function requireAll(label, value, needles) {
+  for (const needle of needles) assert(value.includes(needle), `${label} is missing required evidence: ${needle}`);
+}
+
+function assert(condition, message) {
+  if (!condition) throw new Error(`Product evidence validation failed: ${message}`);
+}
