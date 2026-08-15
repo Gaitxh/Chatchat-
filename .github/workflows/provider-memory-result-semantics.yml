@@ -1,0 +1,39 @@
+name: Provider Memory Result Semantics
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: chatchat-provider-memory-result-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  memory-result:
+    name: Durable Prompt proof · result caveats · privacy receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci
+
+      - name: Compile core
+        run: npm run build:core
+
+      - name: Prove actual Prompt evidence survives history freeze
+        run: node dist/tests/provider-memory-history.test.js
+
+      - name: Prove result integrity stays multidimensional
+        run: node dist/tests/result-integrity-bundle.test.js
+
+      - name: Prove Memory Receipt remains privacy-bounded
+        run: node dist/tests/provider-memory-receipt.test.js
