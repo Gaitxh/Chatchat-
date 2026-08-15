@@ -9,6 +9,9 @@ const transport = fs.readFileSync("src/provider-sdk/transport-audit.ts", "utf8")
 const model = fs.readFileSync("src/theater/provider-memory-coverage.ts", "utf8");
 const ui = fs.readFileSync("src/extension/components/ProviderMemoryCoverage.tsx", "utf8");
 const portal = fs.readFileSync("src/extension/provider-memory-portal.tsx", "utf8");
+const fixture = fs.readFileSync("extension-public/provider-memory-showcase.js", "utf8");
+const guard = fs.readFileSync("extension-public/provider-memory-showcase-guard.js", "utf8");
+const workflow = fs.readFileSync(".github/workflows/provider-memory-proof.yml", "utf8");
 const app = fs.readFileSync("app/app.html", "utf8");
 const sidepanel = fs.readFileSync("extension/sidepanel.html", "utf8");
 
@@ -118,6 +121,8 @@ assert(portal.includes("__chatchatProviderMemoryPromptAudit"), "Prompt memory tr
 for (const [label, html] of [["Full Room", app], ["Side Panel", sidepanel]]) {
   assert(html.includes('id="provider-memory-root"'), `${label} must mount Provider Memory Coverage.`);
   assert(html.includes('/src/extension/provider-memory-portal.tsx'), `${label} must load Provider Memory Coverage.`);
+  assert(html.includes('/provider-memory-showcase.js'), `${label} must load the bounded-memory proof fixture.`);
+  assert(html.includes('/provider-memory-showcase-guard.js'), `${label} must load the bounded-memory proof guard.`);
   assert(
     html.indexOf('/src/extension/execution-provenance.tsx') < html.indexOf('/src/extension/provider-memory-portal.tsx'),
     `${label} must install execution provenance before the outer Prompt memory observer.`,
@@ -128,7 +133,39 @@ for (const [label, html] of [["Full Room", app], ["Side Panel", sidepanel]]) {
   );
 }
 
-console.log("✓ Provider Memory Coverage proves bounded public memory from actual Prompt metadata with archive fallback");
+for (const claim of [
+  'params.get("memory-proof") !== "coverage"',
+  "MEMORY_PROOF_OLD_ROLLOUT_RISK",
+  "MEMORY_PROOF_R2_ORDINARY",
+  "MEMORY_PROOF_R3_RESOLVER",
+  'kind: "uncertain"',
+  'kind: "revision"',
+  "PINNED_OPEN_ISSUE_SOURCE_EVENT_IDS_JSON",
+]) {
+  assert(fixture.includes(claim), `bounded-memory showcase fixture is missing: ${claim}`);
+}
+for (const claim of [
+  'data-chatchat-provider-memory-showcase',
+  'data-provider-memory-round="3"',
+  'data-provider-memory-round="4"',
+  "data-provider-memory-actual-prompt-seats",
+  "data-provider-memory-pinned-source",
+  "data-provider-memory-resolver-event",
+  "sameSourceStillPinned",
+]) {
+  assert(guard.includes(claim), `bounded-memory Chromium proof is missing: ${claim}`);
+}
+for (const claim of [
+  "Provider Memory Proof UI",
+  "memory-proof=coverage",
+  'data-chatchat-provider-memory-showcase="complete"',
+  "chatchat-provider-memory-zh.png",
+  "chatchat-provider-memory-en.png",
+]) {
+  assert(workflow.includes(claim), `Provider Memory workflow is missing: ${claim}`);
+}
+
+console.log("✓ Provider Memory Coverage proves bounded public memory from actual Prompt metadata, pin-until-resolved lifecycle and archive fallback");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`Provider Memory check failed: ${message}`);
