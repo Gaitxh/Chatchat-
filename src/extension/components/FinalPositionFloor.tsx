@@ -149,6 +149,7 @@ function FinalGroup({
 
 function FinalSeat({ seat, zh }: { seat: FinalPositionSeat; zh: boolean }) {
   const execution = executionMeta(seat.executionState, zh);
+  const finalEventId = seat.finalEventId;
   return (
     <section
       className={`final-position-seat execution-${seat.executionState}`}
@@ -188,10 +189,10 @@ function FinalSeat({ seat, zh }: { seat: FinalPositionSeat; zh: boolean }) {
           <span>{zh
             ? `${seat.latestPreFinalStance ?? "?"} → ${seat.stance}：没有对应 revision 事件，因此不推断原因。`
             : `${seat.latestPreFinalStance ?? "?"} → ${seat.stance}: no matching revision event, so no cause is inferred.`}</span>
-          {seat.finalEventId ? <button type="button" onClick={() => focusConsultationEvent(seat.finalEventId)}>{zh ? "查看 Final 事件" : "Trace final event"} ↗</button> : null}
+          {finalEventId ? <button type="button" onClick={() => focusConsultationEvent(finalEventId)}>{zh ? "查看 Final 事件" : "Trace final event"} ↗</button> : null}
         </div>
-      ) : seat.finalEventId ? (
-        <button className="final-position-seat__trace" type="button" data-final-seat-event={seat.finalEventId} onClick={() => focusConsultationEvent(seat.finalEventId)}>{zh ? "查看最终事件" : "Trace final event"} ↗</button>
+      ) : finalEventId ? (
+        <button className="final-position-seat__trace" type="button" data-final-seat-event={finalEventId} onClick={() => focusConsultationEvent(finalEventId)}>{zh ? "查看最终事件" : "Trace final event"} ↗</button>
       ) : null}
 
       {seat.caveats.length ? <div className="final-position-seat__caveats">{seat.caveats.map((item) => <i key={item}>{item}</i>)}</div> : null}
