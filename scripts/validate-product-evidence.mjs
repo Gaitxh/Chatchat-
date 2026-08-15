@@ -43,6 +43,7 @@ requireAll("English Side Panel", pages.sideEn, [
   "Propose once", "Equal AI participants", "CONSULTATION OUTCOME", "CONSULTATION THEATER", "Explicit revisions", "Who changed what", "EXPLICIT STANCE FRONTS", "Claude", "Web + Extension", "Browser Extension",
 ]);
 assert(/no chair/i.test(pages.sideEn), "English Side Panel must preserve no-chair language.");
+assert(/no delegation/i.test(pages.sideEn), "English Side Panel must explicitly reject delegation hierarchy.");
 
 for (const [label, html] of [["Chinese Full Room", pages.roomZh], ["English Full Room", pages.roomEn]]) {
   requireAll(label, html, [
@@ -96,7 +97,7 @@ for (const [label, html] of Object.entries({ sideZh: pages.sideZh, sideEn: pages
   for (const forbidden of ["KING'S COMMAND", "AI HOUSE", "HOUSE VERDICT", "众议院", "COUNCIL THEATER", "议会剧场"]) {
     assert(!html.includes(forbidden), `${label} contains forbidden legacy product language: ${forbidden}`);
   }
-  assert(!/Delegation/i.test(html), `${label} contains legacy delegation language.`);
+  assert(!/\bAI delegation\b|\bdelegation leader\b|\bdelegation chair\b/i.test(html), `${label} contains affirmative delegation hierarchy language.`);
 }
 
 requireAll("manifest", manifest, ["ChatChat — AI Consultation", "optional_host_permissions"]);
