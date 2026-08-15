@@ -1,4 +1,5 @@
 import type { CouncilEvent, CouncilParticipant } from "../src/core/types.js";
+import { deriveOpenMeetingIssueProvenance } from "../src/consultation/open-issues.js";
 import { deriveConflictBoard } from "../src/theater/conflict-board.js";
 import { deriveConflictResolutionLedger } from "../src/theater/conflict-resolution.js";
 
@@ -48,6 +49,18 @@ assert(uncertainty?.state === "resolved" && uncertainty.resolvedByEventId === "b
 assert(ledger.openCount === 1, "Exactly the unanswered challenge should remain open.");
 assert(ledger.resolvedCount === 3, "Question, evidence and uncertainty should have exact closure receipts.");
 
+const openIssueIds = deriveOpenMeetingIssueProvenance(events)
+  .map((item) => item.sourceEventId)
+  .sort();
+const openLedgerIds = ledger.obligations
+  .filter((item) => item.state === "open")
+  .map((item) => item.sourceEventId)
+  .sort();
+assert(
+  JSON.stringify(openIssueIds) === JSON.stringify(openLedgerIds),
+  "Open Issues and Conflict Resolution Ledger must expose exactly the same unresolved source events.",
+);
+
 const planAThreadId = board.eventThreadIds.a1;
 assert(Boolean(planAThreadId), "The Plan A anchor must have a conflict thread.");
 const planA = ledger.threads.find((thread) => thread.threadId === planAThreadId);
@@ -73,5 +86,16 @@ assert(
   strictLedger.obligations.find((item) => item.sourceEventId === "q1")?.state === "open",
   "Similar prose or third-party claims of answering must not close a direct question.",
 );
+const strictOpenIssueIds = deriveOpenMeetingIssueProvenance(withoutExactReply)
+  .map((item) => item.sourceEventId)
+  .sort();
+const strictOpenLedgerIds = strictLedger.obligations
+  .filter((item) => item.state === "open")
+  .map((item) => item.sourceEventId)
+  .sort();
+assert(
+  JSON.stringify(strictOpenIssueIds) === JSON.stringify(strictOpenLedgerIds),
+  "Canonical resolver consistency must survive anti-prose-inference cases too.",
+);
 
-console.log("✓ Conflict Resolution Ledger preserves exact closure provenance and per-round trajectory");
+console.log("✓ Conflict Resolution Ledger preserves exact closure provenance, round trajectory and Open Issues consistency");
