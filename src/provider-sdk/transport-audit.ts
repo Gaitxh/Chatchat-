@@ -14,6 +14,7 @@ export interface ProviderTransportAuditRecord {
   mode: ProviderExecutionMode;
   observedAt: string;
   snapshotEventIds: readonly string[];
+  promptMemoryObserved?: true;
   pinnedOpenIssueEventIds?: readonly string[];
   pinnedIssueSourceEventIds?: readonly string[];
   latestRoundEventIds?: readonly string[];
@@ -35,6 +36,7 @@ export function recordProviderTransportAudit(record: ProviderTransportAuditRecor
   const enriched: ProviderTransportAuditRecord = promptSelection
     ? {
         ...record,
+        promptMemoryObserved: true,
         snapshotEventIds: [...promptSelection.snapshotEventIds],
         ...(promptSelection.pinnedOpenIssueEventIds.length ? { pinnedOpenIssueEventIds: [...promptSelection.pinnedOpenIssueEventIds] } : {}),
         ...(promptSelection.pinnedIssueSourceEventIds.length ? { pinnedIssueSourceEventIds: [...promptSelection.pinnedIssueSourceEventIds] } : {}),
