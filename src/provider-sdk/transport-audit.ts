@@ -1,4 +1,5 @@
 import type { CouncilPhase } from "../core/types.js";
+import { providerPromptMemorySelectionFor } from "./prompt-memory-audit.js";
 
 export const PROVIDER_TRANSPORT_AUDIT_EVENT = "chatchat:provider-transport";
 export type ProviderExecutionMode = "synthetic-showcase" | "live-provider-tabs";
@@ -30,7 +31,17 @@ const MAX_BUFFERED_RECORDS = 720;
 const buffer: ProviderTransportAuditRecord[] = [];
 
 export function recordProviderTransportAudit(record: ProviderTransportAuditRecord): void {
-  const copy = cloneProviderTransportAudit(record);
+  const promptSelection = providerPromptMemorySelectionFor(record);
+  const enriched: ProviderTransportAuditRecord = promptSelection
+    ? {
+        ...record,
+        snapshotEventIds: [...promptSelection.snapshotEventIds],
+        ...(promptSelection.pinnedOpenIssueEventIds.length ? { pinnedOpenIssueEventIds: [...promptSelection.pinnedOpenIssueEventIds] } : {}),
+        ...(promptSelection.pinnedIssueSourceEventIds.length ? { pinnedIssueSourceEventIds: [...promptSelection.pinnedIssueSourceEventIds] } : {}),
+        ...(promptSelection.latestRoundEventIds.length ? { latestRoundEventIds: [...promptSelection.latestRoundEventIds] } : {}),
+      }
+    : record;
+  const copy = cloneProviderTransportAudit(enriched);
   buffer.push(copy);
   if (buffer.length > MAX_BUFFERED_RECORDS) buffer.splice(0, buffer.length - MAX_BUFFERED_RECORDS);
   if (typeof window !== "undefined") {
