@@ -46,6 +46,11 @@ try {
     });
     await cdp.call("Page.navigate", { url });
     await waitForReady(cdp, readySelector, waitMs);
+    await evaluate(cdp, `(() => {
+      window.scrollTo(0, 0);
+      if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+      return { x: window.scrollX, y: window.scrollY };
+    })()`);
     await waitForPaint(cdp);
 
     const dom = await evaluate(cdp, "document.documentElement.outerHTML");
