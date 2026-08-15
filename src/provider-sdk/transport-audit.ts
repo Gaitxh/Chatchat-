@@ -14,6 +14,7 @@ export interface ProviderTransportAuditRecord {
   observedAt: string;
   snapshotEventIds: readonly string[];
   pinnedOpenIssueEventIds?: readonly string[];
+  pinnedIssueSourceEventIds?: readonly string[];
   latestRoundEventIds?: readonly string[];
   repairAttempt: boolean;
   tabId: number;
@@ -50,6 +51,7 @@ export function cloneProviderTransportAudit(record: ProviderTransportAuditRecord
     ...record,
     snapshotEventIds: [...record.snapshotEventIds],
     ...(record.pinnedOpenIssueEventIds ? { pinnedOpenIssueEventIds: [...record.pinnedOpenIssueEventIds] } : {}),
+    ...(record.pinnedIssueSourceEventIds ? { pinnedIssueSourceEventIds: [...record.pinnedIssueSourceEventIds] } : {}),
     ...(record.latestRoundEventIds ? { latestRoundEventIds: [...record.latestRoundEventIds] } : {}),
   };
 }
