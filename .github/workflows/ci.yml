@@ -121,6 +121,25 @@ jobs:
             --screenshot artifacts/chatchat-room-en.png \
             --dom artifacts/chatchat-room-en.html
 
+      - name: Capture bilingual Final Position Floor close-up
+        run: |
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url 'http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=zh' \
+            --width 1440 --height 1800 --wait-ms 22000 \
+            --ready-selector 'html[data-chatchat-final-position-floor-showcase="complete"]' \
+            --focus-selector '[data-final-position-floor="explicit-final-submissions"]' \
+            --screenshot artifacts/chatchat-final-position-floor-zh.png \
+            --dom artifacts/chatchat-final-position-floor-zh.html
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url 'http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=en' \
+            --width 1440 --height 1800 --wait-ms 22000 \
+            --ready-selector 'html[data-chatchat-final-position-floor-showcase="complete"]' \
+            --focus-selector '[data-final-position-floor="explicit-final-submissions"]' \
+            --screenshot artifacts/chatchat-final-position-floor-en.png \
+            --dom artifacts/chatchat-final-position-floor-en.html
+
       - name: Capture bilingual live persuasion frame from the proved DOM
         run: |
           node scripts/capture-chromium-proof.mjs \
@@ -145,6 +164,8 @@ jobs:
             artifacts/chatchat-consultation-en.png \
             artifacts/chatchat-room-zh.png \
             artifacts/chatchat-room-en.png \
+            artifacts/chatchat-final-position-floor-zh.png \
+            artifacts/chatchat-final-position-floor-en.png \
             artifacts/chatchat-live-meeting-zh.png \
             artifacts/chatchat-live-meeting-en.png
 
