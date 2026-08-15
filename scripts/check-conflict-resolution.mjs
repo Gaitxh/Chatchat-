@@ -19,8 +19,9 @@ for (const claim of [
 ]) {
   assert(model.includes(claim), `Conflict resolution model is missing: ${claim}`);
 }
-assert(!model.includes("embedding"), "Conflict closure must never depend on embeddings.");
-assert(!model.includes("similarity"), "Conflict closure must never depend on prose similarity.");
+for (const forbidden of ["semanticSimilarity", "cosineSimilarity", "createEmbedding", "embeddingVector"]) {
+  assert(!model.includes(forbidden), `Conflict closure must not use semantic inference: ${forbidden}`);
+}
 assert(!model.includes("consensusRatio"), "Conflict closure must not depend on majority alignment.");
 
 for (const claim of [
