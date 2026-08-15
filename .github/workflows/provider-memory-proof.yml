@@ -78,7 +78,10 @@ jobs:
           grep -q 'data-chatchat-provider-memory-showcase="complete"' artifacts/chatchat-provider-memory-zh.html
           grep -q 'data-provider-memory-coverage="audited"' artifacts/chatchat-provider-memory-zh.html
           grep -q 'data-provider-memory-consistent="true"' artifacts/chatchat-provider-memory-zh.html
+          grep -q 'data-provider-memory-selector-consistent="true"' artifacts/chatchat-provider-memory-zh.html
+          grep -q 'data-provider-memory-selector-mismatches="0"' artifacts/chatchat-provider-memory-zh.html
           grep -q 'data-provider-memory-snapshot-count="12"' artifacts/chatchat-provider-memory-zh.html
+          grep -q 'data-provider-memory-selector-mismatch-seats="0"' artifacts/chatchat-provider-memory-zh.html
           grep -q 'data-provider-memory-pinned-source=' artifacts/chatchat-provider-memory-zh.html
           grep -q 'data-provider-memory-resolver-event=' artifacts/chatchat-provider-memory-zh.html
           grep -q 'ACTUAL PROMPT' artifacts/chatchat-provider-memory-zh.html
@@ -109,7 +112,10 @@ jobs:
           grep -q 'data-chatchat-provider-memory-showcase="complete"' artifacts/chatchat-provider-memory-en.html
           grep -q 'data-provider-memory-coverage="audited"' artifacts/chatchat-provider-memory-en.html
           grep -q 'data-provider-memory-consistent="true"' artifacts/chatchat-provider-memory-en.html
+          grep -q 'data-provider-memory-selector-consistent="true"' artifacts/chatchat-provider-memory-en.html
+          grep -q 'data-provider-memory-selector-mismatches="0"' artifacts/chatchat-provider-memory-en.html
           grep -q 'data-provider-memory-snapshot-count="12"' artifacts/chatchat-provider-memory-en.html
+          grep -q 'data-provider-memory-selector-mismatch-seats="0"' artifacts/chatchat-provider-memory-en.html
           grep -q 'data-provider-memory-pinned-source=' artifacts/chatchat-provider-memory-en.html
           grep -q 'data-provider-memory-resolver-event=' artifacts/chatchat-provider-memory-en.html
           grep -q 'ACTUAL PROMPT' artifacts/chatchat-provider-memory-en.html
