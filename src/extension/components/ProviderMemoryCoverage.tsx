@@ -36,6 +36,8 @@ export function ProviderMemoryCoverage({
       data-provider-memory-session={model.sessionId ?? ""}
       data-provider-memory-budget={model.contextBudget}
       data-provider-memory-pinned-rounds={model.roundsWithPinnedMemory}
+      data-provider-memory-actual-prompt-turns={model.actualPromptTurnCount}
+      data-provider-memory-total-turns={model.turns.length}
       data-provider-memory-consistent={model.allSharedSnapshotsConsistent ? "true" : "false"}
     >
       <header>
@@ -43,18 +45,19 @@ export function ProviderMemoryCoverage({
           <span>{zh ? "上下文记忆收据" : "PROVIDER MEMORY COVERAGE"}</span>
           <strong>{zh ? "这些 AI 这一轮到底看见了哪些公共会议记忆？" : "Which public meeting memory actually reached each Provider turn?"}</strong>
           <p>{zh
-            ? "ChatChat 公开 12-event 上下文预算的真实组成：最新轮次先保护，旧但仍未解决的结构化争议可以被 pin 回来，其余普通历史按预算省略。pin 只代表记忆优先级，不代表权威或真理。"
-            : "ChatChat exposes the real 12-event public-context accounting: protect the newest round first, pin older structurally unresolved conflicts when needed, and omit ordinary older history under budget. Pinning is memory priority, never authority or truth."}</p>
+            ? "ChatChat 公开 12-event 上下文预算的真实组成：最新轮次先保护，旧但仍未解决的结构化争议可以被 pin 回来，其余普通历史按预算省略。新会议优先从真正发送给 RUN_SPEECH 的 Prompt 字符串读取这些分类；pin 只代表记忆优先级，不代表权威或真理。"
+            : "ChatChat exposes the real 12-event public-context accounting: protect the newest round first, pin older structurally unresolved conflicts when needed, and omit ordinary older history under budget. New meetings prefer these categories parsed from the actual RUN_SPEECH prompt string; pinning is memory priority, never authority or truth."}</p>
         </div>
         <div className="provider-memory-summary">
           <b>{model.contextBudget}<small>{zh ? "最大公共事件" : "max public events"}</small></b>
+          <b>{model.actualPromptTurnCount}/{model.turns.length}<small>{zh ? "实际 Prompt 票据" : "actual prompt proof"}</small></b>
           <b>{model.roundsWithPinnedMemory}<small>{zh ? "轮使用旧争议 pin" : "rounds used pins"}</small></b>
           <b className={model.allSharedSnapshotsConsistent ? "is-ok" : "is-bad"}>{model.allSharedSnapshotsConsistent ? "✓" : "!"}<small>{zh ? "同轮共享快照" : "shared snapshot"}</small></b>
         </div>
       </header>
 
       {archive ? (
-        <div className="provider-memory-archive">↺ {zh ? "历史回放：从冻结 execution receipt 重建，不会重新调用 Provider。" : "Archive replay: reconstructed from the frozen execution receipt; no Provider calls."}</div>
+        <div className="provider-memory-archive">↺ {zh ? "历史回放：从冻结 execution receipt 重建，不会重新调用 Provider。旧记录若早于 actual-Prompt memory metadata，会明确退回 selector audit，而不会伪装成 Prompt 票据。" : "Archive replay: reconstructed from the frozen execution receipt; no Provider calls. Older records that predate actual-Prompt memory metadata explicitly fall back to selector audit rather than pretending to be prompt proof."}</div>
       ) : null}
 
       <div className="provider-memory-rounds">
@@ -81,6 +84,7 @@ function MemoryRoundCard({
   onFocusEvent(eventId: string): void;
 }) {
   const free = Math.max(0, round.contextBudget - round.snapshotCount);
+  const allActualPrompt = round.actualPromptSeatCount === round.seatCount && round.seatCount > 0;
   return (
     <article
       className={`provider-memory-round ${round.pinnedEventIds.length ? "has-pins" : ""} ${round.snapshotsConsistent ? "is-consistent" : "is-mismatch"}`}
@@ -93,6 +97,8 @@ function MemoryRoundCard({
       data-provider-memory-latest-count={round.latestRoundEventIds.length}
       data-provider-memory-ordinary-count={round.ordinaryRecentEventIds.length}
       data-provider-memory-omitted-count={round.omittedEventIds.length}
+      data-provider-memory-actual-prompt-seats={round.actualPromptSeatCount}
+      data-provider-memory-seat-count={round.seatCount}
       data-provider-memory-shared={round.snapshotsConsistent ? "true" : "false"}
     >
       <div className="provider-memory-round__top">
@@ -104,6 +110,11 @@ function MemoryRoundCard({
           <b>{round.receivedSeatCount}/{round.seatCount}</b>
           <small>{zh ? "席位页面返回" : "seat responses"}</small>
           <em>{round.snapshotsConsistent ? (zh ? "✓ 同一快照" : "✓ SAME SNAPSHOT") : (zh ? "! 快照不一致" : "! SNAPSHOT MISMATCH")}</em>
+          <em className={allActualPrompt ? "is-prompt" : "is-fallback"}>
+            {allActualPrompt
+              ? (zh ? "ACTUAL PROMPT" : "ACTUAL PROMPT")
+              : `${round.actualPromptSeatCount}/${round.seatCount} ${zh ? "Prompt 票据" : "prompt proof"}`}
+          </em>
         </div>
       </div>
 
