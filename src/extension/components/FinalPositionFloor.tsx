@@ -85,6 +85,7 @@ export function FinalPositionFloor({
             key={group.id}
             group={group}
             seats={model.seats.filter((seat) => seat.stanceKey === group.stanceKey)}
+            totalParticipants={model.participantCount}
             zh={zh}
           />
         ))}
@@ -110,10 +111,12 @@ export function FinalPositionFloor({
 function FinalGroup({
   group,
   seats,
+  totalParticipants,
   zh,
 }: {
   group: FinalPositionGroup;
   seats: readonly FinalPositionSeat[];
+  totalParticipants: number;
   zh: boolean;
 }) {
   return (
@@ -130,7 +133,7 @@ function FinalGroup({
           <span>{group.isReportLeadingGroup ? (zh ? "报告中的领先组 · 描述性" : "REPORT LEADING GROUP · DESCRIPTIVE") : (zh ? "保留的其他最终立场" : "OTHER SURVIVING FINAL STANCE")}</span>
           <strong>{group.stance}</strong>
         </div>
-        <b>{group.count}/{seats.length + 0 /* local group count is shown; total is in header */}<small>{Math.round(group.share * 100)}%</small></b>
+        <b>{group.count}/{totalParticipants}<small>{Math.round(group.share * 100)}%</small></b>
       </div>
       <div className="final-position-group__meta">
         <span>{zh ? "平均置信度" : "avg confidence"} {Math.round(group.averageConfidence * 100)}%</span>
