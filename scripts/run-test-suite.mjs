@@ -22,6 +22,7 @@ const tests = [
   "dist/tests/conflict-resolution.test.js",
   "dist/tests/context-selection.test.js",
   "dist/tests/provider-memory-coverage.test.js",
+  "dist/tests/prompt-memory-audit.test.js",
   "dist/tests/pinned-issue-prompt.test.js",
   "dist/tests/live-persuasion.test.js",
   "dist/tests/provider-attendance.test.js",
