@@ -74,32 +74,63 @@ const audits: ProviderExecutionAuditEvent[] = [
   audit("b", "Beta", 4, selectionR4),
 ];
 const transports: ProviderTransportAuditRecord[] = [
-  transport("a", 3, 101),
-  transport("b", 3, 102),
-  transport("a", 4, 101),
-  transport("b", 4, 102),
+  transport("a", 3, 101, selectionR3),
+  transport("b", 3, 102, selectionR3),
+  transport("a", 4, 101, selectionR4),
+  transport("b", 4, 102, selectionR4),
 ];
 const model = deriveProviderMemoryCoverage(participants, beforeR4, audits, transports);
 const round3 = model.rounds.find((round) => round.round === 3);
 const round4 = model.rounds.find((round) => round.round === 4);
 assert(round3 && round4, "Memory model must expose R3 and R4 audit decks.");
 assert(round3.snapshotsConsistent && round3.receivedSeatCount === 2, "Both peers should receive the same R3 immutable public memory deck.");
+assert(round3.actualPromptSeatCount === 2 && round3.selectorMismatchSeatCount === 0, "R3 should be backed by actual Prompt metadata that agrees with the selector for both seats.");
 assert(round3.availableCount === 13 && round3.snapshotCount === 12, "R3 must disclose that one older ordinary event was omitted by budget.");
 assert(round3.pinnedIssueSourceEventIds.includes("u1"), "R3 UI model must preserve the exact old Open Issue that caused pinning.");
 assert(round3.pinnedIssues[0]?.resolverEventId === "a2" && round3.pinnedIssues[0]?.resolvedRound === 3, "Pinned issue history must identify the later exact resolver without pretending it was known before R3 ran.");
 assert(round3.omittedEventIds.length === 1, "R3 memory accounting must expose exactly one omitted ordinary historical event.");
 assert(round4.snapshotsConsistent && !round4.pinnedIssueSourceEventIds.includes("u1"), "R4 must prove pin-until-resolved lifecycle closure.");
+assert(round4.actualPromptSeatCount === 2 && round4.selectorMismatchSeatCount === 0, "R4 actual Prompt metadata must keep agreeing with the selector after the old issue is unpinned.");
 assert(round4.availableCount === 22 && round4.snapshotCount === 12 && round4.omittedEventIds.length === 10, "R4 must expose bounded context accounting after the history grows.");
 assert(model.roundsWithPinnedMemory === 1, "Only the still-unresolved R3 turn should need conflict-pinned memory.");
-assert(model.allSharedSnapshotsConsistent, "Equal peers should share identical public memory selection within each round.");
+assert(model.actualPromptTurnCount === 4, "Every deterministic turn in this fixture should carry actual Prompt evidence.");
+assert(model.selectorMismatchTurnCount === 0 && model.allPromptSelectorConsistent, "Baseline actual Prompt metadata must agree with deterministic selector audit.");
+assert(model.allSharedSnapshotsConsistent, "Equal peers should share identical actual public memory selection within each round.");
 
-const mismatched = audits.map((item) => ({ ...item, snapshotEventIds: [...item.snapshotEventIds] }));
-const betaR3 = mismatched.find((item) => item.actorId === "b" && item.round === 3)!;
-betaR3.snapshotEventIds = betaR3.snapshotEventIds.slice(1);
-const mismatchModel = deriveProviderMemoryCoverage(participants, beforeR4, mismatched, transports);
-assert(!mismatchModel.allSharedSnapshotsConsistent, "A per-seat public snapshot mismatch must be surfaced instead of being normalized away.");
+// Selector-only drift is a different failure class from peer fairness. Keep the
+// actual Prompt receipts identical, but mutate Beta's deterministic selector
+// audit. Provider-to-Provider fairness should remain true while selector↔Prompt
+// consistency becomes false for exactly one turn.
+const selectorMismatched = audits.map((item) => ({
+  ...item,
+  snapshotEventIds: [...item.snapshotEventIds],
+  ...(item.pinnedOpenIssueEventIds ? { pinnedOpenIssueEventIds: [...item.pinnedOpenIssueEventIds] } : {}),
+  ...(item.pinnedIssueSourceEventIds ? { pinnedIssueSourceEventIds: [...item.pinnedIssueSourceEventIds] } : {}),
+  ...(item.latestRoundEventIds ? { latestRoundEventIds: [...item.latestRoundEventIds] } : {}),
+}));
+const betaSelectorR3 = selectorMismatched.find((item) => item.actorId === "b" && item.round === 3)!;
+betaSelectorR3.snapshotEventIds = betaSelectorR3.snapshotEventIds.slice(1);
+const selectorMismatchModel = deriveProviderMemoryCoverage(participants, beforeR4, selectorMismatched, transports);
+assert(selectorMismatchModel.allSharedSnapshotsConsistent, "Identical actual Provider Prompts must remain fair even if selector audit itself drifts.");
+assert(selectorMismatchModel.selectorMismatchTurnCount === 1, "Exactly the mutated Beta R3 selector audit should disagree with its actual Prompt receipt.");
+assert(!selectorMismatchModel.allPromptSelectorConsistent, "Selector-to-Prompt drift must be surfaced as its own integrity failure.");
 
-console.log("✓ Provider Memory Coverage proves bounded context, shared snapshots and pin-until-resolved lifecycle");
+// Actual Prompt drift *is* a peer-memory fairness failure. Mutate Beta R3's
+// frozen actual Prompt receipt while leaving selector audit unchanged.
+const promptMismatched = transports.map((item) => ({
+  ...item,
+  snapshotEventIds: [...item.snapshotEventIds],
+  ...(item.pinnedOpenIssueEventIds ? { pinnedOpenIssueEventIds: [...item.pinnedOpenIssueEventIds] } : {}),
+  ...(item.pinnedIssueSourceEventIds ? { pinnedIssueSourceEventIds: [...item.pinnedIssueSourceEventIds] } : {}),
+  ...(item.latestRoundEventIds ? { latestRoundEventIds: [...item.latestRoundEventIds] } : {}),
+}));
+const betaPromptR3 = promptMismatched.find((item) => item.actorId === "b" && item.round === 3)!;
+betaPromptR3.snapshotEventIds = betaPromptR3.snapshotEventIds.slice(1);
+const promptMismatchModel = deriveProviderMemoryCoverage(participants, beforeR4, audits, promptMismatched);
+assert(!promptMismatchModel.allSharedSnapshotsConsistent, "Different actual Provider Prompt decks must surface a same-round peer-memory fairness failure.");
+assert(promptMismatchModel.selectorMismatchTurnCount === 1, "The drifted actual Beta R3 Prompt should also disagree with deterministic selector audit.");
+
+console.log("✓ Provider Memory Coverage proves bounded context, peer fairness, selector agreement and pin-until-resolved lifecycle");
 
 function audit(
   actorId: string,
@@ -123,7 +154,12 @@ function audit(
   };
 }
 
-function transport(actorId: string, round: number, tabId: number): ProviderTransportAuditRecord {
+function transport(
+  actorId: string,
+  round: number,
+  tabId: number,
+  selection: ReturnType<typeof selectProviderContextEvents>,
+): ProviderTransportAuditRecord {
   return {
     sessionId: base.sessionId,
     actorId,
@@ -132,7 +168,11 @@ function transport(actorId: string, round: number, tabId: number): ProviderTrans
     state: "received",
     mode: "live-provider-tabs",
     observedAt: `2026-08-15T01:0${round}:01.000Z`,
-    snapshotEventIds: round === 3 ? selectionR3.events.map((event) => event.id) : selectionR4.events.map((event) => event.id),
+    promptMemoryObserved: true,
+    snapshotEventIds: selection.events.map((event) => event.id),
+    ...(selection.pinnedEventIds.length ? { pinnedOpenIssueEventIds: [...selection.pinnedEventIds] } : {}),
+    ...(selection.pinnedIssueSourceEventIds.length ? { pinnedIssueSourceEventIds: [...selection.pinnedIssueSourceEventIds] } : {}),
+    ...(selection.latestRoundEventIds.length ? { latestRoundEventIds: [...selection.latestRoundEventIds] } : {}),
     repairAttempt: false,
     tabId,
     promptChars: 1000,
