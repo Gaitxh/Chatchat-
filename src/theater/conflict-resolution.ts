@@ -1,10 +1,9 @@
 import type { CouncilEvent, CouncilParticipant } from "../core/types.js";
 import {
-  directPeerRequestTarget,
-  eventReferences,
-  explicitlyAnswersRequest,
-} from "../consultation/structured-response.js";
-import type { OpenMeetingIssueKind } from "../consultation/open-issues.js";
+  findMeetingIssueResolver,
+  type OpenMeetingIssueKind,
+} from "../consultation/open-issues.js";
+import { directPeerRequestTarget } from "../consultation/structured-response.js";
 import { deriveConflictBoard, type ConflictBoardModel } from "./conflict-board.js";
 
 export type ConflictObligationState = "open" | "resolved";
@@ -60,10 +59,9 @@ export interface ConflictResolutionLedger {
 /**
  * Deterministic closure ledger for Conflict Board obligations.
  *
- * A resolution exists only when the same exact structural rule that would make
- * an Open Issue disappear can identify the first later event that closes it.
- * No prose similarity, embeddings, sentiment or model confidence ranking is
- * used to decide whether a question/challenge/evidence obligation was answered.
+ * A resolution exists only when the canonical Open Issues resolver identifies
+ * the first later public event that closes it. The ledger records that exact
+ * resolver; it does not introduce a second definition of "answered".
  */
 export function deriveConflictResolutionLedger(
   participants: readonly CouncilParticipant[],
@@ -120,7 +118,7 @@ function obligationForEvent(
         ? "evidence_awaiting_response"
         : "explicit_uncertainty";
   const target = event.kind === "uncertain" ? undefined : directPeerRequestTarget(event, eventById);
-  const resolver = firstResolver(event, events, target?.actorId);
+  const resolver = findMeetingIssueResolver(events, event, eventById);
   const threadId = board.eventThreadIds[event.id] ?? `conflict:${event.id}`;
 
   return {
@@ -143,51 +141,6 @@ function obligationForEvent(
       resolvedRound: resolver.round,
     } : {}),
   };
-}
-
-function firstResolver(
-  source: CouncilEvent,
-  events: readonly CouncilEvent[],
-  targetActorId?: string,
-): CouncilEvent | undefined {
-  const sourceIndex = events.findIndex((event) => event.id === source.id);
-  if (sourceIndex < 0) return undefined;
-
-  for (const candidate of events.slice(sourceIndex + 1)) {
-    if (source.kind === "question") {
-      if (!explicitlyAnswersRequest(candidate, source.id)) continue;
-      if (targetActorId ? candidate.actorId === targetActorId : candidate.actorId !== source.actorId) return candidate;
-      continue;
-    }
-
-    if (source.kind === "challenge") {
-      if (targetActorId && candidate.actorId === targetActorId && explicitlyAnswersRequest(candidate, source.id)) return candidate;
-      continue;
-    }
-
-    if (source.kind === "evidence") {
-      if (targetActorId) {
-        if (candidate.actorId === targetActorId && explicitlyAnswersRequest(candidate, source.id)) return candidate;
-      } else if (candidate.actorId !== source.actorId && eventReferences(candidate).includes(source.id)) {
-        return candidate;
-      }
-      continue;
-    }
-
-    if (source.kind === "uncertain" && candidate.actorId === source.actorId) {
-      if (
-        candidate.kind === "revision"
-        && candidate.confidence > source.confidence
-        && (candidate.causedBy ?? []).some((eventId) => eventId !== source.id)
-      ) return candidate;
-      if (
-        candidate.kind === "final_position"
-        && candidate.confidence > source.confidence
-        && normalize(candidate.stance) !== "uncertain"
-      ) return candidate;
-    }
-  }
-  return undefined;
 }
 
 function deriveTrajectory(
@@ -229,8 +182,4 @@ function deriveTrajectory(
 
 function actorName(names: ReadonlyMap<string, string>, actorId: string): string {
   return names.get(actorId) ?? actorId;
-}
-
-function normalize(value: string): string {
-  return value.trim().toLocaleLowerCase().replace(/\s+/g, " ");
 }
