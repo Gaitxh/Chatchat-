@@ -8,6 +8,8 @@ import type { ProviderExecutionAuditEvent } from "../provider-sdk/execution-audi
 import type { ProviderTransportAuditRecord } from "../provider-sdk/transport-audit.js";
 import { DEFAULT_PROVIDER_CONTEXT_EVENTS } from "../provider-sdk/context-selection.js";
 
+export type ProviderMemorySelectionEvidence = "actual_prompt" | "selector_audit";
+
 export interface ProviderPinnedMemoryIssue {
   sourceEventId: string;
   kind: OpenMeetingIssueKind;
@@ -33,6 +35,7 @@ export interface ProviderMemoryTurn {
   phase: CouncilPhase;
   round: number;
   contextBudget: number;
+  selectionEvidence: ProviderMemorySelectionEvidence;
   availableEventIds: string[];
   snapshotEventIds: string[];
   latestRoundEventIds: string[];
@@ -53,6 +56,7 @@ export interface ProviderMemoryRound {
   seatCount: number;
   attemptedSeatCount: number;
   receivedSeatCount: number;
+  actualPromptSeatCount: number;
   snapshotsConsistent: boolean;
   selectionFingerprints: string[];
   snapshotEventIds: string[];
@@ -74,14 +78,17 @@ export interface ProviderMemoryCoverageModel {
   turns: ProviderMemoryTurn[];
   roundsWithPinnedMemory: number;
   pinnedIssueSourceEventIds: string[];
+  actualPromptTurnCount: number;
   allSharedSnapshotsConsistent: boolean;
 }
 
 /**
- * Reconstruct the exact public-memory accounting that was audited for each
- * Provider turn. Selection categories come from execution audit fields that
- * were computed by the same deterministic selector used to build the prompt.
- * The model never scores semantic importance or reconstructs hidden reasoning.
+ * Reconstruct exact public-memory accounting for each Provider turn.
+ *
+ * New browser turns prefer category metadata parsed from the actual RUN_SPEECH
+ * string and stored in the transport receipt. Selector audit fields are only a
+ * backwards-compatible fallback for older archives or browser environments
+ * where transport instrumentation could not enrich the receipt.
  */
 export function deriveProviderMemoryCoverage(
   participants: readonly CouncilParticipant[],
@@ -99,6 +106,7 @@ export function deriveProviderMemoryCoverage(
       turns: [],
       roundsWithPinnedMemory: 0,
       pinnedIssueSourceEventIds: [],
+      actualPromptTurnCount: 0,
       allSharedSnapshotsConsistent: true,
     };
   }
@@ -110,15 +118,6 @@ export function deriveProviderMemoryCoverage(
     const participant = participantById.get(audit.actorId);
     const availableEvents = sessionEvents.filter((event) => event.round < audit.round);
     const availableIds = availableEvents.map((event) => event.id);
-    const snapshot = unique(audit.snapshotEventIds);
-    const latest = unique(audit.latestRoundEventIds ?? []).filter((id) => snapshot.includes(id));
-    const pinned = unique(audit.pinnedOpenIssueEventIds ?? []).filter((id) => snapshot.includes(id));
-    const pinnedSources = unique(audit.pinnedIssueSourceEventIds ?? []);
-    const pinnedSet = new Set(pinned);
-    const latestSet = new Set(latest);
-    const snapshotSet = new Set(snapshot);
-    const ordinaryRecent = snapshot.filter((id) => !pinnedSet.has(id) && !latestSet.has(id));
-    const omitted = availableIds.filter((id) => !snapshotSet.has(id));
     const transport = transports.filter((record) =>
       record.sessionId === sessionId
       && record.actorId === audit.actorId
@@ -126,6 +125,29 @@ export function deriveProviderMemoryCoverage(
       && record.round === audit.round
       && !record.repairAttempt,
     );
+    const promptRecord = transport.find((record) => record.state === "sending") ?? transport[0];
+    const promptHasMemoryCategories = Boolean(
+      promptRecord
+      && (promptRecord.latestRoundEventIds !== undefined
+        || promptRecord.pinnedOpenIssueEventIds !== undefined
+        || promptRecord.pinnedIssueSourceEventIds !== undefined),
+    );
+    const selectionEvidence: ProviderMemorySelectionEvidence = promptHasMemoryCategories ? "actual_prompt" : "selector_audit";
+    const snapshot = unique(promptRecord?.snapshotEventIds ?? audit.snapshotEventIds);
+    const latest = unique(
+      promptHasMemoryCategories ? (promptRecord?.latestRoundEventIds ?? []) : (audit.latestRoundEventIds ?? []),
+    ).filter((id) => snapshot.includes(id));
+    const pinned = unique(
+      promptHasMemoryCategories ? (promptRecord?.pinnedOpenIssueEventIds ?? []) : (audit.pinnedOpenIssueEventIds ?? []),
+    ).filter((id) => snapshot.includes(id));
+    const pinnedSources = unique(
+      promptHasMemoryCategories ? (promptRecord?.pinnedIssueSourceEventIds ?? []) : (audit.pinnedIssueSourceEventIds ?? []),
+    );
+    const pinnedSet = new Set(pinned);
+    const latestSet = new Set(latest);
+    const snapshotSet = new Set(snapshot);
+    const ordinaryRecent = snapshot.filter((id) => !pinnedSet.has(id) && !latestSet.has(id));
+    const omitted = availableIds.filter((id) => !snapshotSet.has(id));
     return {
       key: `${sessionId}|${audit.actorId}|${audit.phase}|${audit.round}`,
       sessionId,
@@ -135,6 +157,7 @@ export function deriveProviderMemoryCoverage(
       phase: audit.phase,
       round: audit.round,
       contextBudget,
+      selectionEvidence,
       availableEventIds: availableIds,
       snapshotEventIds: snapshot,
       latestRoundEventIds: latest,
@@ -169,6 +192,7 @@ export function deriveProviderMemoryCoverage(
       seatCount: roundTurns.length,
       attemptedSeatCount: roundTurns.filter((turn) => turn.transportAttempted).length,
       receivedSeatCount: roundTurns.filter((turn) => turn.transportReceived).length,
+      actualPromptSeatCount: roundTurns.filter((turn) => turn.selectionEvidence === "actual_prompt").length,
       snapshotsConsistent: fingerprints.length <= 1,
       selectionFingerprints: fingerprints,
       snapshotEventIds: representative ? [...representative.snapshotEventIds] : [],
@@ -191,6 +215,7 @@ export function deriveProviderMemoryCoverage(
     turns,
     roundsWithPinnedMemory: rounds.filter((round) => round.pinnedEventIds.length > 0).length,
     pinnedIssueSourceEventIds: unique(rounds.flatMap((round) => round.pinnedIssueSourceEventIds)),
+    actualPromptTurnCount: turns.filter((turn) => turn.selectionEvidence === "actual_prompt").length,
     allSharedSnapshotsConsistent: rounds.every((round) => round.snapshotsConsistent),
   };
 }
