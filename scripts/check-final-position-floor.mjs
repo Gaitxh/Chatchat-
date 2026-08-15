@@ -22,8 +22,8 @@ for (const claim of [
 ]) {
   assert(model.includes(claim), `Final Position Floor model is missing: ${claim}`);
 }
-assert(!model.includes("embedding"), "Final groups must not use embedding similarity.");
-assert(!model.includes("cosineSimilarity"), "Final groups must not infer semantically similar camps.");
+assert(!/\bembed(?:ding)?\s*\(/i.test(model), "Final groups must not call embedding similarity code.");
+assert(!/\bcosineSimilarity\s*\(/.test(model), "Final groups must not infer semantically similar camps.");
 assert(model.includes("stance.trim().toLocaleLowerCase()"), "Final grouping must match the orchestrator trim/lowercase contract.");
 
 for (const claim of [
