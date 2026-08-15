@@ -21,7 +21,7 @@ const events: CouncilEvent[] = [
   { ...base, id: "ev1", round: 2, actorId: "c", kind: "evidence", targetEventId: "a1", claim: "Benchmark contradicts the cost assumption.", content: "A public benchmark gives a higher cost.", confidence: .82 },
   { ...base, id: "u1", round: 2, actorId: "b", kind: "uncertain", content: "I am unsure about rollout risk.", confidence: .35 },
   { ...base, id: "ans1", round: 3, actorId: "a", kind: "argument", stance: "Plan A", content: "The failure bound is 5% under the stated constraint.", confidence: .75, replyToEventId: "q1" },
-  { ...base, id: "evReply", round: 3, actorId: "a", kind: "evidence", targetEventId: "a1", claim: "Updated benchmark scope.", content: "This responds to the evidence scope.", confidence: .8, replyToEventId: "ev1" },
+  { ...base, id: "evReply", round: 3, actorId: "a", kind: "argument", stance: "Plan A", content: "The benchmark comparison needs a narrower scope.", confidence: .8, replyToEventId: "ev1" },
   { ...base, id: "b2", round: 3, actorId: "b", kind: "revision", previousEventId: "b1", stance: "Plan A with guardrails", content: "The new evidence changes my rollout view.", confidence: .68, causedBy: ["ev1"] },
   { ...base, id: "f1", round: 4, actorId: "a", kind: "final_position", stance: "Plan A", content: "Final.", confidence: .8 },
   { ...base, id: "f2", round: 4, actorId: "b", kind: "final_position", stance: "Plan A with guardrails", content: "Final.", confidence: .75 },
