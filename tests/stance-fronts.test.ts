@@ -18,7 +18,9 @@ const events: CouncilEvent[] = [
   { ...base, id: "ev1", round: 2, actorId: "gemini", kind: "evidence", targetEventId: "c1", claim: "Runtime host permission exists.", content: "Browser docs support a hidden bridge.", confidence: .84 },
   { ...base, id: "c2", round: 3, actorId: "claude", kind: "revision", previousEventId: "c1", stance: "Web + Extension", content: "I now prefer Web-first with a bridge.", confidence: .87, causedBy: ["ev1"] },
   { ...base, id: "s1", round: 3, actorId: "gemini", kind: "support", targetEventId: "c2", content: "I support that split." },
-  { ...base, id: "q1", round: 3, actorId: "gpt", kind: "question", targetActorId: "claude", content: "What bridge failure reverses this choice?" },
+  { ...base, id: "ch2", round: 4, actorId: "gpt", kind: "challenge", targetEventId: "c2", content: "What bridge failure reverses this choice?" },
+  // Same target actor, but a separate question thread. It must not be attached to c1's stance front.
+  { ...base, id: "q1", round: 4, actorId: "gemini", kind: "question", targetActorId: "claude", content: "Separate product question." },
 ];
 
 const board = deriveConflictBoard(participants, events);
@@ -34,7 +36,9 @@ assert(oldFront.challengeEventIds.includes("ch1"), "Challenge pressure should st
 assert(oldFront.evidenceEventIds.includes("ev1"), "Targeted evidence should stay attached to the exact stance it targeted");
 assert(newFront?.state === "current" && newFront.currentMembers.some((member) => member.actorId === "claude"), "Latest explicit revision should occupy the current front");
 assert(newFront.supportEventIds.includes("s1"), "Explicit support should attach to the stance-bearing event it targeted");
-assert(newFront.unresolvedTargetEventIds.includes("q1"), "Open direct question to the current holder should remain attached to that front");
+assert(newFront.challengeEventIds.includes("ch2"), "Later challenge should attach to the current stance it directly targeted");
+assert(newFront.unresolvedTargetEventIds.includes("ch2"), "Unresolved same-thread challenge should remain attached to the current front");
+assert(!newFront.unresolvedTargetEventIds.includes("q1"), "Separate actor-targeted question thread must not be silently reclassified as pressure on this stance");
 assert(fronts.movements.length === 1, "One explicit revision across different stance labels should create one movement");
 assert(fronts.movements[0]?.revisionEventId === "c2" && fronts.movements[0]?.previousEventId === "c1", "Movement must preserve exact revision provenance");
 assert(fronts.movements[0]?.causedByEventIds.includes("ev1"), "Movement must retain explicit causedBy provenance");
@@ -56,3 +60,4 @@ assert(grouped?.currentMembers.some((member) => member.actorId === "claude") && 
 console.log("✓ ChatChat explicit stance-front tests passed");
 console.log("✓ Challenge/evidence/support activity never invents an unstated participant stance");
 console.log("✓ Revisions preserve vacated fronts and exact movement provenance");
+console.log("✓ Actor-targeted questions stay separate unless structural references attach them to the stance thread");
