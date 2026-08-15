@@ -12,6 +12,7 @@
   const ATTENDANCE_ATTR = "data-chatchat-provider-attendance-showcase";
   const CONFLICT_ATTR = "data-chatchat-conflict-board-showcase";
   const CONFLICT_RESOLUTION_ATTR = "data-chatchat-conflict-resolution-showcase";
+  const STANCE_FRONTS_ATTR = "data-chatchat-stance-fronts-showcase";
   let sawFreshSignalAgenda = false;
   let sawOpenIssue = false;
   let sawStrongPersuasion = false;
@@ -22,6 +23,7 @@
   let sawResolvedConflictObligation = false;
   let sawOpenConflictObligation = false;
   let sawConflictTrajectory = false;
+  let sawStanceMovement = false;
 
   function markComplete(attribute) {
     if (document.documentElement.getAttribute(attribute) === "complete") return;
@@ -63,6 +65,17 @@
       sawOpenConflict = true;
     }
     if (sawConflictChange && sawOpenConflict) markComplete(CONFLICT_ATTR);
+
+    const stanceFronts = changedThread?.querySelector('[data-conflict-stance-fronts]');
+    const currentFront = stanceFronts?.querySelector('[data-stance-front-state="current"]');
+    const vacatedFront = stanceFronts?.querySelector('[data-stance-front-state="vacated"]');
+    const stanceMovement = stanceFronts?.querySelector('[data-stance-movement-event][data-stance-movement-from][data-stance-movement-to]');
+    const stanceMovementCause = stanceMovement?.querySelector('[data-stance-movement-cause]');
+    const uncommitted = stanceFronts?.querySelector('[data-stance-uncommitted="explicit-none"]');
+    if (stanceFronts && currentFront && vacatedFront && stanceMovement && stanceMovementCause && uncommitted) {
+      sawStanceMovement = true;
+      markComplete(STANCE_FRONTS_ATTR);
+    }
 
     const resolutionLedger = conflict?.querySelector('[data-conflict-resolution-ledger="exact-provenance"]');
     const resolvedObligation = resolutionLedger?.querySelector(
@@ -150,6 +163,7 @@
       && sawResolvedConflictObligation
       && sawOpenConflictObligation
       && sawConflictTrajectory
+      && sawStanceMovement
       && sawStrongPersuasion
       && sawHonestSyntheticBoundary
       && sawVerifiedAttendance
