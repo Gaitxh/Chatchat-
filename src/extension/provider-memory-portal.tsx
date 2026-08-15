@@ -9,6 +9,7 @@ import {
   PROVIDER_EXECUTION_AUDIT_EVENT,
   type ProviderExecutionAuditEvent,
 } from "../provider-sdk/execution-audit.js";
+import { rememberProviderPromptMemorySelection } from "../provider-sdk/prompt-memory-audit.js";
 import {
   cloneProviderTransportAudit,
   PROVIDER_TRANSPORT_AUDIT_EVENT,
@@ -22,6 +23,7 @@ const LIVE_EVENT = "chatchat:consultation-live";
 const COMPLETE_EVENT = "chatchat:consultation-complete";
 const OPEN_ARCHIVE_EVENT = "chatchat:consultation-open-archive";
 const executionHistory = new ExecutionAuditHistoryStore();
+const browserChrome = (globalThis as typeof globalThis & { chrome?: any }).chrome;
 
 interface ConsultationLiveDetail {
   participants?: CouncilParticipant[];
@@ -37,6 +39,8 @@ interface OpenArchiveDetail {
   archive: ConsultationArchive;
 }
 
+installProviderMemoryPromptObserver();
+
 function ProviderMemoryPortal() {
   const [participants, setParticipants] = useState<CouncilParticipant[]>([]);
   const [events, setEvents] = useState<CouncilEvent[]>([]);
@@ -45,12 +49,12 @@ function ProviderMemoryPortal() {
   const [archive, setArchive] = useState(false);
   const [locale, setLocale] = useState<Locale>(() => normalizeLocale(document.documentElement.lang));
   const sessionRef = useRef<string | null>(null);
+  const archiveRef = useRef(false);
 
   useEffect(() => {
     const onExecution = (event: Event) => {
       const detail = (event as CustomEvent<ProviderExecutionAuditEvent>).detail;
-      if (!detail?.sessionId) return;
-      if (archive) return;
+      if (!detail?.sessionId || archiveRef.current) return;
       if (sessionRef.current && detail.sessionId !== sessionRef.current) {
         sessionRef.current = detail.sessionId;
         setExecution([]);
@@ -62,7 +66,7 @@ function ProviderMemoryPortal() {
     };
     const onTransport = (event: Event) => {
       const detail = (event as CustomEvent<ProviderTransportAuditRecord>).detail;
-      if (!detail?.sessionId || archive) return;
+      if (!detail?.sessionId || archiveRef.current) return;
       sessionRef.current ??= detail.sessionId;
       setTransports((current) => [...current, cloneProviderTransportAudit(detail)].slice(-720));
     };
@@ -70,7 +74,8 @@ function ProviderMemoryPortal() {
       const detail = (event as CustomEvent<ConsultationLiveDetail>).detail;
       const incomingEvents = Array.isArray(detail?.events) ? detail.events : [];
       const incomingSession = incomingEvents[0]?.sessionId ?? null;
-      if (archive) {
+      if (archiveRef.current) {
+        archiveRef.current = false;
         setArchive(false);
         setExecution([]);
         setTransports([]);
@@ -85,8 +90,7 @@ function ProviderMemoryPortal() {
     };
     const onComplete = (event: Event) => {
       const detail = (event as CustomEvent<ConsultationCompletionDetail>).detail;
-      if (!detail?.report || !Array.isArray(detail.events)) return;
-      if (archive) return;
+      if (!detail?.report || !Array.isArray(detail.events) || archiveRef.current) return;
       sessionRef.current = detail.report.sessionId;
       setParticipants(detail.report.positions.map((position) => ({ ...position.participant })));
       setEvents(detail.events.map(cloneEvent));
@@ -95,17 +99,18 @@ function ProviderMemoryPortal() {
       const item = (event as CustomEvent<OpenArchiveDetail>).detail?.archive;
       if (!item?.report || !Array.isArray(item.events)) return;
       sessionRef.current = item.sessionId;
+      archiveRef.current = true;
       setArchive(true);
       setParticipants(item.report.positions.map((position) => ({ ...position.participant })));
       setEvents(item.events.map(cloneEvent));
       setExecution([]);
       setTransports([]);
       void executionHistory.load(item.sessionId).then((saved) => {
-        if (sessionRef.current !== item.sessionId) return;
+        if (sessionRef.current !== item.sessionId || !archiveRef.current) return;
         setExecution(saved?.execution.map(cloneProviderExecutionAudit) ?? []);
         setTransports(saved?.transports.map(cloneProviderTransportAudit) ?? []);
       }).catch(() => {
-        if (sessionRef.current !== item.sessionId) return;
+        if (sessionRef.current !== item.sessionId || !archiveRef.current) return;
         setExecution([]);
         setTransports([]);
       });
@@ -123,7 +128,7 @@ function ProviderMemoryPortal() {
       window.removeEventListener(COMPLETE_EVENT, onComplete);
       window.removeEventListener(OPEN_ARCHIVE_EVENT, onArchive);
     };
-  }, [archive]);
+  }, []);
 
   useEffect(() => {
     const observer = new MutationObserver(() => setLocale(normalizeLocale(document.documentElement.lang)));
@@ -145,6 +150,33 @@ function ProviderMemoryPortal() {
       onFocusEvent={focusConsultationEvent}
     />
   );
+}
+
+/**
+ * Loaded after execution-provenance.tsx and before consultation-panel.tsx.
+ * This makes the memory observer the outer wrapper: it records exact metadata
+ * from the RUN_SPEECH string first, then delegates to the existing transport
+ * observer, whose receipt is enriched from that same prompt metadata.
+ */
+function installProviderMemoryPromptObserver(): void {
+  const tabs = browserChrome?.tabs;
+  if (!tabs || typeof tabs.sendMessage !== "function") return;
+  const existing = tabs.sendMessage as typeof tabs.sendMessage & { __chatchatProviderMemoryPromptAudit?: boolean };
+  if (existing.__chatchatProviderMemoryPromptAudit) return;
+  const original = tabs.sendMessage.bind(tabs);
+  const wrapped = (async (tabId: number, payload: any, ...rest: any[]) => {
+    if (payload?.__chatchat && payload.type === "RUN_SPEECH" && typeof payload.prompt === "string") {
+      rememberProviderPromptMemorySelection(String(payload.prompt));
+    }
+    return original(tabId, payload, ...rest);
+  }) as typeof existing;
+  wrapped.__chatchatProviderMemoryPromptAudit = true;
+  try {
+    tabs.sendMessage = wrapped;
+  } catch {
+    // Keep consultation functional if a browser ever exposes a non-writable
+    // API surface; execution audit still retains deterministic selector data.
+  }
 }
 
 function cloneEvent(event: CouncilEvent): CouncilEvent {
