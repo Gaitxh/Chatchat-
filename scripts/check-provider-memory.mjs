@@ -68,6 +68,7 @@ for (const claim of [
 }
 for (const claim of [
   "providerPromptMemorySelectionFor",
+  "promptMemoryObserved",
   "pinnedIssueSourceEventIds",
   "promptSelection.snapshotEventIds",
   "cloneProviderTransportAudit",
@@ -79,7 +80,10 @@ for (const claim of [
   "deriveProviderMemoryCoverage",
   'ProviderMemorySelectionEvidence = "actual_prompt" | "selector_audit"',
   'selectionEvidence: ProviderMemorySelectionEvidence',
+  "selectorMatchesActualPrompt",
   "actualPromptTurnCount",
+  "selectorMismatchTurnCount",
+  "allPromptSelectorConsistent",
   "snapshotsConsistent",
   "ordinaryRecentEventIds",
   "omittedEventIds",
@@ -95,12 +99,16 @@ for (const forbidden of ["semanticSimilarity", "cosineSimilarity", "embeddingVec
 for (const claim of [
   'data-provider-memory-coverage="audited"',
   "data-provider-memory-actual-prompt-turns",
+  "data-provider-memory-selector-mismatches",
+  "data-provider-memory-selector-consistent",
   "data-provider-memory-pinned-rounds",
   "data-provider-memory-consistent",
+  "data-provider-memory-selector-mismatch-seats",
   "data-provider-memory-pinned-source",
   "data-provider-memory-resolver-event",
   "data-provider-memory-omitted-count",
   "ACTUAL PROMPT",
+  "selector = Prompt",
   "记忆优先级，不代表权威或真理",
 ]) {
   assert(ui.includes(claim), `Provider Memory Coverage UI is missing: ${claim}`);
@@ -148,7 +156,10 @@ for (const claim of [
   "chatchatProviderMemoryShowcase",
   'data-provider-memory-round="3"',
   'data-provider-memory-round="4"',
+  "data-provider-memory-selector-consistent",
+  "data-provider-memory-selector-mismatches",
   "data-provider-memory-actual-prompt-seats",
+  "data-provider-memory-selector-mismatch-seats",
   "data-provider-memory-pinned-source",
   "data-provider-memory-resolver-event",
   "sameSourceStillPinned",
@@ -165,7 +176,7 @@ for (const claim of [
   assert(workflow.includes(claim), `Provider Memory workflow is missing: ${claim}`);
 }
 
-console.log("✓ Provider Memory Coverage proves bounded public memory from actual Prompt metadata, pin-until-resolved lifecycle and archive fallback");
+console.log("✓ Provider Memory Coverage proves peer memory fairness, selector-to-actual-Prompt agreement, pin-until-resolved lifecycle and archive fallback");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`Provider Memory check failed: ${message}`);
