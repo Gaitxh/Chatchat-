@@ -41,7 +41,7 @@ export function parseProviderPromptMemorySelection(prompt: string): ProviderProm
 export function rememberProviderPromptMemorySelection(prompt: string): ProviderPromptMemorySelection | null {
   const selection = parseProviderPromptMemorySelection(prompt);
   if (!selection) return null;
-  selections.set(selectionKey(selection), cloneSelection(selection));
+  selections.set(selectionKey(selection), cloneProviderPromptMemorySelection(selection));
   trimSelections();
   return selection;
 }
@@ -50,7 +50,7 @@ export function providerPromptMemorySelectionFor(
   value: Pick<ProviderPromptMemorySelection, "sessionId" | "actorId" | "phase" | "round" | "repairAttempt">,
 ): ProviderPromptMemorySelection | null {
   const found = selections.get(selectionKey(value));
-  return found ? cloneSelection(found) : null;
+  return found ? cloneProviderPromptMemorySelection(found) : null;
 }
 
 export function cloneProviderPromptMemorySelection(selection: ProviderPromptMemorySelection): ProviderPromptMemorySelection {
