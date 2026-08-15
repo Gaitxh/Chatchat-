@@ -1,6 +1,6 @@
 import type { CouncilEvent, CouncilParticipant } from "../src/core/types.js";
 import { deriveOpenMeetingIssues } from "../src/consultation/open-issues.js";
-import { eventReferences } from "../src/consultation/structured-response.js";
+import { directPeerRequestTarget, eventReferences } from "../src/consultation/structured-response.js";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Assertion failed: ${message}`);
@@ -25,6 +25,8 @@ const events: CouncilEvent[] = [
   event({ id: "e-waiting", round: 3, actorId: "c", kind: "evidence", claim: "Unanswered evidence", content: "No one has reacted yet.", source: "https://example.com/unanswered", confidence: 0.7 }),
   event({ id: "e-used", round: 3, actorId: "a", kind: "evidence", claim: "Influential evidence", content: "This evidence later receives explicit support.", source: "https://example.com/influential", confidence: 0.95 }),
   event({ id: "support-e-used", round: 3, actorId: "b", kind: "support", targetEventId: "e-used", content: "I support this evidence." }),
+  event({ id: "self-evidence", round: 3, actorId: "a", kind: "evidence", targetEventId: "arg-a", claim: "Evidence attached to my own claim", content: "This is room material, not a request for myself to answer myself.", confidence: 0.8 }),
+  event({ id: "support-self-evidence", round: 3, actorId: "b", kind: "support", targetEventId: "self-evidence", content: "A peer explicitly responds to the self-attached evidence." }),
   event({ id: "uncertain-open", round: 3, actorId: "a", kind: "uncertain", content: "One implementation risk remains.", confidence: 0.3 }),
   event({ id: "uncertain-resolved", round: 3, actorId: "c", kind: "uncertain", content: "I am unsure about the permission boundary.", confidence: 0.2 }),
   event({ id: "final-c", round: 4, actorId: "c", kind: "final_position", stance: "A", content: "Later evidence resolved my uncertainty.", confidence: 0.8, caveats: [] }),
@@ -38,6 +40,7 @@ assert(ids.has("challenge-open"), "Unanswered challenge must stay open.");
 assert(!ids.has("challenge-resolved"), "Challenge causing the targeted participant's later revision must close.");
 assert(ids.has("e-waiting"), "Evidence with no explicit response must remain awaiting response.");
 assert(!ids.has("e-used"), "Untargeted evidence explicitly supported later must close its awaiting-response issue.");
+assert(!ids.has("self-evidence"), "Evidence attached to the actor's own prior claim must not create self-response debt when a peer explicitly responds.");
 assert(ids.has("uncertain-open"), "Unresolved explicit uncertainty must remain visible.");
 assert(!ids.has("uncertain-resolved"), "Later confident non-uncertain final position by the same actor must close uncertainty.");
 const openQuestion = issues.find((issue) => issue.sourceEventId === "q-open");
@@ -47,6 +50,8 @@ assert(openChallenge?.actorName === "Claude", "Issue derivation must retain part
 assert(openChallenge?.relatedEventIds.includes("arg-a"), "Open challenge must retain targeted event provenance.");
 assert(eventReferences(events.find((item) => item.id === "revision-b")!).includes("challenge-resolved"), "Revision references must expose causedBy ids.");
 assert(eventReferences(events.find((item) => item.id === "e-answer")!).includes("q-answered"), "Evidence references must expose target ids.");
+const eventById = new Map(events.map((item) => [item.id, item] as const));
+assert(directPeerRequestTarget(events.find((item) => item.id === "self-evidence")!, eventById) === null, "Self-targeted evidence must not become a direct peer request to the same actor.");
 
 console.log("✓ ChatChat open meeting issue derivation tests passed");
 

@@ -11,18 +11,21 @@ export interface DirectPeerRequestTarget {
 /**
  * Resolve who is actually being asked to respond. Questions name an actor
  * directly; targeted challenges/evidence inherit the actor who authored the
- * referenced event. Untargeted events intentionally return null.
+ * referenced event. A participant cannot owe a *peer* response to itself, so a
+ * self-targeted event is treated as non-direct room material rather than a
+ * direct peer obligation.
  */
 export function directPeerRequestTarget(
   event: CouncilEvent,
   eventById: ReadonlyMap<string, CouncilEvent>,
 ): DirectPeerRequestTarget | null {
   if (event.kind === "question" && event.targetActorId) {
+    if (event.targetActorId === event.actorId) return null;
     return { kind: "question", actorId: event.targetActorId };
   }
   if ((event.kind === "challenge" || event.kind === "evidence") && event.targetEventId) {
     const targetEvent = eventById.get(event.targetEventId);
-    if (!targetEvent) return null;
+    if (!targetEvent || targetEvent.actorId === event.actorId) return null;
     return { kind: event.kind, actorId: targetEvent.actorId, targetEventId: targetEvent.id };
   }
   return null;

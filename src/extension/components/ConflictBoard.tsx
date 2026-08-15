@@ -6,6 +6,7 @@ import {
   type ConflictThread,
   type ConflictThreadStatus,
 } from "../../theater/conflict-board.js";
+import { ConflictResolutionLedgerPanel } from "./ConflictResolutionLedger.js";
 import "./conflict-board.css";
 
 interface ConflictBoardProps {
@@ -78,6 +79,14 @@ export function ConflictBoard({
       {archive ? (
         <div className="conflict-board__archive-note">↺ {zh ? "历史回放：只读取冻结事件图，不调用 Provider。" : "Archive replay: frozen event graph only; no Provider calls."}</div>
       ) : null}
+
+      <ConflictResolutionLedgerPanel
+        participants={participants}
+        events={events}
+        locale={locale}
+        compact={compact}
+        onFocusEvent={onFocusEvent}
+      />
 
       {visible.length ? (
         <div className="conflict-thread-list">
