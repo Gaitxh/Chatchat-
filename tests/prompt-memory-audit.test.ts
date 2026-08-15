@@ -53,10 +53,11 @@ recordProviderTransportAudit({
   elapsedMs: 120,
 });
 const receipt = providerTransportAuditSnapshot("memory-prompt-session")[0];
-assert(receipt?.snapshotEventIds.join(",") === "latest-1,old-risk,recent-2", "Transport receipt must be enriched from actual Prompt snapshot metadata.");
-assert(receipt?.pinnedOpenIssueEventIds?.[0] === "old-risk", "Transport receipt must freeze actual Prompt pinned events.");
-assert(receipt?.pinnedIssueSourceEventIds?.[0] === "old-risk", "Transport receipt must freeze the actual pin-reason source event.");
-assert(receipt?.latestRoundEventIds?.[0] === "latest-1", "Transport receipt must freeze actual Prompt latest-round protection.");
+assert(receipt?.promptMemoryObserved === true, "Transport receipt must state that memory categories were observed in the actual RUN_SPEECH Prompt.");
+assert(receipt.snapshotEventIds.join(",") === "latest-1,old-risk,recent-2", "Transport receipt must be enriched from actual Prompt snapshot metadata.");
+assert(receipt.pinnedOpenIssueEventIds?.[0] === "old-risk", "Transport receipt must freeze actual Prompt pinned events.");
+assert(receipt.pinnedIssueSourceEventIds?.[0] === "old-risk", "Transport receipt must freeze the actual pin-reason source event.");
+assert(receipt.latestRoundEventIds?.[0] === "latest-1", "Transport receipt must freeze actual Prompt latest-round protection.");
 
 const repairPrompt = `${prompt}\nREPAIR ATTEMPT:\nReturn corrected JSON.`;
 const repair = rememberProviderPromptMemorySelection(repairPrompt);
@@ -77,6 +78,7 @@ recordProviderTransportAudit({
   elapsedMs: 90,
 });
 const repairReceipt = providerTransportAuditSnapshot("memory-prompt-session").find((item) => item.repairAttempt);
-assert(repairReceipt?.pinnedIssueSourceEventIds?.[0] === "old-risk", "Repair transport receipt must preserve the same actual memory deck provenance.");
+assert(repairReceipt?.promptMemoryObserved === true, "Repair receipt must retain actual Prompt observation status.");
+assert(repairReceipt.pinnedIssueSourceEventIds?.[0] === "old-risk", "Repair transport receipt must preserve the same actual memory deck provenance.");
 
 console.log("✓ actual RUN_SPEECH Prompt memory metadata enriches durable transport receipts");
