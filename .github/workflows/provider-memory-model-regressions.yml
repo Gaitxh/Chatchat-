@@ -1,0 +1,36 @@
+name: Provider Memory Model Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: chatchat-provider-memory-models-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  memory-models:
+    name: Hard-cap gaps · memory integrity semantics
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci
+
+      - name: Compile core and deterministic memory models
+        run: npm run build:core
+
+      - name: Test hard-cap memory coverage gaps
+        run: node dist/tests/provider-memory-gaps.test.js
+
+      - name: Test memory protocol integrity states
+        run: node dist/tests/meeting-memory-integrity.test.js
