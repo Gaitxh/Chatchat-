@@ -28,6 +28,57 @@ export interface OpenMeetingIssue extends OpenMeetingIssueProvenance {
 }
 
 /**
+ * Canonical structural closure detector shared by Open Issues, Provider context
+ * selection and the Conflict Resolution Ledger. Returning an event here is the
+ * one mechanical definition of "this public obligation was explicitly closed".
+ */
+export function findMeetingIssueResolver(
+  events: readonly CouncilEvent[],
+  source: CouncilEvent,
+  eventById: ReadonlyMap<string, CouncilEvent> = new Map(events.map((event) => [event.id, event] as const)),
+): CouncilEvent | undefined {
+  const target = source.kind === "uncertain" ? undefined : directPeerRequestTarget(source, eventById);
+  const sourceIndex = events.findIndex((event) => event.id === source.id);
+  if (sourceIndex < 0) return undefined;
+
+  for (const candidate of events.slice(sourceIndex + 1)) {
+    if (source.kind === "question") {
+      if (!explicitlyAnswersRequest(candidate, source.id)) continue;
+      if (target ? candidate.actorId === target.actorId : candidate.actorId !== source.actorId) return candidate;
+      continue;
+    }
+
+    if (source.kind === "challenge") {
+      if (target && candidate.actorId === target.actorId && explicitlyAnswersRequest(candidate, source.id)) return candidate;
+      continue;
+    }
+
+    if (source.kind === "evidence") {
+      if (target) {
+        if (candidate.actorId === target.actorId && explicitlyAnswersRequest(candidate, source.id)) return candidate;
+      } else if (candidate.actorId !== source.actorId && eventReferences(candidate).includes(source.id)) {
+        return candidate;
+      }
+      continue;
+    }
+
+    if (source.kind === "uncertain" && candidate.actorId === source.actorId) {
+      if (
+        candidate.kind === "revision"
+        && candidate.confidence > source.confidence
+        && (candidate.causedBy ?? []).some((eventId) => eventId !== source.id)
+      ) return candidate;
+      if (
+        candidate.kind === "final_position"
+        && candidate.confidence > source.confidence
+        && normalize(candidate.stance) !== "uncertain"
+      ) return candidate;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Pure structural issue detection shared by UI and Provider context selection.
  * It carries ids/actors/rounds only and never needs participant names or a
  * summarizing model, so there is one canonical definition of "still open".
@@ -41,48 +92,23 @@ export function deriveOpenMeetingIssueProvenance(
   for (const event of events) {
     if (event.kind === "question") {
       const target = directPeerRequestTarget(event, eventById);
-      const answered = laterEvents(events, event).some((candidate) => {
-        if (!explicitlyAnswersRequest(candidate, event.id)) return false;
-        return target ? candidate.actorId === target.actorId : candidate.actorId !== event.actorId;
-      });
-      if (!answered) {
-        result.push(provenance(
-          "open_question",
-          event,
-          [],
-          target?.actorId,
-        ));
+      if (!findMeetingIssueResolver(events, event, eventById)) {
+        result.push(provenance("open_question", event, [], target?.actorId));
       }
       continue;
     }
 
     if (event.kind === "challenge") {
       const target = directPeerRequestTarget(event, eventById);
-      const answered = laterEvents(events, event).some((candidate) =>
-        Boolean(target)
-        && candidate.actorId === target!.actorId
-        && explicitlyAnswersRequest(candidate, event.id),
-      );
-      if (!answered) {
-        result.push(provenance(
-          "challenged_claim",
-          event,
-          [event.targetEventId],
-          target?.actorId,
-        ));
+      if (!findMeetingIssueResolver(events, event, eventById)) {
+        result.push(provenance("challenged_claim", event, [event.targetEventId], target?.actorId));
       }
       continue;
     }
 
     if (event.kind === "evidence") {
       const target = directPeerRequestTarget(event, eventById);
-      const answered = laterEvents(events, event).some((candidate) => {
-        if (target) {
-          return candidate.actorId === target.actorId && explicitlyAnswersRequest(candidate, event.id);
-        }
-        return candidate.actorId !== event.actorId && eventReferences(candidate).includes(event.id);
-      });
-      if (!answered) {
+      if (!findMeetingIssueResolver(events, event, eventById)) {
         result.push(provenance(
           "evidence_awaiting_response",
           event,
@@ -93,19 +119,8 @@ export function deriveOpenMeetingIssueProvenance(
       continue;
     }
 
-    if (event.kind === "uncertain") {
-      const resolved = laterEvents(events, event).some((candidate) => {
-        if (candidate.actorId !== event.actorId) return false;
-        if (candidate.kind === "revision") {
-          return candidate.confidence > event.confidence
-            && (candidate.causedBy ?? []).some((eventId) => eventId !== event.id);
-        }
-        if (candidate.kind === "final_position") {
-          return candidate.confidence > event.confidence && normalize(candidate.stance) !== "uncertain";
-        }
-        return false;
-      });
-      if (!resolved) result.push(provenance("explicit_uncertainty", event, []));
+    if (event.kind === "uncertain" && !findMeetingIssueResolver(events, event, eventById)) {
+      result.push(provenance("explicit_uncertainty", event, []));
     }
   }
 
@@ -177,11 +192,6 @@ function issueContent(
 
 function actor(names: ReadonlyMap<string, string>, actorId: string): string {
   return names.get(actorId) ?? actorId;
-}
-
-function laterEvents(events: readonly CouncilEvent[], source: CouncilEvent): CouncilEvent[] {
-  const index = events.findIndex((event) => event.id === source.id);
-  return index < 0 ? [] : events.slice(index + 1);
 }
 
 function issueRank(kind: OpenMeetingIssueKind): number {
