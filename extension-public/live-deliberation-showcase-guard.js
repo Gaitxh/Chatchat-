@@ -11,6 +11,7 @@
   const EXECUTION_BOUNDARY_ATTR = "data-chatchat-execution-boundary-showcase";
   const ATTENDANCE_ATTR = "data-chatchat-provider-attendance-showcase";
   const CONFLICT_ATTR = "data-chatchat-conflict-board-showcase";
+  const CONFLICT_RESOLUTION_ATTR = "data-chatchat-conflict-resolution-showcase";
   let sawFreshSignalAgenda = false;
   let sawOpenIssue = false;
   let sawStrongPersuasion = false;
@@ -18,6 +19,9 @@
   let sawVerifiedAttendance = false;
   let sawConflictChange = false;
   let sawOpenConflict = false;
+  let sawResolvedConflictObligation = false;
+  let sawOpenConflictObligation = false;
+  let sawConflictTrajectory = false;
 
   function markComplete(attribute) {
     if (document.documentElement.getAttribute(attribute) === "complete") return;
@@ -59,6 +63,21 @@
       sawOpenConflict = true;
     }
     if (sawConflictChange && sawOpenConflict) markComplete(CONFLICT_ATTR);
+
+    const resolutionLedger = conflict?.querySelector('[data-conflict-resolution-ledger="exact-provenance"]');
+    const resolvedObligation = resolutionLedger?.querySelector(
+      '[data-conflict-obligation-state="resolved"][data-conflict-resolved-by-event]',
+    );
+    const openObligation = resolutionLedger?.querySelector('[data-conflict-obligation-state="open"]');
+    const trajectoryRound = resolutionLedger?.querySelector(
+      '[data-conflict-trajectory-round][data-conflict-trajectory-open-at-end]',
+    );
+    if (resolvedObligation) sawResolvedConflictObligation = true;
+    if (openObligation) sawOpenConflictObligation = true;
+    if (trajectoryRound) sawConflictTrajectory = true;
+    if (sawResolvedConflictObligation && sawOpenConflictObligation && sawConflictTrajectory) {
+      markComplete(CONFLICT_RESOLUTION_ATTR);
+    }
 
     const persuasion = document.querySelector(
       '[data-persuasion-strength="strong"][data-persuasion-cause-event][data-persuasion-action-event]',
@@ -128,6 +147,9 @@
       && secretariatComplete
       && sawConflictChange
       && sawOpenConflict
+      && sawResolvedConflictObligation
+      && sawOpenConflictObligation
+      && sawConflictTrajectory
       && sawStrongPersuasion
       && sawHonestSyntheticBoundary
       && sawVerifiedAttendance
