@@ -12,6 +12,7 @@ for (const [label, html] of [["Chinese Final Position Floor", zh], ["English Fin
     'data-final-position-alignment-match="true"',
     'data-final-position-group-leading="true"',
     'data-final-position-group-leading="false"',
+    'data-final-seat-source="provider_final"',
     'data-final-seat-execution="verified"',
     'data-final-seat-changed="true"',
     'data-final-seat-lineage="explicit-revision"',
@@ -26,6 +27,7 @@ requireAll("Chinese Final Position Floor", zh, [
   "报告中的领先组 · 描述性",
   "保留的其他最终立场",
   "明确 revision 票据",
+  "这是 verified / repaired Provider Final",
   "没有对应 revision 事件",
   "因此不推断原因",
   "DEMO · SYNTHETIC",
@@ -35,6 +37,7 @@ requireAll("English Final Position Floor", en, [
   "REPORT LEADING GROUP · DESCRIPTIVE",
   "OTHER SURVIVING FINAL STANCE",
   "EXPLICIT REVISION RECEIPTS",
+  "verified/repaired Provider Final",
   "no matching revision event",
   "no cause is inferred",
   "DEMO · SYNTHETIC",
@@ -42,8 +45,10 @@ requireAll("English Final Position Floor", en, [
 
 assert(!zh.includes("明确修正轨迹"), "Chinese focused evidence still uses the misleading old all-the-way-to-final lineage label.");
 assert(!en.includes("EXPLICIT REVISION LINEAGE"), "English focused evidence still uses the misleading old all-the-way-to-final lineage label.");
+assert(!zh.includes("每个席位最后自己提交了什么？"), "Chinese Final Floor must not describe fallback report positions as participant-authored Finals.");
+assert(!en.includes("What did every seat actually submit at the end?"), "English Final Floor must not describe fallback report positions as Provider-authored Finals.");
 
-console.log("✓ focused Final Position Floor proof separates explicit revision receipts from unexplained final shifts");
+console.log("✓ focused Final Position Floor proof separates verified Provider Finals, explicit revision receipts, and unexplained Final shifts");
 
 function read(name) {
   const path = `${dir}/${name}`;
