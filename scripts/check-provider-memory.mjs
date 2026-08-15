@@ -145,7 +145,7 @@ for (const claim of [
   assert(fixture.includes(claim), `bounded-memory showcase fixture is missing: ${claim}`);
 }
 for (const claim of [
-  'data-chatchat-provider-memory-showcase',
+  "chatchatProviderMemoryShowcase",
   'data-provider-memory-round="3"',
   'data-provider-memory-round="4"',
   "data-provider-memory-actual-prompt-seats",
