@@ -56,24 +56,15 @@ jobs:
       - name: Capture Chinese Provider memory lifecycle
         run: |
           URL='http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=zh&memory-proof=coverage'
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --hide-scrollbars \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=22000 \
-            --window-size=1440,3200 \
-            --screenshot=artifacts/chatchat-provider-memory-zh.png \
-            "$URL"
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=22000 \
-            --dump-dom \
-            "$URL" > artifacts/chatchat-provider-memory-zh.html
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url "$URL" \
+            --marker 'data-chatchat-provider-memory-showcase=complete' \
+            --width 1440 \
+            --height 3200 \
+            --timeout-ms 30000 \
+            --screenshot artifacts/chatchat-provider-memory-zh.png \
+            --dom artifacts/chatchat-provider-memory-zh.html
           test -s artifacts/chatchat-provider-memory-zh.png
           grep -q 'data-chatchat-provider-memory-showcase="complete"' artifacts/chatchat-provider-memory-zh.html
           grep -q 'data-provider-memory-coverage="audited"' artifacts/chatchat-provider-memory-zh.html
@@ -90,24 +81,15 @@ jobs:
       - name: Capture English Provider memory lifecycle
         run: |
           URL='http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=en&memory-proof=coverage'
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --hide-scrollbars \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=22000 \
-            --window-size=1440,3200 \
-            --screenshot=artifacts/chatchat-provider-memory-en.png \
-            "$URL"
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=22000 \
-            --dump-dom \
-            "$URL" > artifacts/chatchat-provider-memory-en.html
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url "$URL" \
+            --marker 'data-chatchat-provider-memory-showcase=complete' \
+            --width 1440 \
+            --height 3200 \
+            --timeout-ms 30000 \
+            --screenshot artifacts/chatchat-provider-memory-en.png \
+            --dom artifacts/chatchat-provider-memory-en.html
           test -s artifacts/chatchat-provider-memory-en.png
           grep -q 'data-chatchat-provider-memory-showcase="complete"' artifacts/chatchat-provider-memory-en.html
           grep -q 'data-provider-memory-coverage="audited"' artifacts/chatchat-provider-memory-en.html
