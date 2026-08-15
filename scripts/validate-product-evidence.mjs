@@ -29,6 +29,14 @@ for (const [label, html] of [["Chinese Side Panel", pages.sideZh], ["English Sid
     'data-chatchat-conflict-board-showcase="complete"',
     'data-chatchat-conflict-resolution-showcase="complete"',
     'data-chatchat-stance-fronts-showcase="complete"',
+    'data-chatchat-final-position-floor-showcase="complete"',
+    'data-final-position-floor="explicit-final-submissions"',
+    'data-final-position-alignment-match="true"',
+    'data-final-position-group-leading="true"',
+    'data-final-position-group-leading="false"',
+    'data-final-seat-changed="true"',
+    'data-final-seat-lineage="explicit-revision"',
+    'data-final-seat-execution="verified"',
     'data-stance-front-state="current"',
     'data-stance-front-state="vacated"',
     'data-stance-movement-event=',
@@ -37,10 +45,10 @@ for (const [label, html] of [["Chinese Side Panel", pages.sideZh], ["English Sid
   ]);
 }
 requireAll("Chinese Side Panel", pages.sideZh, [
-  "用户发起提案", "平等 AI 参与者", "没有议长", "协商结果", "协商剧场", "明确发生的立场修正", "明示立场战线", "Claude", "Web + Extension", "Browser Extension",
+  "用户发起提案", "平等 AI 参与者", "没有议长", "协商结果", "协商剧场", "明确发生的立场修正", "明示立场战线", "会议最终席位图", "Claude", "Web + Extension", "Browser Extension",
 ]);
 requireAll("English Side Panel", pages.sideEn, [
-  "Propose once", "Equal AI participants", "CONSULTATION OUTCOME", "CONSULTATION THEATER", "Explicit revisions", "Who changed what", "EXPLICIT STANCE FRONTS", "Claude", "Web + Extension", "Browser Extension",
+  "Propose once", "Equal AI participants", "CONSULTATION OUTCOME", "CONSULTATION THEATER", "Explicit revisions", "Who changed what", "EXPLICIT STANCE FRONTS", "FINAL POSITION FLOOR", "Claude", "Web + Extension", "Browser Extension",
 ]);
 assert(/no chair/i.test(pages.sideEn), "English Side Panel must preserve no-chair language.");
 assert(/no delegation/i.test(pages.sideEn), "English Side Panel must explicitly reject delegation hierarchy.");
@@ -61,16 +69,18 @@ for (const [label, html] of [["Chinese Full Room", pages.roomZh], ["English Full
     'data-chatchat-conflict-board-showcase="complete"',
     'data-chatchat-conflict-resolution-showcase="complete"',
     'data-chatchat-stance-fronts-showcase="complete"',
-    'data-stance-front-state="current"',
-    'data-stance-front-state="vacated"',
-    'data-stance-movement-event=',
-    'data-stance-uncommitted="explicit-none"',
+    'data-chatchat-final-position-floor-showcase="complete"',
+    'data-final-position-floor="explicit-final-submissions"',
+    'data-final-position-alignment-match="true"',
+    'data-final-position-group-leading="true"',
+    'data-final-position-group-leading="false"',
+    'data-final-seat-lineage="explicit-revision"',
     'data-meeting-integrity-state="verified"',
     'data-history-execution-audit="loaded"',
   ]);
 }
-requireAll("Chinese Full Room", pages.roomZh, ["协商记录", "history-entry", "INDEXEDDB · LOCAL", "协商剧场", "AI 关系战场", "明示立场战线", "LOCAL · EXECUTION RECEIPT"]);
-requireAll("English Full Room", pages.roomEn, ["CONSULTATION HISTORY", "history-entry", "INDEXEDDB · LOCAL", "CONSULTATION THEATER", "RELATIONSHIP MAP", "EXPLICIT STANCE FRONTS", "LOCAL · EXECUTION RECEIPT"]);
+requireAll("Chinese Full Room", pages.roomZh, ["协商记录", "history-entry", "INDEXEDDB · LOCAL", "协商剧场", "AI 关系战场", "明示立场战线", "会议最终席位图", "LOCAL · EXECUTION RECEIPT"]);
+requireAll("English Full Room", pages.roomEn, ["CONSULTATION HISTORY", "history-entry", "INDEXEDDB · LOCAL", "CONSULTATION THEATER", "RELATIONSHIP MAP", "EXPLICIT STANCE FRONTS", "FINAL POSITION FLOOR", "LOCAL · EXECUTION RECEIPT"]);
 
 requireAll("Chinese live meeting frame", pages.liveZh, [
   'data-chatchat-live-proof-showcase="complete"',
@@ -105,7 +115,7 @@ assert(!manifest.includes("AI Council"), "Manifest must not regress to AI Counci
 assert(!manifest.includes("Parliament"), "Manifest must not regress to Parliament product language.");
 assert(fs.existsSync("dist-extension/app/app.html"), "Full Room build output is missing.");
 
-console.log("✓ bilingual Chromium DOM evidence preserves consultation, conflict, stance-front, execution-integrity and history contracts");
+console.log("✓ bilingual Chromium DOM evidence preserves consultation, conflict, stance-front, final-position, execution-integrity and history contracts");
 
 function read(name) {
   const path = `${artifactDir}/${name}`;
