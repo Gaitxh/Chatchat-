@@ -9,6 +9,8 @@ const formatter = fs.readFileSync("src/core/format.ts", "utf8");
 const browserGuard = fs.readFileSync("extension-public/live-deliberation-showcase-guard.js", "utf8");
 const liveFrameProof = fs.readFileSync("extension-public/live-meeting-frame-showcase.js", "utf8");
 const ciWorkflow = fs.readFileSync(".github/workflows/ci.yml", "utf8");
+const chromiumCapture = fs.readFileSync("scripts/capture-chromium-proof.mjs", "utf8");
+const pngContentCheck = fs.readFileSync("scripts/check-png-content.mjs", "utf8");
 
 const productionFiles = [
   "src/extension/components/LiveAgenda.tsx",
@@ -120,13 +122,22 @@ for (const proof of [
 ]) {
   assert(liveFrameProof.includes(proof), `Live-frame Chromium demo proof is missing: ${proof}`);
 }
+
 for (const artifact of [
   "chatchat-live-meeting-zh.png",
   "chatchat-live-meeting-en.png",
-  "Capture bilingual live meeting frame evidence",
-  'data-chatchat-live-proof-showcase="complete"',
+  "Capture bilingual live persuasion frame from the proved DOM",
+  "scripts/capture-chromium-proof.mjs",
+  "scripts/check-png-content.mjs",
+  "Reject blank or visually empty screenshots",
 ]) {
-  assert(ciWorkflow.includes(artifact), `CI no longer captures the Chromium live meeting demo artifact: ${artifact}`);
+  assert(ciWorkflow.includes(artifact), `CI no longer captures content-validated Chromium live meeting evidence: ${artifact}`);
+}
+for (const proof of ["Page.captureScreenshot", "requestAnimationFrame", "readySelector", "document.documentElement.outerHTML"]) {
+  assert(chromiumCapture.includes(proof), `Chromium proof capture no longer waits for and freezes the proved DOM: ${proof}`);
+}
+for (const proof of ["uniqueSampledColors", "channelRange", "lumaStdDev", "zlib.inflateSync"]) {
+  assert(pngContentCheck.includes(proof), `Chromium screenshot proof no longer rejects visually blank PNGs: ${proof}`);
 }
 
 for (const source of [readmeEn, readmeZh]) {
@@ -141,7 +152,7 @@ assert(
   "README must not present synthetic showcase speech as live third-party Provider inference.",
 );
 
-console.log("✓ README separates live Provider execution from synthetic Chromium UI/protocol evidence");
+console.log("✓ README separates live Provider execution from synthetic Chromium UI/protocol evidence and requires nonblank proved-DOM screenshots");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`README product-truth check failed: ${message}`);
