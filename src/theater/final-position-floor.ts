@@ -1,6 +1,5 @@
 import type {
   CouncilEvent,
-  CouncilParticipant,
   CouncilPosition,
   CouncilReport,
 } from "../core/types.js";
@@ -17,6 +16,11 @@ export type FinalSeatExecutionState =
   | "failed"
   | "incomplete"
   | "unknown";
+
+export type FinalSeatRecordSource =
+  | "provider_final"
+  | "fallback_placeholder"
+  | "unverified_record";
 
 export interface FinalPositionRevisionStep {
   eventId: string;
@@ -43,9 +47,14 @@ export interface FinalPositionSeat {
   latestPreFinalEventId?: string;
   revisionSteps: FinalPositionRevisionStep[];
   changedExplicitStance: boolean;
-  /** Final changed relative to the latest pre-final stance without a matching revision event. */
+  /**
+   * Only a verified/repaired Provider Final can be called an unexplained Final
+   * shift. ChatChat fallback placeholders already have a known execution cause
+   * and must never be misdescribed as the model silently changing its mind.
+   */
   unexplainedFinalShift: boolean;
   executionState: FinalSeatExecutionState;
+  recordSource: FinalSeatRecordSource;
   finalTurnState?: ProviderTurnAttendanceAudit["state"];
   verifiedTurns: number;
   totalTurns: number;
@@ -63,6 +72,7 @@ export interface FinalPositionGroup {
   isLargestGroup: boolean;
   isReportLeadingGroup: boolean;
   degradedMemberCount: number;
+  fallbackMemberCount: number;
 }
 
 export interface FinalPositionFloorModel {
@@ -78,16 +88,20 @@ export interface FinalPositionFloorModel {
   minorityActorIds: string[];
   unexplainedFinalShiftActorIds: string[];
   degradedActorIds: string[];
+  fallbackActorIds: string[];
 }
 
 /**
  * Meeting-wide final position map.
  *
- * This deliberately does NOT reuse thread-local Conflict Stance Fronts. Final
- * seat membership comes only from CouncilReport.positions (the participant's
- * own final submission). Challenge/evidence/support activity cannot move a seat
- * into a final group. Grouping follows the orchestrator's report semantics:
- * trim + case-insensitive comparison only; no embeddings or semantic merging.
+ * This deliberately does NOT reuse thread-local Conflict Stance Fronts. Seat
+ * accounting follows CouncilReport.positions exactly so the floor reproduces
+ * the outcome report. When execution is verified/repaired, that record is a
+ * completed Provider Final. A zero-confidence ChatChat fallback remains in the
+ * report accounting but is explicitly labeled fallback_placeholder and never
+ * presented as participant-authored reasoning. Challenge/evidence/support
+ * activity cannot move a seat into a final group. Grouping follows the
+ * orchestrator's trim + case-insensitive comparison only; no semantic merging.
  */
 export function deriveFinalPositionFloor(
   report: CouncilReport,
@@ -132,6 +146,7 @@ export function deriveFinalPositionFloor(
     isLargestGroup: members.length === largestGroupCount && largestGroupCount > 0,
     isReportLeadingGroup: reportLeadingKey === stanceKey,
     degradedMemberCount: members.filter((seat) => isExecutionDegraded(seat.executionState)).length,
+    fallbackMemberCount: members.filter((seat) => seat.recordSource === "fallback_placeholder").length,
   } satisfies FinalPositionGroup)).sort((a, b) =>
     Number(b.isReportLeadingGroup) - Number(a.isReportLeadingGroup)
       || b.count - a.count
@@ -143,6 +158,7 @@ export function deriveFinalPositionFloor(
     .map((seat) => seat.actorId);
   const unexplainedFinalShiftActorIds = seats.filter((seat) => seat.unexplainedFinalShift).map((seat) => seat.actorId);
   const degradedActorIds = seats.filter((seat) => isExecutionDegraded(seat.executionState)).map((seat) => seat.actorId);
+  const fallbackActorIds = seats.filter((seat) => seat.recordSource === "fallback_placeholder").map((seat) => seat.actorId);
   const ratioMatches = Math.abs(report.consensusRatio - largestGroupShare) < 1e-9;
   const leadingMatches = reportLeadingKey === null
     ? groups.length === 0
@@ -161,6 +177,7 @@ export function deriveFinalPositionFloor(
     minorityActorIds,
     unexplainedFinalShiftActorIds,
     degradedActorIds,
+    fallbackActorIds,
   };
 }
 
@@ -195,12 +212,14 @@ function buildSeat(
   const changedExplicitStance = revisionSteps.some((step) =>
     step.fromStance !== undefined && normalizeFinalStance(step.fromStance) !== normalizeFinalStance(step.toStance),
   );
-  const unexplainedFinalShift = Boolean(
+  const execution = finalExecutionState(attendance);
+  const recordSource = finalRecordSource(execution.state);
+  const stanceDiffersFromLatestPreFinal = Boolean(
     latestPreFinal
       && hasStance(latestPreFinal)
       && normalizeFinalStance(latestPreFinal.stance) !== normalizeFinalStance(position.stance),
   );
-  const execution = finalExecutionState(attendance);
+  const unexplainedFinalShift = stanceDiffersFromLatestPreFinal && recordSource === "provider_final";
 
   return {
     actorId: position.participant.id,
@@ -224,6 +243,7 @@ function buildSeat(
     changedExplicitStance,
     unexplainedFinalShift,
     executionState: execution.state,
+    recordSource,
     ...(execution.finalTurn ? { finalTurnState: execution.finalTurn.state } : {}),
     verifiedTurns: attendance?.verifiedTurns ?? 0,
     totalTurns: attendance?.turns.length ?? 0,
@@ -241,6 +261,12 @@ function finalExecutionState(
   if (finalTurn.state === "fallback") return { state: "fallback", finalTurn };
   if (finalTurn.state === "failed") return { state: "failed", finalTurn };
   return { state: "incomplete", finalTurn };
+}
+
+function finalRecordSource(state: FinalSeatExecutionState): FinalSeatRecordSource {
+  if (state === "verified" || state === "repaired") return "provider_final";
+  if (state === "fallback") return "fallback_placeholder";
+  return "unverified_record";
 }
 
 function hasStance(event: CouncilEvent): event is CouncilEvent & { stance: string; confidence: number } {
