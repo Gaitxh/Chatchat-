@@ -10,8 +10,8 @@
     const synthetic = floor.querySelector('[data-final-position-synthetic="true"]');
     const leading = floor.querySelector('[data-final-position-group-leading="true"]');
     const other = floor.querySelector('[data-final-position-group-leading="false"]');
-    const verifiedSeat = floor.querySelector('[data-final-seat-execution="verified"], [data-final-seat-execution="repaired"]');
-    const changedSeat = floor.querySelector('[data-final-seat-changed="true"]');
+    const verifiedSeat = floor.querySelector('[data-final-seat-source="provider_final"][data-final-seat-execution="verified"], [data-final-seat-source="provider_final"][data-final-seat-execution="repaired"]');
+    const changedSeat = floor.querySelector('[data-final-seat-source="provider_final"][data-final-seat-changed="true"]');
     const lineage = changedSeat?.querySelector('[data-final-seat-lineage="explicit-revision"]');
     const revision = lineage?.querySelector('[data-final-seat-revision-event]');
     const traceableFinal = floor.querySelector('[data-final-seat-event], [data-final-seat-shift-warning="unexplained"]');
