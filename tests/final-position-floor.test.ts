@@ -26,7 +26,8 @@ const events: CouncilEvent[] = [
   { ...base, id: "fg", round: 4, actorId: "gpt", kind: "final_position", stance: "Browser Extension", content: "Extension remains primary.", confidence: .80 },
   { ...base, id: "fc", round: 4, actorId: "claude", kind: "final_position", stance: "Web + Extension", content: "Hybrid final.", confidence: .88 },
   { ...base, id: "fgm", round: 4, actorId: "gemini", kind: "final_position", stance: "web + extension", content: "Hybrid final.", confidence: .90 },
-  // Final differs from latest explicit pre-final stance without a revision; floor must surface it, not invent a cause.
+  // The report records Web UI for DeepSeek. Whether that may be described as a Provider-authored Final
+  // depends on the execution receipt, not on the prose alone.
   { ...base, id: "fd", round: 4, actorId: "deepseek", kind: "final_position", stance: "Web UI", content: "I end at Web UI.", confidence: .61 },
 ];
 
@@ -68,28 +69,44 @@ const attendance: ProviderAttendanceAuditModel = {
 };
 
 const floor = deriveFinalPositionFloor(report, events, attendance);
-assert(floor.participantCount === 4 && floor.groups.length === 3, "Final floor must group only participant-authored final positions");
+assert(floor.participantCount === 4 && floor.groups.length === 3, "Final floor must reproduce report positions without inventing camps");
 const hybrid = floor.groups.find((group) => group.stanceKey === normalizeFinalStance("Web + Extension"));
 assert(hybrid?.count === 2 && hybrid.share === .5, "Case-only final stance variants should follow the orchestrator grouping contract");
 assert(hybrid.isLargestGroup && hybrid.isReportLeadingGroup, "Report leading stance should map to the descriptive largest final group");
 assert(floor.reportAlignmentMatchesGroups, "Final floor grouping should reproduce the report's descriptive alignment ratio");
 assert(floor.minorityActorIds.includes("gpt") && floor.minorityActorIds.includes("deepseek"), "Minority seats must remain explicit rather than disappearing behind the leading group");
 
-const claude = floor.seats.find((seat) => seat.actorId === "claude");
-assert(claude?.executionState === "repaired", "Final seat must preserve final-turn repair provenance");
+const claude = floor.seats.find((item) => item.actorId === "claude");
+assert(claude?.executionState === "repaired" && claude.recordSource === "provider_final", "Repaired Final should remain a verified Provider-authored record with repair provenance");
 assert(claude.changedExplicitStance, "Explicit revision across stance labels should mark the seat as changed");
 assert(claude.revisionSteps[0]?.eventId === "c2" && claude.revisionSteps[0]?.previousEventId === "c1", "Revision lineage must preserve exact event IDs");
 assert(claude.revisionSteps[0]?.causedByEventIds.includes("ev1"), "Final floor must preserve explicit revision causes");
 assert(!claude.unexplainedFinalShift, "A final stance matching the latest explicit revision must not be flagged as unexplained");
 
-const deepseek = floor.seats.find((seat) => seat.actorId === "deepseek");
+const deepseek = floor.seats.find((item) => item.actorId === "deepseek");
 assert(deepseek?.executionState === "fallback", "Fallback final turn must not masquerade as verified final participation");
-assert(deepseek.unexplainedFinalShift, "A final stance that silently differs from the latest pre-final stance must be surfaced without inventing a cause");
-assert(floor.unexplainedFinalShiftActorIds.includes("deepseek"), "Meeting-level model should expose unexplained final shifts");
+assert(deepseek.recordSource === "fallback_placeholder", "Fallback seat must be explicitly sourced as a ChatChat fallback placeholder");
+assert(!deepseek.unexplainedFinalShift, "Known fallback execution failure must not be mislabeled as the model silently changing its stance");
+assert(!floor.unexplainedFinalShiftActorIds.includes("deepseek"), "Fallback placeholder must stay out of unexplained Provider Final shifts");
+assert(floor.fallbackActorIds.includes("deepseek"), "Meeting-level model should expose fallback final seats explicitly");
 assert(floor.degradedActorIds.includes("deepseek"), "Execution-degraded final seats must be visible at meeting level");
 
-const gpt = floor.seats.find((seat) => seat.actorId === "gpt");
-assert(gpt?.executionState === "verified" && !gpt.changedExplicitStance, "Stable verified seat should remain straightforward");
+const gpt = floor.seats.find((item) => item.actorId === "gpt");
+assert(gpt?.executionState === "verified" && gpt.recordSource === "provider_final" && !gpt.changedExplicitStance, "Stable verified seat should remain straightforward");
+
+// The same report stance shift is genuinely unexplained only if the Final execution chain succeeded.
+const fullyExecutedAttendance: ProviderAttendanceAuditModel = {
+  ...attendance,
+  verifiedTurns: 16,
+  fallbackTurns: 0,
+  seats: attendance.seats.map((item) => item.actorId === "deepseek"
+    ? seat("deepseek", "DeepSeek", "deepseek", "published", 4, 4)
+    : item),
+};
+const fullyExecutedFloor = deriveFinalPositionFloor(report, events, fullyExecutedAttendance);
+const fullyExecutedDeepSeek = fullyExecutedFloor.seats.find((item) => item.actorId === "deepseek");
+assert(fullyExecutedDeepSeek?.recordSource === "provider_final" && fullyExecutedDeepSeek.unexplainedFinalShift, "A verified Provider Final that silently differs from the latest pre-final stance must be surfaced without a fictional cause");
+assert(fullyExecutedFloor.unexplainedFinalShiftActorIds.includes("deepseek"), "Meeting-level model should expose genuine unexplained Provider Final shifts");
 
 // Activity from somebody else must never move a final seat.
 const noisyEvents: CouncilEvent[] = [
@@ -98,12 +115,12 @@ const noisyEvents: CouncilEvent[] = [
   { ...base, id: "noise2", round: 3, actorId: "gpt", kind: "support", targetEventId: "c2", content: "I also support part of Claude's implementation detail." },
 ];
 const noisy = deriveFinalPositionFloor(report, noisyEvents, attendance);
-assert(noisy.seats.find((seat) => seat.actorId === "gpt")?.stance === "Browser Extension", "Challenge/support activity must never infer a different global final stance");
+assert(noisy.seats.find((item) => item.actorId === "gpt")?.stance === "Browser Extension", "Challenge/support activity must never infer a different global final stance");
 
 console.log("✓ ChatChat final-position-floor tests passed");
-console.log("✓ Meeting-wide final groups come only from final_position / CouncilReport.positions");
-console.log("✓ Final seats preserve revision and execution provenance without inferring camps from peer activity");
-console.log("✓ Silent final stance changes are surfaced as unexplained rather than assigned a fictional cause");
+console.log("✓ Meeting-wide final groups reproduce CouncilReport.positions without inferring camps from peer activity");
+console.log("✓ Verified/repaired Provider Finals, fallback placeholders and unverified records remain distinct");
+console.log("✓ Known fallback shifts are not mislabeled unexplained; successful un-ticketed Provider Final shifts are");
 
 function seat(
   actorId: string,
