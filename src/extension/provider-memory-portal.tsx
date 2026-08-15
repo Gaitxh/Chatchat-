@@ -6,12 +6,14 @@ import { ExecutionAuditHistoryStore } from "../history/execution-audit-history.j
 import { normalizeLocale, type Locale } from "../i18n/index.js";
 import {
   cloneProviderExecutionAudit,
+  providerExecutionAuditSnapshot,
   PROVIDER_EXECUTION_AUDIT_EVENT,
   type ProviderExecutionAuditEvent,
 } from "../provider-sdk/execution-audit.js";
 import { rememberProviderPromptMemorySelection } from "../provider-sdk/prompt-memory-audit.js";
 import {
   cloneProviderTransportAudit,
+  providerTransportAuditSnapshot,
   PROVIDER_TRANSPORT_AUDIT_EVENT,
   type ProviderTransportAuditRecord,
 } from "../provider-sdk/transport-audit.js";
@@ -52,6 +54,10 @@ function ProviderMemoryPortal() {
   const archiveRef = useRef(false);
 
   useEffect(() => {
+    const syncLiveAudit = (sessionId: string) => {
+      setExecution(providerExecutionAuditSnapshot(sessionId));
+      setTransports(providerTransportAuditSnapshot(sessionId));
+    };
     const onExecution = (event: Event) => {
       const detail = (event as CustomEvent<ProviderExecutionAuditEvent>).detail;
       if (!detail?.sessionId || archiveRef.current) return;
@@ -62,18 +68,18 @@ function ProviderMemoryPortal() {
       } else {
         sessionRef.current = detail.sessionId;
       }
-      setExecution((current) => [...current, cloneProviderExecutionAudit(detail)].slice(-720));
+      setExecution((current) => appendUniqueExecution(current, detail));
     };
     const onTransport = (event: Event) => {
       const detail = (event as CustomEvent<ProviderTransportAuditRecord>).detail;
       if (!detail?.sessionId || archiveRef.current) return;
       sessionRef.current ??= detail.sessionId;
-      setTransports((current) => [...current, cloneProviderTransportAudit(detail)].slice(-720));
+      setTransports((current) => appendUniqueTransport(current, detail));
     };
     const onLive = (event: Event) => {
       const detail = (event as CustomEvent<ConsultationLiveDetail>).detail;
       const incomingEvents = Array.isArray(detail?.events) ? detail.events : [];
-      const incomingSession = incomingEvents[0]?.sessionId ?? null;
+      const incomingSession = incomingEvents[0]?.sessionId ?? sessionRef.current;
       if (archiveRef.current) {
         archiveRef.current = false;
         setArchive(false);
@@ -84,7 +90,10 @@ function ProviderMemoryPortal() {
         setExecution([]);
         setTransports([]);
       }
-      if (incomingSession) sessionRef.current = incomingSession;
+      if (incomingSession) {
+        sessionRef.current = incomingSession;
+        syncLiveAudit(incomingSession);
+      }
       if (Array.isArray(detail?.participants)) setParticipants(detail.participants.map((item) => ({ ...item })));
       if (Array.isArray(detail?.events)) setEvents(detail.events.map(cloneEvent));
     };
@@ -92,6 +101,7 @@ function ProviderMemoryPortal() {
       const detail = (event as CustomEvent<ConsultationCompletionDetail>).detail;
       if (!detail?.report || !Array.isArray(detail.events) || archiveRef.current) return;
       sessionRef.current = detail.report.sessionId;
+      syncLiveAudit(detail.report.sessionId);
       setParticipants(detail.report.positions.map((position) => ({ ...position.participant })));
       setEvents(detail.events.map(cloneEvent));
     };
@@ -177,6 +187,28 @@ function installProviderMemoryPromptObserver(): void {
     // Keep consultation functional if a browser ever exposes a non-writable
     // API surface; execution audit still retains deterministic selector data.
   }
+}
+
+function appendUniqueExecution(
+  current: readonly ProviderExecutionAuditEvent[],
+  event: ProviderExecutionAuditEvent,
+): ProviderExecutionAuditEvent[] {
+  const key = `${event.sessionId}|${event.actorId}|${event.phase}|${event.round}|${event.stage}|${event.attempt ?? 0}|${event.observedAt}`;
+  if (current.some((item) => `${item.sessionId}|${item.actorId}|${item.phase}|${item.round}|${item.stage}|${item.attempt ?? 0}|${item.observedAt}` === key)) {
+    return [...current];
+  }
+  return [...current, cloneProviderExecutionAudit(event)].slice(-720);
+}
+
+function appendUniqueTransport(
+  current: readonly ProviderTransportAuditRecord[],
+  record: ProviderTransportAuditRecord,
+): ProviderTransportAuditRecord[] {
+  const key = `${record.sessionId}|${record.actorId}|${record.phase}|${record.round}|${record.state}|${record.repairAttempt ? 1 : 0}|${record.observedAt}`;
+  if (current.some((item) => `${item.sessionId}|${item.actorId}|${item.phase}|${item.round}|${item.state}|${item.repairAttempt ? 1 : 0}|${item.observedAt}` === key)) {
+    return [...current];
+  }
+  return [...current, cloneProviderTransportAudit(record)].slice(-720);
 }
 
 function cloneEvent(event: CouncilEvent): CouncilEvent {
