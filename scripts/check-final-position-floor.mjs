@@ -6,6 +6,9 @@ const portal = fs.readFileSync("src/extension/final-position-floor-portal.tsx", 
 const app = fs.readFileSync("app/app.html", "utf8");
 const sidepanel = fs.readFileSync("extension/sidepanel.html", "utf8");
 const browserGuard = fs.readFileSync("extension-public/final-position-floor-showcase-guard.js", "utf8");
+const ci = fs.readFileSync(".github/workflows/ci.yml", "utf8");
+const capture = fs.readFileSync("scripts/capture-chromium-proof.mjs", "utf8");
+const focusedValidator = fs.readFileSync("scripts/validate-final-position-evidence.mjs", "utf8");
 
 for (const claim of [
   "deriveFinalPositionFloor",
@@ -35,12 +38,18 @@ for (const claim of [
   "data-final-seat-lineage",
   "data-final-seat-revision-event",
   'data-final-seat-shift-warning="unexplained"',
+  "EXPLICIT REVISION RECEIPTS",
+  "明确 revision 票据",
+  "no matching revision event",
+  "没有对应 revision 事件",
   "Challenges, evidence, support, or somebody else's prose cannot assign a final camp",
   "质疑、证据、支持和别人替它说的话都不能把一个席位塞进某个阵营",
   "DEMO · SYNTHETIC",
 ]) {
   assert(component.includes(claim), `Final Position Floor UI is missing: ${claim}`);
 }
+assert(!component.includes("EXPLICIT REVISION LINEAGE"), "Final UI must not imply an unexplained final shift is part of the explicit revision lineage.");
+assert(!component.includes("明确修正轨迹"), "Chinese Final UI must distinguish explicit revision receipts from unexplained Final changes.");
 
 for (const claim of [
   "providerTransportAuditSnapshot",
@@ -80,7 +89,21 @@ for (const claim of [
   assert(browserGuard.includes(claim), `Chromium final-position proof is missing: ${claim}`);
 }
 
-console.log("✓ final position floor derives only from participant-authored final submissions and preserves revision/execution provenance");
+for (const claim of [
+  "Capture bilingual Final Position Floor close-up",
+  "chatchat-final-position-floor-zh.png",
+  "chatchat-final-position-floor-en.png",
+  '--focus-selector \'[data-final-position-floor="explicit-final-submissions"]\'',
+  "validate-final-position-evidence.mjs",
+]) {
+  assert(ci.includes(claim), `CI does not preserve focused Final Position Floor proof: ${claim}`);
+}
+assert(capture.includes("focusSelector") && capture.includes("scrollIntoView"), "CDP proof capture must support focused product screenshots.");
+for (const claim of ["EXPLICIT REVISION RECEIPTS", "no matching revision event", "data-final-seat-shift-warning", "data-final-position-unexplained"]) {
+  assert(focusedValidator.includes(claim), `Focused Final Position Floor validator is missing: ${claim}`);
+}
+
+console.log("✓ final position floor derives only from final submissions, preserves execution provenance, and separates explicit revision receipts from unexplained final shifts");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`Final Position Floor check failed: ${message}`);
