@@ -170,7 +170,9 @@ jobs:
             artifacts/chatchat-live-meeting-en.png
 
       - name: Validate bilingual product evidence semantics
-        run: node scripts/validate-product-evidence.mjs artifacts dist-extension/manifest.json
+        run: |
+          node scripts/validate-product-evidence.mjs artifacts dist-extension/manifest.json
+          node scripts/validate-final-position-evidence.mjs artifacts
 
       - name: Save preview log
         if: always()
