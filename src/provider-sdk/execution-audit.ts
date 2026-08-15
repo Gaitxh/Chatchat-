@@ -22,6 +22,7 @@ export interface ProviderExecutionAuditEvent {
   stage: ProviderExecutionAuditStage;
   snapshotEventIds: readonly string[];
   pinnedOpenIssueEventIds?: readonly string[];
+  pinnedIssueSourceEventIds?: readonly string[];
   latestRoundEventIds?: readonly string[];
   attempt?: 1 | 2;
   contributionKinds?: readonly CouncilEventKind[];
@@ -72,6 +73,7 @@ export function providerAuditBase(
     round: context.round,
     snapshotEventIds: selection.events.map((event) => event.id),
     ...(selection.pinnedEventIds.length ? { pinnedOpenIssueEventIds: [...selection.pinnedEventIds] } : {}),
+    ...(selection.pinnedIssueSourceEventIds.length ? { pinnedIssueSourceEventIds: [...selection.pinnedIssueSourceEventIds] } : {}),
     ...(selection.latestRoundEventIds.length ? { latestRoundEventIds: [...selection.latestRoundEventIds] } : {}),
   };
 }
@@ -81,6 +83,7 @@ export function cloneProviderExecutionAudit(event: ProviderExecutionAuditEvent):
     ...event,
     snapshotEventIds: [...event.snapshotEventIds],
     ...(event.pinnedOpenIssueEventIds ? { pinnedOpenIssueEventIds: [...event.pinnedOpenIssueEventIds] } : {}),
+    ...(event.pinnedIssueSourceEventIds ? { pinnedIssueSourceEventIds: [...event.pinnedIssueSourceEventIds] } : {}),
     ...(event.latestRoundEventIds ? { latestRoundEventIds: [...event.latestRoundEventIds] } : {}),
     ...(event.contributionKinds ? { contributionKinds: [...event.contributionKinds] } : {}),
   };
