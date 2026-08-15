@@ -7,6 +7,7 @@ import {
   type ConflictThreadStatus,
 } from "../../theater/conflict-board.js";
 import { ConflictResolutionLedgerPanel } from "./ConflictResolutionLedger.js";
+import { ConflictStanceFrontsPanel } from "./ConflictStanceFronts.js";
 import "./conflict-board.css";
 
 interface ConflictBoardProps {
@@ -94,6 +95,7 @@ export function ConflictBoard({
             <ConflictThreadCard
               key={thread.id}
               thread={thread}
+              events={events}
               index={index}
               zh={zh}
               compact={compact}
@@ -120,12 +122,14 @@ export function ConflictBoard({
 
 function ConflictThreadCard({
   thread,
+  events,
   index,
   zh,
   compact,
   onFocusEvent,
 }: {
   thread: ConflictThread;
+  events: readonly CouncilEvent[];
   index: number;
   zh: boolean;
   compact: boolean;
@@ -179,6 +183,14 @@ function ConflictThreadCard({
       </div>
 
       <ThreadMetrics thread={thread} zh={zh} />
+
+      <ConflictStanceFrontsPanel
+        thread={thread}
+        events={events}
+        zh={zh}
+        compact={compact}
+        onFocusEvent={onFocusEvent}
+      />
 
       {activity.length ? (
         <div className="conflict-thread__timeline">
