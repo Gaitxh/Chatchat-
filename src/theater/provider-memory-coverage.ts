@@ -36,6 +36,7 @@ export interface ProviderMemoryTurn {
   round: number;
   contextBudget: number;
   selectionEvidence: ProviderMemorySelectionEvidence;
+  selectorMatchesActualPrompt: boolean | null;
   availableEventIds: string[];
   snapshotEventIds: string[];
   latestRoundEventIds: string[];
@@ -57,6 +58,7 @@ export interface ProviderMemoryRound {
   attemptedSeatCount: number;
   receivedSeatCount: number;
   actualPromptSeatCount: number;
+  selectorMismatchSeatCount: number;
   snapshotsConsistent: boolean;
   selectionFingerprints: string[];
   snapshotEventIds: string[];
@@ -79,7 +81,9 @@ export interface ProviderMemoryCoverageModel {
   roundsWithPinnedMemory: number;
   pinnedIssueSourceEventIds: string[];
   actualPromptTurnCount: number;
+  selectorMismatchTurnCount: number;
   allSharedSnapshotsConsistent: boolean;
+  allPromptSelectorConsistent: boolean;
 }
 
 /**
@@ -87,8 +91,9 @@ export interface ProviderMemoryCoverageModel {
  *
  * New browser turns prefer category metadata parsed from the actual RUN_SPEECH
  * string and stored in the transport receipt. Selector audit fields are only a
- * backwards-compatible fallback for older archives or browser environments
- * where transport instrumentation could not enrich the receipt.
+ * backwards-compatible fallback for older archives. When both exist, the model
+ * also checks that deterministic selector audit and actual Prompt metadata agree
+ * instead of silently normalizing one source over the other.
  */
 export function deriveProviderMemoryCoverage(
   participants: readonly CouncilParticipant[],
@@ -107,7 +112,9 @@ export function deriveProviderMemoryCoverage(
       roundsWithPinnedMemory: 0,
       pinnedIssueSourceEventIds: [],
       actualPromptTurnCount: 0,
+      selectorMismatchTurnCount: 0,
       allSharedSnapshotsConsistent: true,
+      allPromptSelectorConsistent: true,
     };
   }
 
@@ -126,23 +133,28 @@ export function deriveProviderMemoryCoverage(
       && !record.repairAttempt,
     );
     const promptRecord = transport.find((record) => record.state === "sending") ?? transport[0];
-    const promptHasMemoryCategories = Boolean(
-      promptRecord
-      && (promptRecord.latestRoundEventIds !== undefined
-        || promptRecord.pinnedOpenIssueEventIds !== undefined
-        || promptRecord.pinnedIssueSourceEventIds !== undefined),
-    );
+    const promptHasMemoryCategories = promptRecord?.promptMemoryObserved === true;
     const selectionEvidence: ProviderMemorySelectionEvidence = promptHasMemoryCategories ? "actual_prompt" : "selector_audit";
-    const snapshot = unique(promptRecord?.snapshotEventIds ?? audit.snapshotEventIds);
+
+    const auditSnapshot = unique(audit.snapshotEventIds);
+    const auditLatest = unique(audit.latestRoundEventIds ?? []).filter((id) => auditSnapshot.includes(id));
+    const auditPinned = unique(audit.pinnedOpenIssueEventIds ?? []).filter((id) => auditSnapshot.includes(id));
+    const auditPinnedSources = unique(audit.pinnedIssueSourceEventIds ?? []);
+
+    const snapshot = unique(promptRecord?.snapshotEventIds ?? auditSnapshot);
     const latest = unique(
-      promptHasMemoryCategories ? (promptRecord?.latestRoundEventIds ?? []) : (audit.latestRoundEventIds ?? []),
+      promptHasMemoryCategories ? (promptRecord?.latestRoundEventIds ?? []) : auditLatest,
     ).filter((id) => snapshot.includes(id));
     const pinned = unique(
-      promptHasMemoryCategories ? (promptRecord?.pinnedOpenIssueEventIds ?? []) : (audit.pinnedOpenIssueEventIds ?? []),
+      promptHasMemoryCategories ? (promptRecord?.pinnedOpenIssueEventIds ?? []) : auditPinned,
     ).filter((id) => snapshot.includes(id));
     const pinnedSources = unique(
-      promptHasMemoryCategories ? (promptRecord?.pinnedIssueSourceEventIds ?? []) : (audit.pinnedIssueSourceEventIds ?? []),
+      promptHasMemoryCategories ? (promptRecord?.pinnedIssueSourceEventIds ?? []) : auditPinnedSources,
     );
+    const selectorMatchesActualPrompt = promptHasMemoryCategories
+      ? memoryFingerprint(snapshot, latest, pinned, pinnedSources) === memoryFingerprint(auditSnapshot, auditLatest, auditPinned, auditPinnedSources)
+      : null;
+
     const pinnedSet = new Set(pinned);
     const latestSet = new Set(latest);
     const snapshotSet = new Set(snapshot);
@@ -158,6 +170,7 @@ export function deriveProviderMemoryCoverage(
       round: audit.round,
       contextBudget,
       selectionEvidence,
+      selectorMatchesActualPrompt,
       availableEventIds: availableIds,
       snapshotEventIds: snapshot,
       latestRoundEventIds: latest,
@@ -193,6 +206,7 @@ export function deriveProviderMemoryCoverage(
       attemptedSeatCount: roundTurns.filter((turn) => turn.transportAttempted).length,
       receivedSeatCount: roundTurns.filter((turn) => turn.transportReceived).length,
       actualPromptSeatCount: roundTurns.filter((turn) => turn.selectionEvidence === "actual_prompt").length,
+      selectorMismatchSeatCount: roundTurns.filter((turn) => turn.selectorMatchesActualPrompt === false).length,
       snapshotsConsistent: fingerprints.length <= 1,
       selectionFingerprints: fingerprints,
       snapshotEventIds: representative ? [...representative.snapshotEventIds] : [],
@@ -216,7 +230,9 @@ export function deriveProviderMemoryCoverage(
     roundsWithPinnedMemory: rounds.filter((round) => round.pinnedEventIds.length > 0).length,
     pinnedIssueSourceEventIds: unique(rounds.flatMap((round) => round.pinnedIssueSourceEventIds)),
     actualPromptTurnCount: turns.filter((turn) => turn.selectionEvidence === "actual_prompt").length,
+    selectorMismatchTurnCount: turns.filter((turn) => turn.selectorMatchesActualPrompt === false).length,
     allSharedSnapshotsConsistent: rounds.every((round) => round.snapshotsConsistent),
+    allPromptSelectorConsistent: turns.every((turn) => turn.selectorMatchesActualPrompt !== false),
   };
 }
 
@@ -273,11 +289,25 @@ function describePinnedIssues(
 }
 
 function selectionFingerprint(turn: ProviderMemoryTurn): string {
+  return memoryFingerprint(
+    turn.snapshotEventIds,
+    turn.latestRoundEventIds,
+    turn.pinnedEventIds,
+    turn.pinnedIssueSourceEventIds,
+  );
+}
+
+function memoryFingerprint(
+  snapshotEventIds: readonly string[],
+  latestRoundEventIds: readonly string[],
+  pinnedEventIds: readonly string[],
+  pinnedIssueSourceEventIds: readonly string[],
+): string {
   return JSON.stringify({
-    snapshot: turn.snapshotEventIds,
-    latest: turn.latestRoundEventIds,
-    pinned: turn.pinnedEventIds,
-    sources: turn.pinnedIssueSourceEventIds,
+    snapshot: snapshotEventIds,
+    latest: latestRoundEventIds,
+    pinned: pinnedEventIds,
+    sources: pinnedIssueSourceEventIds,
   });
 }
 
