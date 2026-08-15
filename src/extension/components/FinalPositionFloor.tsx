@@ -150,6 +150,10 @@ function FinalGroup({
 function FinalSeat({ seat, zh }: { seat: FinalPositionSeat; zh: boolean }) {
   const execution = executionMeta(seat.executionState, zh);
   const finalEventId = seat.finalEventId;
+  const firstRevision = seat.revisionSteps[0];
+  const lastRevision = seat.revisionSteps.at(-1);
+  const explicitRevisionStart = firstRevision?.fromStance ?? seat.firstExplicitStance ?? "?";
+  const explicitRevisionEnd = lastRevision?.toStance ?? explicitRevisionStart;
   return (
     <section
       className={`final-position-seat execution-${seat.executionState}`}
@@ -171,8 +175,8 @@ function FinalSeat({ seat, zh }: { seat: FinalPositionSeat; zh: boolean }) {
 
       {seat.changedExplicitStance ? (
         <div className="final-position-seat__lineage" data-final-seat-lineage="explicit-revision">
-          <span>↻ {zh ? "明确修正轨迹" : "EXPLICIT REVISION LINEAGE"}</span>
-          <p>{seat.firstExplicitStance ?? "?"} <i>→</i> {seat.stance}</p>
+          <span>↻ {zh ? "明确 revision 票据" : "EXPLICIT REVISION RECEIPTS"}</span>
+          <p>{explicitRevisionStart} <i>→</i> {explicitRevisionEnd}</p>
           <div>
             {seat.revisionSteps.map((step) => (
               <button key={step.eventId} type="button" data-final-seat-revision-event={step.eventId} onClick={() => focusConsultationEvent(step.eventId)}>
