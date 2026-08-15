@@ -1,0 +1,129 @@
+name: Provider Memory Proof UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: chatchat-provider-memory-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  memory-proof:
+    name: Bounded memory · actual Prompt / pin / unpin
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci
+
+      - name: Build production Browser Extension
+        run: npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Locate Chromium browser
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_BIN"
+          echo "CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
+
+      - name: Start production extension preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4180 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-provider-memory-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4180/manifest.json >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4180/manifest.json >/dev/null
+
+      - name: Capture Chinese Provider memory lifecycle
+        run: |
+          URL='http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=zh&memory-proof=coverage'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=22000 \
+            --window-size=1440,3200 \
+            --screenshot=artifacts/chatchat-provider-memory-zh.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=22000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-provider-memory-zh.html
+          test -s artifacts/chatchat-provider-memory-zh.png
+          grep -q 'data-chatchat-provider-memory-showcase="complete"' artifacts/chatchat-provider-memory-zh.html
+          grep -q 'data-provider-memory-coverage="audited"' artifacts/chatchat-provider-memory-zh.html
+          grep -q 'data-provider-memory-consistent="true"' artifacts/chatchat-provider-memory-zh.html
+          grep -q 'data-provider-memory-snapshot-count="12"' artifacts/chatchat-provider-memory-zh.html
+          grep -q 'data-provider-memory-pinned-source=' artifacts/chatchat-provider-memory-zh.html
+          grep -q 'data-provider-memory-resolver-event=' artifacts/chatchat-provider-memory-zh.html
+          grep -q 'ACTUAL PROMPT' artifacts/chatchat-provider-memory-zh.html
+          grep -q 'MEMORY_PROOF_OLD_ROLLOUT_RISK' artifacts/chatchat-provider-memory-zh.html
+
+      - name: Capture English Provider memory lifecycle
+        run: |
+          URL='http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=en&memory-proof=coverage'
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --hide-scrollbars \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=22000 \
+            --window-size=1440,3200 \
+            --screenshot=artifacts/chatchat-provider-memory-en.png \
+            "$URL"
+          "$CHROME_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --run-all-compositor-stages-before-draw \
+            --virtual-time-budget=22000 \
+            --dump-dom \
+            "$URL" > artifacts/chatchat-provider-memory-en.html
+          test -s artifacts/chatchat-provider-memory-en.png
+          grep -q 'data-chatchat-provider-memory-showcase="complete"' artifacts/chatchat-provider-memory-en.html
+          grep -q 'data-provider-memory-coverage="audited"' artifacts/chatchat-provider-memory-en.html
+          grep -q 'data-provider-memory-consistent="true"' artifacts/chatchat-provider-memory-en.html
+          grep -q 'data-provider-memory-snapshot-count="12"' artifacts/chatchat-provider-memory-en.html
+          grep -q 'data-provider-memory-pinned-source=' artifacts/chatchat-provider-memory-en.html
+          grep -q 'data-provider-memory-resolver-event=' artifacts/chatchat-provider-memory-en.html
+          grep -q 'ACTUAL PROMPT' artifacts/chatchat-provider-memory-en.html
+          grep -q 'MEMORY_PROOF_OLD_ROLLOUT_RISK' artifacts/chatchat-provider-memory-en.html
+
+      - name: Save preview log
+        if: always()
+        run: cp /tmp/chatchat-provider-memory-preview.log artifacts/provider-memory-preview.log || true
+
+      - name: Upload Provider memory evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-provider-memory-proof
+          path: artifacts/**
+          if-no-files-found: error
+          retention-days: 14
