@@ -6,6 +6,8 @@
     const coverage = document.querySelector('[data-provider-memory-coverage="audited"]');
     if (!coverage) return false;
     if (coverage.getAttribute("data-provider-memory-consistent") !== "true") return false;
+    if (coverage.getAttribute("data-provider-memory-selector-consistent") !== "true") return false;
+    if (numberAttr(coverage, "data-provider-memory-selector-mismatches") !== 0) return false;
 
     const r3 = coverage.querySelector('[data-provider-memory-round="3"][data-provider-memory-phase="debate"]');
     const r4 = coverage.querySelector('[data-provider-memory-round="4"]');
@@ -17,9 +19,10 @@
     const r3PinnedSources = numberAttr(r3, "data-provider-memory-pinned-source-count");
     const r3Omitted = numberAttr(r3, "data-provider-memory-omitted-count");
     const r3PromptSeats = numberAttr(r3, "data-provider-memory-actual-prompt-seats");
+    const r3SelectorMismatchSeats = numberAttr(r3, "data-provider-memory-selector-mismatch-seats");
     const r3Seats = numberAttr(r3, "data-provider-memory-seat-count");
     if (!(r3Snapshot === 12 && r3Available > 12 && r3Pinned > 0 && r3PinnedSources > 0 && r3Omitted > 0)) return false;
-    if (!(r3Seats > 0 && r3PromptSeats === r3Seats && r3.getAttribute("data-provider-memory-shared") === "true")) return false;
+    if (!(r3Seats > 0 && r3PromptSeats === r3Seats && r3SelectorMismatchSeats === 0 && r3.getAttribute("data-provider-memory-shared") === "true")) return false;
 
     const pinned = r3.querySelector(
       '[data-provider-memory-pinned-source][data-provider-memory-resolver-event][data-provider-memory-resolved-round="3"]',
@@ -33,9 +36,10 @@
     const r4Snapshot = numberAttr(r4, "data-provider-memory-snapshot-count");
     const r4Omitted = numberAttr(r4, "data-provider-memory-omitted-count");
     const r4PromptSeats = numberAttr(r4, "data-provider-memory-actual-prompt-seats");
+    const r4SelectorMismatchSeats = numberAttr(r4, "data-provider-memory-selector-mismatch-seats");
     const r4Seats = numberAttr(r4, "data-provider-memory-seat-count");
     if (!(r4Available > 12 && r4Snapshot === 12 && r4Omitted > 0)) return false;
-    if (!(r4Seats > 0 && r4PromptSeats === r4Seats && r4.getAttribute("data-provider-memory-shared") === "true")) return false;
+    if (!(r4Seats > 0 && r4PromptSeats === r4Seats && r4SelectorMismatchSeats === 0 && r4.getAttribute("data-provider-memory-shared") === "true")) return false;
 
     const sameSourceStillPinned = [...r4.querySelectorAll("[data-provider-memory-pinned-source]")]
       .some((item) => item.getAttribute("data-provider-memory-pinned-source") === sourceEventId);
