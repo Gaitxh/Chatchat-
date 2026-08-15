@@ -9,6 +9,7 @@ const url = required(args.url, "--url");
 const screenshotPath = required(args.screenshot, "--screenshot");
 const domPath = required(args.dom, "--dom");
 const readySelector = required(args.readySelector, "--ready-selector");
+const focusSelector = typeof args.focusSelector === "string" ? args.focusSelector : null;
 const width = positiveInteger(args.width ?? "1440", "--width");
 const height = positiveInteger(args.height ?? "2800", "--height");
 const waitMs = positiveInteger(args.waitMs ?? "26000", "--wait-ms");
@@ -46,16 +47,23 @@ try {
     });
     await cdp.call("Page.navigate", { url });
     await waitForReady(cdp, readySelector, waitMs);
-    await evaluate(cdp, `(() => {
-      window.scrollTo(0, 0);
-      if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
-      return { x: window.scrollX, y: window.scrollY };
-    })()`);
+    if (focusSelector) {
+      await focusElement(cdp, focusSelector);
+    } else {
+      await evaluate(cdp, `(() => {
+        window.scrollTo(0, 0);
+        if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+        return { x: window.scrollX, y: window.scrollY };
+      })()`);
+    }
     await waitForPaint(cdp);
 
     const dom = await evaluate(cdp, "document.documentElement.outerHTML");
     if (typeof dom !== "string" || !dom.includes(readySelectorHint(readySelector))) {
       throw new Error(`Ready DOM was not captured after selector ${readySelector}.`);
+    }
+    if (focusSelector && !dom.includes(readySelectorHint(focusSelector))) {
+      throw new Error(`Focused DOM did not contain selector ${focusSelector}.`);
     }
     await fs.mkdir(path.dirname(domPath), { recursive: true });
     await fs.writeFile(domPath, `<!doctype html>\n${dom}\n`, "utf8");
@@ -93,6 +101,19 @@ async function waitForReady(cdp, selector, timeoutMs) {
     text: document.body?.innerText?.slice(0, 800) ?? ""
   })`);
   throw new Error(`Timed out waiting for ${selector}. Last page state: ${JSON.stringify(snapshot)}`);
+}
+
+async function focusElement(cdp, selector) {
+  const result = await evaluate(cdp, `(() => {
+    const element = document.querySelector(${JSON.stringify(selector)});
+    if (!element) return null;
+    element.scrollIntoView({ block: "start", inline: "nearest", behavior: "instant" });
+    const scrolling = document.scrollingElement;
+    if (scrolling) scrolling.scrollTop = Math.max(0, scrolling.scrollTop - 18);
+    const rect = element.getBoundingClientRect();
+    return { top: rect.top, left: rect.left, width: rect.width, height: rect.height, x: window.scrollX, y: window.scrollY };
+  })()`);
+  if (!result) throw new Error(`Could not focus selector ${selector}.`);
 }
 
 async function waitForPaint(cdp) {
