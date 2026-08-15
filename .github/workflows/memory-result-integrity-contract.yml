@@ -1,0 +1,45 @@
+name: Memory Result Integrity Contract
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: chatchat-memory-result-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: No composite score · canonical gaps · privacy boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci
+
+      - name: Enforce memory result integrity contract
+        run: node scripts/check-memory-result-integrity.mjs
+
+      - name: Compile model tests
+        run: npm run build:core
+
+      - name: Run hard-cap gap regression
+        run: node dist/tests/provider-memory-gaps.test.js
+
+      - name: Run memory protocol integrity regression
+        run: node dist/tests/meeting-memory-integrity.test.js
+
+      - name: Run result bundle regression
+        run: node dist/tests/result-integrity-bundle.test.js
+
+      - name: Run privacy-bounded Memory Receipt regression
+        run: node dist/tests/provider-memory-receipt.test.js
