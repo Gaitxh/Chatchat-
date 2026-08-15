@@ -46,16 +46,17 @@ export function FinalPositionFloor({
       data-final-position-leading-share={model.largestGroupShare.toFixed(4)}
       data-final-position-alignment-match={model.reportAlignmentMatchesGroups ? "true" : "false"}
       data-final-position-degraded-count={model.degradedActorIds.length}
+      data-final-position-fallback-count={model.fallbackActorIds.length}
       data-final-position-unexplained-count={model.unexplainedFinalShiftActorIds.length}
       data-final-position-execution-mode={executionMode}
     >
       <header className="final-position-floor__header">
         <div>
           <span>{zh ? "会议最终席位图" : "FINAL POSITION FLOOR"}</span>
-          <h3>{zh ? "每个席位最后自己提交了什么？" : "What did every seat actually submit at the end?"}</h3>
+          <h3>{zh ? "每个最终席位实际记录了什么？" : "What was actually recorded for every final seat?"}</h3>
           <p>{zh
-            ? "这里只读取参与者自己的 final_position / CouncilReport.positions。质疑、证据、支持和别人替它说的话都不能把一个席位塞进某个阵营。最大组只是描述性的最终分布，不是权威。"
-            : "Only participant-authored final_position / CouncilReport.positions can place a seat here. Challenges, evidence, support, or somebody else's prose cannot assign a final camp. The largest group is descriptive distribution, not authority."}</p>
+            ? "这里按 CouncilReport.positions 复现最终席位分组，并同时核对每个席位的 Final 执行票据。只有 verified / repaired 才能说对应 Provider 的 Final 真正完成了执行链；fallback 会明确标成 ChatChat 的失败占位，不冒充模型自己的最终判断。质疑、证据、支持和别人替它说的话都不能把一个席位塞进某个阵营。最大组只是描述性分布，不是权威。"
+            : "This reproduces final seat accounting from CouncilReport.positions while checking each seat's Final execution receipt. Only verified/repaired means that Provider Final completed the execution chain; fallback is labeled as a ChatChat failure placeholder and never masquerades as the model's own final judgment. Challenges, evidence, support, or somebody else's prose cannot assign a final camp. The largest group is descriptive distribution, not authority."}</p>
         </div>
         <div className="final-position-floor__summary">
           <b>{model.participantCount}<small>{zh ? "席位" : "seats"}</small></b>
@@ -93,17 +94,17 @@ export function FinalPositionFloor({
 
       {model.unexplainedFinalShiftActorIds.length ? (
         <div className="final-position-floor__unexplained" data-final-position-unexplained="true">
-          <span>{zh ? "没有 revision 票据的最终变更" : "FINAL SHIFTS WITHOUT REVISION RECEIPTS"}</span>
+          <span>{zh ? "没有 revision 票据的 Provider Final 变更" : "PROVIDER FINAL SHIFTS WITHOUT REVISION RECEIPTS"}</span>
           <p>{zh
-            ? "这些参与者的最终 stance 与它们最后一次公开的 pre-final stance 不同，但事件流里没有匹配的 revision。最终提交仍被保留；ChatChat 不会替它编造改变原因。"
-            : "These participants ended on a different stance than their latest public pre-final stance without a matching revision event. The final submission is preserved, but ChatChat does not invent why it changed."}</p>
+            ? "这些 verified / repaired Provider Final 与它们最后一次公开的 pre-final stance 不同，但事件流里没有匹配的 revision。最终提交仍被保留；ChatChat 不会替它编造改变原因。fallback 不会进入这里，因为它已经有明确的执行失败来源。"
+            : "These verified/repaired Provider Finals differ from their latest public pre-final stance without a matching revision event. The final submission is preserved, but ChatChat does not invent why it changed. Fallback records never enter this warning because their execution-failure source is already known."}</p>
           <div>{model.seats.filter((seat) => seat.unexplainedFinalShift).map((seat) => <i key={seat.actorId}>{seat.participantName}</i>)}</div>
         </div>
       ) : null}
 
       <footer>{archive
         ? (zh ? "↺ 历史视图只读取冻结 report / Blackboard / execution receipt；不会重新调用 Provider。" : "↺ Archive view reads frozen report / Blackboard / execution receipt only; no Provider calls.")
-        : (zh ? "最终席位图与线程内“明示立场战线”是两层不同视图：一个看全场最终提交，一个看具体争议中的公开站位。" : "This meeting-wide final floor is separate from thread-local Explicit Stance Fronts: one shows final submissions, the other shows positions inside a specific dispute.")}</footer>
+        : (zh ? "最终席位图与线程内“明示立场战线”是两层不同视图：一个复现全场最终报告席位，一个看具体争议中的公开站位。" : "This meeting-wide final floor is separate from thread-local Explicit Stance Fronts: one reproduces final report seats, the other shows positions inside a specific dispute.")}</footer>
     </section>
   );
 }
@@ -137,6 +138,7 @@ function FinalGroup({
       </div>
       <div className="final-position-group__meta">
         <span>{zh ? "平均置信度" : "avg confidence"} {Math.round(group.averageConfidence * 100)}%</span>
+        {group.fallbackMemberCount ? <span className="is-warning">≈ {group.fallbackMemberCount} fallback</span> : null}
         {group.degradedMemberCount ? <span className="is-warning">! {group.degradedMemberCount} {zh ? "席位执行降级" : "degraded seat"}</span> : null}
         {group.isLargestGroup && !group.isReportLeadingGroup ? <span>{zh ? "并列最大组" : "tied largest group"}</span> : null}
       </div>
@@ -160,6 +162,7 @@ function FinalSeat({ seat, zh }: { seat: FinalPositionSeat; zh: boolean }) {
       data-final-seat={seat.actorId}
       data-final-seat-stance={seat.stance}
       data-final-seat-execution={seat.executionState}
+      data-final-seat-source={seat.recordSource}
       data-final-seat-changed={seat.changedExplicitStance ? "true" : "false"}
       data-final-seat-unexplained-shift={seat.unexplainedFinalShift ? "true" : "false"}
     >
@@ -172,6 +175,16 @@ function FinalSeat({ seat, zh }: { seat: FinalPositionSeat; zh: boolean }) {
         <span>{Math.round(seat.confidence * 100)}% {zh ? "置信度" : "confidence"}</span>
         {seat.totalTurns ? <span>{seat.verifiedTurns}/{seat.totalTurns} {zh ? "轮已验证" : "turns verified"}</span> : <span>{zh ? "无执行票据" : "no execution receipt"}</span>}
       </div>
+
+      {seat.recordSource === "fallback_placeholder" ? (
+        <div className="final-position-seat__source-note is-fallback" data-final-seat-source-note="fallback-placeholder">
+          <b>≈</b><span>{zh ? "ChatChat fallback placeholder · 这是执行失败说明，不是该 Provider 自己完成的 Final。" : "ChatChat fallback placeholder · this records execution failure, not a Final successfully authored by the Provider."}</span>
+        </div>
+      ) : seat.recordSource === "unverified_record" ? (
+        <div className="final-position-seat__source-note" data-final-seat-source-note="unverified-record">
+          <b>?</b><span>{zh ? "缺少足够的 Final 执行票据，不能证明这条记录由 Provider 完成。" : "There is not enough Final execution provenance to claim this record completed at the Provider."}</span>
+        </div>
+      ) : null}
 
       {seat.changedExplicitStance ? (
         <div className="final-position-seat__lineage" data-final-seat-lineage="explicit-revision">
@@ -191,8 +204,8 @@ function FinalSeat({ seat, zh }: { seat: FinalPositionSeat; zh: boolean }) {
         <div className="final-position-seat__unexplained" data-final-seat-shift-warning="unexplained">
           <b>!</b>
           <span>{zh
-            ? `${seat.latestPreFinalStance ?? "?"} → ${seat.stance}：没有对应 revision 事件，因此不推断原因。`
-            : `${seat.latestPreFinalStance ?? "?"} → ${seat.stance}: no matching revision event, so no cause is inferred.`}</span>
+            ? `${seat.latestPreFinalStance ?? "?"} → ${seat.stance}：这是 verified / repaired Provider Final，但没有对应 revision 事件，因此不推断原因。`
+            : `${seat.latestPreFinalStance ?? "?"} → ${seat.stance}: this is a verified/repaired Provider Final with no matching revision event, so no cause is inferred.`}</span>
           {finalEventId ? <button type="button" onClick={() => focusConsultationEvent(finalEventId)}>{zh ? "查看 Final 事件" : "Trace final event"} ↗</button> : null}
         </div>
       ) : finalEventId ? (
