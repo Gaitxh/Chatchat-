@@ -156,10 +156,16 @@ function ProviderMemoryPortal() {
   const integrity = useMemo(() => deriveMeetingMemoryIntegrity(coverage, gaps), [coverage, gaps]);
 
   if (!coverage.rounds.length) return null;
-  return <>
-    <ProviderMemoryCoverage model={coverage} integrity={integrity} locale={locale} archive={archive} onFocusEvent={focusConsultationEvent} />
-    <ProviderMemoryGaps model={gaps} locale={locale} onFocusEvent={focusConsultationEvent} />
-  </>;
+  return (
+    <div
+      className="provider-memory-view"
+      data-provider-memory-view={archive ? "archive" : "live"}
+      data-provider-memory-view-session={coverage.sessionId ?? ""}
+    >
+      <ProviderMemoryCoverage model={coverage} integrity={integrity} locale={locale} archive={archive} onFocusEvent={focusConsultationEvent} />
+      <ProviderMemoryGaps model={gaps} locale={locale} onFocusEvent={focusConsultationEvent} />
+    </div>
+  );
 }
 
 function appendUniqueExecution(current: readonly ProviderExecutionAuditEvent[], event: ProviderExecutionAuditEvent): ProviderExecutionAuditEvent[] {
