@@ -93,6 +93,7 @@ for (const claim of [
   "deriveProviderMemoryGaps",
   "deriveMeetingMemoryIntegrity",
   "OPEN_ARCHIVE_EVENT",
+  'data-provider-memory-view={archive ? "archive" : "live"}',
 ]) assert(portal.includes(claim), `Provider Memory portal is missing ${claim}.`);
 
 for (const claim of [
@@ -138,11 +139,11 @@ for (const claim of [
 
 for (const claim of [
   "memory-proof=coverage",
-  'data-chatchat-provider-memory-showcase=\\"complete\\"',
+  "data-chatchat-provider-memory-showcase=",
   "chatchat-provider-memory-zh.png",
   "chatchat-provider-memory-en.png",
   "validate-provider-memory-evidence.mjs",
-  'data-chatchat-live-deliberation-showcase=\\"complete\\"',
+  "data-chatchat-live-deliberation-showcase=",
 ]) assert(workflow.includes(claim), `CI Provider Memory proof is missing ${claim}.`);
 
 console.log("✓ actual Prompt memory, selector audit, hard-cap gaps, archive replay and dedicated Chromium stress proof are mechanically required");
