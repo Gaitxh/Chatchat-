@@ -86,14 +86,14 @@ assert(round3.availableCount === 13 && round3.snapshotCount === 12, "R3 must dis
 assert(round3.actualPromptSeatCount === 2, "Both R3 seats must be backed by actual Prompt metadata.");
 assert(round3.snapshotsConsistent, "Equal peers must receive one identical public memory deck in the same round.");
 assert(round3.pinnedIssueSourceEventIds.includes("u1"), "Memory receipt must keep the exact canonical pin reason.");
-assert(round3.pinnedIssues[0]?.resolverEventId === "a2", "Replay may show the later exact resolver while keeping the earlier turn's selection immutable.");
-assert(round4.actualPromptSeatCount === 2 && !round4.pinnedIssueSourceEventIds.includes("u1"), "The resolved source must be absent from R4 pinned memory while actual Prompt proof continues.");
+assert(round3.pinnedIssues[0]?.resolverEventId === "a2", "Replay may show the later exact resolver while keeping the earlier turn selection immutable.");
+assert(round4.actualPromptSeatCount === 2 && !round4.pinnedIssueSourceEventIds.includes("u1"), "Resolved source must leave R4 pinned memory while actual Prompt proof continues.");
 assert(model.actualPromptTurnCount === 4 && model.legacySelectorTurnCount === 0, "Modern actual Prompt proof must not be downgraded to selector-only evidence.");
 assert(model.allSharedSnapshotsConsistent && model.allPromptSelectorConsistent, "Baseline fixture must satisfy peer fairness and selector↔Prompt agreement.");
 
 const selectorMismatched = audits.map(cloneAudit);
-const betaSelector = selectorMismatched.find((item) => item.actorId === "b" && item.round === 3)!;
-betaSelector.snapshotEventIds = betaSelector.snapshotEventIds.slice(1);
+selectorMismatched.find((item) => item.actorId === "b" && item.round === 3)!.snapshotEventIds =
+  selectorMismatched.find((item) => item.actorId === "b" && item.round === 3)!.snapshotEventIds.slice(1);
 const selectorDrift = deriveProviderMemoryCoverage(participants, beforeR4, selectorMismatched, transports);
 assert(selectorDrift.allSharedSnapshotsConsistent, "Identical actual Prompt decks remain peer-fair even when selector audit drifts.");
 assert(selectorDrift.selectorMismatchTurnCount === 1 && !selectorDrift.allPromptSelectorConsistent, "Selector drift must remain distinct from peer fairness.");
@@ -104,8 +104,12 @@ betaPrompt.snapshotEventIds = betaPrompt.snapshotEventIds.slice(1);
 const promptDrift = deriveProviderMemoryCoverage(participants, beforeR4, audits, promptMismatched);
 assert(!promptDrift.allSharedSnapshotsConsistent, "Different actual public Prompt decks must surface peer fairness violation.");
 
-const selectorOnly = transports.map((record) => ({ ...cloneTransport(record), promptMemoryObserved: undefined }));
-const selectorOnlyModel = deriveProviderMemoryCoverage(participants, beforeR4, audits, selectorOnly as ProviderTransportAuditRecord[]);
+const selectorOnly = transports.map((record) => {
+  const copy = cloneTransport(record);
+  delete copy.promptMemoryObserved;
+  return copy;
+});
+const selectorOnlyModel = deriveProviderMemoryCoverage(participants, beforeR4, audits, selectorOnly);
 assert(selectorOnlyModel.actualPromptTurnCount === 0 && selectorOnlyModel.legacySelectorTurnCount === 0, "Modern explicit selector audit without actual Prompt proof must remain selector-only, not legacy.");
 
 const legacyAudits = audits.map((event) => {
@@ -119,22 +123,24 @@ const legacyAudits = audits.map((event) => {
 const legacyModel = deriveProviderMemoryCoverage(participants, beforeR4, legacyAudits, []);
 assert(legacyModel.legacySelectorTurnCount === 4, "Old archives must stay visibly legacy rather than receiving post-hoc modern memory proof.");
 
-// Create a deliberately tiny-memory projection so an actually open canonical
-// issue is absent. The gap model may report coverage loss but never importance.
 const tinyCoverage = deriveProviderMemoryCoverage(participants, beforeR3, [audit("a", "Alpha", 3, selectionR3)], [], 2);
 tinyCoverage.turns[0]!.snapshotEventIds = ["r2-9", "r2-10"];
 tinyCoverage.turns[0]!.omittedEventIds = tinyCoverage.turns[0]!.availableEventIds.filter((id) => !tinyCoverage.turns[0]!.snapshotEventIds.includes(id));
 const gaps = deriveProviderMemoryGaps(participants, beforeR3, tinyCoverage);
 assert(gaps.uniqueGapSourceEventIds.includes("u1"), "Canonical-open source omitted by the bounded deck must become a memory coverage gap.");
-const integrity = deriveMeetingMemoryIntegrity(tinyCoverage, gaps);
-assert(integrity.protocolState === "bounded_coverage", "Fair hard-cap omissions must be reported as bounded coverage rather than a composite trust failure.");
-
-const peerIntegrity = deriveMeetingMemoryIntegrity(promptDrift, deriveProviderMemoryGaps(participants, beforeR4, promptDrift));
-assert(peerIntegrity.protocolState === "peer_fairness_violation", "Different actual same-round public decks must dominate memory protocol state.");
-const selectorIntegrity = deriveMeetingMemoryIntegrity(selectorDrift, deriveProviderMemoryGaps(participants, beforeR4, selectorDrift));
-assert(selectorIntegrity.protocolState === "selector_drift", "Actual Prompt agreement failure with peer-fair decks must remain selector drift.");
-const legacyIntegrity = deriveMeetingMemoryIntegrity(legacyModel, deriveProviderMemoryGaps(participants, beforeR4, legacyModel));
-assert(legacyIntegrity.protocolState === "legacy_unverified", "Legacy selector-only archives must never be upgraded to verified memory integrity.");
+assert(deriveMeetingMemoryIntegrity(tinyCoverage, gaps).protocolState === "bounded_coverage", "Fair hard-cap omissions must be bounded coverage, not a composite trust failure.");
+assert(
+  deriveMeetingMemoryIntegrity(promptDrift, deriveProviderMemoryGaps(participants, beforeR4, promptDrift)).protocolState === "peer_fairness_violation",
+  "Different actual same-round decks must dominate memory protocol state.",
+);
+assert(
+  deriveMeetingMemoryIntegrity(selectorDrift, deriveProviderMemoryGaps(participants, beforeR4, selectorDrift)).protocolState === "selector_drift",
+  "Peer-fair actual Prompts with selector mismatch must remain selector drift.",
+);
+assert(
+  deriveMeetingMemoryIntegrity(legacyModel, deriveProviderMemoryGaps(participants, beforeR4, legacyModel)).protocolState === "legacy_unverified",
+  "Legacy selector-only archives must never be upgraded to verified memory integrity.",
+);
 
 console.log("✓ Provider memory v2 separates actual Prompt coverage, selector drift, peer fairness, hard-cap gaps and legacy evidence");
 
