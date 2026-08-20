@@ -21,7 +21,10 @@ export interface ProviderExecutionAuditEvent {
   round: number;
   stage: ProviderExecutionAuditStage;
   snapshotEventIds: readonly string[];
+  /** Present on modern audit records, including when the selected arrays are empty. */
+  contextSelectionObserved?: true;
   pinnedOpenIssueEventIds?: readonly string[];
+  pinnedIssueSourceEventIds?: readonly string[];
   latestRoundEventIds?: readonly string[];
   attempt?: 1 | 2;
   contributionKinds?: readonly CouncilEventKind[];
@@ -71,8 +74,13 @@ export function providerAuditBase(
     phase: context.phase,
     round: context.round,
     snapshotEventIds: selection.events.map((event) => event.id),
-    ...(selection.pinnedEventIds.length ? { pinnedOpenIssueEventIds: [...selection.pinnedEventIds] } : {}),
-    ...(selection.latestRoundEventIds.length ? { latestRoundEventIds: [...selection.latestRoundEventIds] } : {}),
+    contextSelectionObserved: true,
+    // Keep explicit empties on modern records. Otherwise a short modern meeting
+    // with zero pins is indistinguishable from an archive written before memory
+    // provenance existed.
+    pinnedOpenIssueEventIds: [...selection.pinnedEventIds],
+    pinnedIssueSourceEventIds: [...selection.pinnedIssueSourceEventIds],
+    latestRoundEventIds: [...selection.latestRoundEventIds],
   };
 }
 
@@ -80,8 +88,15 @@ export function cloneProviderExecutionAudit(event: ProviderExecutionAuditEvent):
   return {
     ...event,
     snapshotEventIds: [...event.snapshotEventIds],
-    ...(event.pinnedOpenIssueEventIds ? { pinnedOpenIssueEventIds: [...event.pinnedOpenIssueEventIds] } : {}),
-    ...(event.latestRoundEventIds ? { latestRoundEventIds: [...event.latestRoundEventIds] } : {}),
+    ...(event.pinnedOpenIssueEventIds !== undefined
+      ? { pinnedOpenIssueEventIds: [...event.pinnedOpenIssueEventIds] }
+      : {}),
+    ...(event.pinnedIssueSourceEventIds !== undefined
+      ? { pinnedIssueSourceEventIds: [...event.pinnedIssueSourceEventIds] }
+      : {}),
+    ...(event.latestRoundEventIds !== undefined
+      ? { latestRoundEventIds: [...event.latestRoundEventIds] }
+      : {}),
     ...(event.contributionKinds ? { contributionKinds: [...event.contributionKinds] } : {}),
   };
 }
