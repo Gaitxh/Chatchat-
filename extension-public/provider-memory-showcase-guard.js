@@ -25,8 +25,8 @@
     if (!(r3Snapshot === 12 && r3Available > 12 && r3Pinned > 0 && r3PinnedSources > 0 && r3Omitted > 0)) return false;
     if (!(r3Seats > 0 && r3PromptSeats === r3Seats && r3SelectorMismatchSeats === 0 && r3.getAttribute("data-provider-memory-shared") === "true")) return false;
 
-    const pinned = r3.querySelector('[data-provider-memory-pinned-source][data-provider-memory-resolver-event][data-provider-memory-resolved-round="3"]');
-    if (!pinned) return false;
+    const pinned = r3.querySelector('[data-provider-memory-pinned-source][data-provider-memory-resolver-event]');
+    if (!pinned || !/R3/.test(pinned.textContent ?? "")) return false;
     const sourceEventId = pinned.getAttribute("data-provider-memory-pinned-source");
     const resolverEventId = pinned.getAttribute("data-provider-memory-resolver-event");
     if (!sourceEventId || !resolverEventId || sourceEventId === resolverEventId) return false;
