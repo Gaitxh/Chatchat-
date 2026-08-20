@@ -12,6 +12,7 @@ const coverageUi = fs.readFileSync("src/extension/components/ProviderMemoryCover
 const gapUi = fs.readFileSync("src/extension/components/ProviderMemoryGaps.tsx", "utf8");
 const fixture = fs.readFileSync("extension-public/provider-memory-showcase.js", "utf8");
 const guard = fs.readFileSync("extension-public/provider-memory-showcase-guard.js", "utf8");
+const historyGuard = fs.readFileSync("extension-public/history-persistence-showcase-guard.js", "utf8");
 const validator = fs.readFileSync("scripts/validate-provider-memory-evidence.mjs", "utf8");
 const workflow = fs.readFileSync(".github/workflows/ci.yml", "utf8");
 const app = fs.readFileSync("app/app.html", "utf8");
@@ -131,6 +132,15 @@ for (const claim of [
 ]) assert(guard.includes(claim), `Provider Memory browser guard is missing ${claim}.`);
 
 for (const claim of [
+  'data-provider-memory-view="archive"',
+  "data-provider-memory-view-session",
+  "data-provider-memory-evidence",
+  "chatchatProviderMemoryHistoryReplayShowcase",
+  "Historical Provider Memory Coverage did not rebuild from the frozen execution receipt",
+  "not-applicable",
+]) assert(historyGuard.includes(claim), `Frozen Provider Memory history replay contract is missing ${claim}.`);
+
+for (const claim of [
   "chatchat-provider-memory-zh.html",
   "chatchat-provider-memory-en.html",
   "R3 must preserve the 12-event hard cap",
@@ -146,7 +156,7 @@ for (const claim of [
   "data-chatchat-live-deliberation-showcase=",
 ]) assert(workflow.includes(claim), `CI Provider Memory proof is missing ${claim}.`);
 
-console.log("✓ actual Prompt memory, selector audit, hard-cap gaps, archive replay and dedicated Chromium stress proof are mechanically required");
+console.log("✓ actual Prompt memory, selector audit, hard-cap gaps, frozen archive replay and dedicated Chromium stress proof are mechanically required");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`Provider memory v2 check failed: ${message}`);
