@@ -9,6 +9,7 @@
     if (memory.getAttribute("data-provider-memory-evidence") !== "actual_prompt") return false;
     if (memory.getAttribute("data-provider-memory-consistent") !== "true") return false;
     if (memory.getAttribute("data-provider-memory-selector-consistent") !== "true") return false;
+    if (numberAttr(fairness, "data-memory-fairness-metadata-mismatch-turns") !== 0) return false;
 
     const fairnessRound = fairness.querySelector('[data-memory-fairness-round="3"][data-memory-fairness-phase="debate"]');
     const memoryRound = memory.querySelector('[data-provider-memory-round="3"][data-provider-memory-phase="debate"]');
@@ -22,6 +23,7 @@
     if (!(actorTotal === 3 && actorRepresented === 3 && actorOmitted === 0)) return false;
     if (!(seatCount === 3 && actualSeats === 3)) return false;
     if (fairnessRound.getAttribute("data-memory-fairness-payload-consistent") !== "true") return false;
+    if (numberAttr(fairnessRound, "data-memory-fairness-metadata-mismatch-seats") !== 0) return false;
     if (numberAttr(fairnessRound, "data-memory-fairness-selector-actor-mismatch-seats") !== 0) return false;
     if (numberAttr(fairnessRound, "data-memory-fairness-repair-mismatch-seats") !== 0) return false;
 
@@ -35,6 +37,7 @@
     document.documentElement.dataset.chatchatProviderMemoryFairnessShowcase = "complete";
     document.documentElement.dataset.chatchatProviderMemoryFairnessActors = `${actorRepresented}/${actorTotal}`;
     document.documentElement.dataset.chatchatProviderMemoryFairnessLatestEvents = String(latest);
+    document.documentElement.dataset.chatchatProviderMemoryFairnessMetadataParity = "complete";
     return true;
   }
 
