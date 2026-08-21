@@ -1,53 +1,60 @@
 import fs from "node:fs";
 
-const selector = fs.readFileSync("src/provider-sdk/context-selection.ts", "utf8");
-const fingerprint = fs.readFileSync("src/provider-sdk/protocol-fingerprint.ts", "utf8");
-const promptAudit = fs.readFileSync("src/provider-sdk/prompt-memory-audit.ts", "utf8");
-const execution = fs.readFileSync("src/provider-sdk/execution-audit.ts", "utf8");
-const transport = fs.readFileSync("src/provider-sdk/transport-audit.ts", "utf8");
-const fairness = fs.readFileSync("src/theater/provider-memory-fairness.ts", "utf8");
-const portal = fs.readFileSync("src/extension/provider-memory-portal.tsx", "utf8");
-const ui = fs.readFileSync("src/extension/components/ProviderMemoryFairness.tsx", "utf8");
-const selectorTest = fs.readFileSync("tests/context-selection-fairness.test.ts", "utf8");
-const fairnessTest = fs.readFileSync("tests/provider-memory-fairness.test.ts", "utf8");
+const selector = read("src/provider-sdk/context-selection.ts");
+const fingerprint = read("src/provider-sdk/protocol-fingerprint.ts");
+const promptAudit = read("src/provider-sdk/prompt-memory-audit.ts");
+const execution = read("src/provider-sdk/execution-audit.ts");
+const transport = read("src/provider-sdk/transport-audit.ts");
+const fairness = read("src/theater/provider-memory-fairness.ts");
+const portal = read("src/extension/provider-memory-portal.tsx");
+const ui = read("src/extension/components/ProviderMemoryFairness.tsx");
+const selectorTest = read("tests/context-selection-fairness.test.ts");
+const fairnessTest = read("tests/provider-memory-fairness.test.ts");
+const historyTest = read("tests/execution-audit-history.test.ts");
+const fixture = read("extension-public/provider-memory-fairness-showcase.js");
+const guard = read("extension-public/provider-memory-fairness-showcase-guard.js");
+const historyGuard = read("extension-public/history-persistence-showcase-guard.js");
+const validator = read("scripts/validate-provider-memory-fairness-evidence.mjs");
+const workflow = read(".github/workflows/ci.yml");
+const app = read("app/app.html");
 
-for (const claim of [
+requireClaims("Seat-balanced latest-round selector", selector, [
   "selectLatestRoundFairly",
   "latestRoundActorIds",
   "latestRoundSelectedActorIds",
   "latestRoundOmittedActorIds",
   "stableActorRank",
-  "Every latest-round actor receives one slot before any actor receives a second slot",
+  "latest-round actor receives one slot before any actor receives a second slot",
   "canonical-open source events",
-]) assert(selector.includes(claim), `Seat-balanced latest-round selector is missing ${claim}.`);
+]);
 
-for (const claim of [
+requireClaims("Protocol payload fingerprint", fingerprint, [
   'algorithm: "fnv1a32"',
   "fingerprintProtocolJsonText",
   "not a security hash",
-]) assert(fingerprint.includes(claim), `Protocol payload fingerprint contract is missing ${claim}.`);
+]);
 
-for (const claim of [
+requireClaims("Actual Prompt fairness audit", promptAudit, [
   "CONSULTATION_EVENTS_JSON",
   "publicContextFingerprint",
   "latestRoundSelectedActorIds",
   "fingerprintProtocolJsonText",
-]) assert(promptAudit.includes(claim), `Actual Prompt fairness audit is missing ${claim}.`);
+]);
 
-for (const claim of [
+requireClaims("Selector fairness audit", execution, [
   "latestRoundActorIds",
   "latestRoundSelectedActorIds",
   "latestRoundOmittedActorIds",
   "contextSelectionObserved: true",
-]) assert(execution.includes(claim), `Selector fairness audit is missing ${claim}.`);
+]);
 
-for (const claim of [
+requireClaims("Transport fairness receipt", transport, [
   "publicContextFingerprint",
   "latestRoundSelectedActorIds",
   "promptMemoryObserved: true",
-]) assert(transport.includes(claim), `Transport fairness receipt is missing ${claim}.`);
+]);
 
-for (const claim of [
+requireClaims("Provider Memory Fairness model", fairness, [
   '"representation_limited"',
   '"public_payload_mismatch"',
   '"repair_context_drift"',
@@ -56,40 +63,96 @@ for (const claim of [
   '"legacy_unverified"',
   "samePromptDeck",
   "selectorActorCoverageMatchesActual",
-]) assert(fairness.includes(claim), `Provider Memory Fairness model is missing ${claim}.`);
+]);
 
-for (const claim of [
+requireClaims("Provider Memory fairness portal", portal, [
   "deriveProviderMemoryFairness",
   "ProviderMemoryFairness",
-]) assert(portal.includes(claim), `Provider Memory portal is missing fairness integration ${claim}.`);
+]);
 
-for (const claim of [
+requireClaims("Provider Memory Fairness UI", ui, [
   "PUBLIC MEMORY PROCEDURAL FAIRNESS",
   "data-provider-memory-fairness",
   "data-memory-fairness-payload-consistent",
   "data-memory-fairness-actor-omitted",
   "repair keeps deck",
   "REPRESENTATION LIMITED",
-]) assert(ui.includes(claim), `Provider Memory Fairness UI is missing ${claim}.`);
+]);
 
-for (const claim of [
+requireClaims("Seat-order regression test", selectorTest, [
   "4 latest-round slots each",
   "Changing actor publication order",
   "Five-seat overfull selection",
   "latestRoundOmittedActorIds.length === 1",
-]) assert(selectorTest.includes(claim), `Seat-order regression test is missing ${claim}.`);
+]);
 
-for (const claim of [
+requireClaims("Fairness state regression test", fairnessTest, [
   "public_payload_mismatch",
   "repair_context_drift",
   "selector_actor_drift",
   "representation_limited",
   "prompt_unverified",
   "legacy_unverified",
-]) assert(fairnessTest.includes(claim), `Fairness state regression test is missing ${claim}.`);
+]);
 
-console.log("✓ Provider memory fairness enforces seat-balanced latest-round representation, actual payload equality and repair-deck parity");
+requireClaims("Durable fairness receipt test", historyTest, [
+  "latestRoundSelectedActorIds",
+  "latestRoundOmittedActorIds",
+  "publicContextFingerprint",
+  "frozen selector audit must own omitted actor ids",
+]);
 
-function assert(condition, message) {
-  if (!condition) throw new Error(`Provider memory fairness check failed: ${message}`);
+requireClaims("Overfull latest-round browser fixture", fixture, [
+  'fairness-proof") !== "overfull"',
+  "MEMORY_FAIRNESS_OVERFULL_R2",
+  "exactly six public events",
+  "never writes the success marker",
+]);
+
+requireClaims("Provider Memory Fairness browser guard", guard, [
+  'data-memory-fairness-round="3"',
+  "data-memory-fairness-actor-represented",
+  "data-memory-fairness-payload-consistent",
+  "data-provider-memory-latest-count",
+  "chatchatProviderMemoryFairnessShowcase",
+]);
+
+requireClaims("Frozen Provider Memory Fairness replay", historyGuard, [
+  "chatchatProviderMemoryFairnessHistoryReplayShowcase",
+  'data-provider-memory-fairness-view="archive"',
+  "Historical Provider Memory Fairness",
+  "not-applicable",
+]);
+
+requireClaims("Provider Memory Fairness evidence validator", validator, [
+  "chatchat-provider-memory-fairness-zh.html",
+  "chatchat-provider-memory-fairness-en.html",
+  "three actors spoke in the overfull latest round",
+  "must preserve all three latest-round actors",
+  "same normalized public payload",
+]);
+
+requireClaims("Full Room fairness proof scripts", app, [
+  "provider-memory-fairness-showcase.js",
+  "provider-memory-fairness-showcase-guard.js",
+]);
+
+requireClaims("CI Provider Memory Fairness proof", workflow, [
+  "fairness-proof=overfull",
+  "data-chatchat-provider-memory-fairness-showcase=",
+  "chatchat-provider-memory-fairness-zh.png",
+  "chatchat-provider-memory-fairness-en.png",
+  "validate-provider-memory-fairness-evidence.mjs",
+]);
+
+console.log("✓ Provider memory fairness requires seat-balanced representation, actual payload equality, repair-deck parity, frozen replay and dedicated Chromium proof");
+
+function read(path) {
+  return fs.readFileSync(path, "utf8");
+}
+
+function requireClaims(label, value, claims) {
+  for (const claim of claims) {
+    if (!value.includes(claim)) throw new Error(`Provider memory fairness check failed: ${label} is missing ${claim}.`);
+  }
 }
