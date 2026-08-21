@@ -18,8 +18,10 @@ import {
 } from "../provider-sdk/transport-audit.js";
 import { deriveMeetingMemoryIntegrity } from "../theater/meeting-memory-integrity.js";
 import { deriveProviderMemoryCoverage } from "../theater/provider-memory-coverage.js";
+import { deriveProviderMemoryFairness } from "../theater/provider-memory-fairness.js";
 import { deriveProviderMemoryGaps } from "../theater/provider-memory-gaps.js";
 import { ProviderMemoryCoverage } from "./components/ProviderMemoryCoverage.js";
+import { ProviderMemoryFairness } from "./components/ProviderMemoryFairness.js";
 import { ProviderMemoryGaps } from "./components/ProviderMemoryGaps.js";
 import { focusConsultationEvent } from "./provenance-wire.js";
 
@@ -154,6 +156,10 @@ function ProviderMemoryPortal() {
     [participants, events, coverage],
   );
   const integrity = useMemo(() => deriveMeetingMemoryIntegrity(coverage, gaps), [coverage, gaps]);
+  const fairness = useMemo(
+    () => deriveProviderMemoryFairness(participants, execution, transports),
+    [participants, execution, transports],
+  );
 
   if (!coverage.rounds.length) return null;
   return (
@@ -163,6 +169,7 @@ function ProviderMemoryPortal() {
       data-provider-memory-view-session={coverage.sessionId ?? ""}
     >
       <ProviderMemoryCoverage model={coverage} integrity={integrity} locale={locale} archive={archive} onFocusEvent={focusConsultationEvent} />
+      <ProviderMemoryFairness model={fairness} locale={locale} archive={archive} />
       <ProviderMemoryGaps model={gaps} locale={locale} onFocusEvent={focusConsultationEvent} />
     </div>
   );
