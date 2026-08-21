@@ -1,12 +1,15 @@
 import { readFile } from "node:fs/promises";
 
-const [teamSettings, teamCss, panel, webCss, appHtml, zeroConfigGuard] = await Promise.all([
+const [teamSettings, teamCss, panel, webCss, appHtml, zeroConfigGuard, inviteGuard, inviteBootstrap, inviteWorkflow] = await Promise.all([
   readFile("src/extension/team-settings.ts", "utf8"),
   readFile("src/extension/team-settings.css", "utf8"),
   readFile("src/extension/consultation-panel.tsx", "utf8"),
   readFile("src/extension/web-app.css", "utf8"),
   readFile("app/app.html", "utf8"),
   readFile("extension-public/zero-config-showcase-guard.js", "utf8"),
+  readFile("extension-public/invite-ai-showcase-guard.js", "utf8"),
+  readFile("extension-public/invite-ai-showcase-bootstrap.js", "utf8"),
+  readFile(".github/workflows/invite-ai-ui.yml", "utf8"),
 ]);
 
 for (const copy of [
@@ -76,6 +79,38 @@ for (const contract of [
   requireText(zeroConfigGuard, contract, "starter-room → Invite AI product transition");
 }
 
+// "Paste any AI website URL" is stronger than known-provider catalog support.
+// Keep a synthetic production-browser proof for an unknown reserved domain so
+// the novice promise must continue traversing custom detection → AUTO_SETUP →
+// persisted local recipe → READY without exposing manual repair by default.
+for (const contract of [
+  'params.get("target") === "custom"',
+  'https://council-lab.example/',
+  'invited.providerId !== "custom"',
+  'chatchatInviteAiAutoSetupCount',
+  'chatchatInviteAiAutoSetupProfile',
+  'chatchatInviteAiCustomRecipe = "complete"',
+]) {
+  requireText(inviteGuard, contract, "custom Invite AI proof guard");
+}
+for (const contract of [
+  "autoSetupCount += 1",
+  "chatchatInviteAiAutoSetupCount",
+  "chatchatInviteAiAutoSetupProfile",
+  'diagnostics: { mode: "invite-ai-automatic" }',
+]) {
+  requireText(inviteBootstrap, contract, "custom AUTO_SETUP fixture evidence");
+}
+for (const contract of [
+  "for TARGET in known custom",
+  "chatchat-invite-ai-custom-$LANG.html",
+  'data-chatchat-invite-ai-provider-id="custom"',
+  'data-chatchat-invite-ai-auto-setup-count="1"',
+  'data-chatchat-invite-ai-custom-recipe="complete"',
+]) {
+  requireText(inviteWorkflow, contract, "known/custom Invite AI Chromium workflow");
+}
+
 const inviteCopy = teamSettings.match(/inviteLabel:[\s\S]*?inviteTitle:[^\n]+/g)?.join("\n") ?? "";
 for (const jargon of ["selector", "adapter", "recipe", "cookie", "token"]) {
   if (inviteCopy.toLocaleLowerCase().includes(jargon)) {
@@ -85,6 +120,7 @@ for (const jargon of ["selector", "adapter", "recipe", "cookie", "token"]) {
 
 console.log("✓ ChatChat exposes URL onboarding as first-class Invite AI without exposing advanced repair plumbing");
 console.log("✓ Invite AI appears after starter-room assembly while advanced team controls stay disclosure-gated");
+console.log("✓ Invite AI browser proof covers both a known Provider and an unknown custom URL through AUTO_SETUP → persisted recipe → READY");
 
 function requireText(haystack, needle, label) {
   if (!haystack.includes(needle)) fail(`Missing ${label}: ${needle}`);

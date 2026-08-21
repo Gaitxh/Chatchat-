@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   invite-ai:
-    name: Invite AI · URL to READY seat
+    name: Invite AI · known/custom URL to READY seat
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -52,35 +52,52 @@ jobs:
           done
           curl --fail http://127.0.0.1:4185/manifest.json >/dev/null
 
-      - name: Capture bilingual Invite AI journey
+      - name: Capture bilingual known and custom Invite AI journeys
         run: |
-          for LANG in en zh; do
-            node scripts/capture-chromium-proof.mjs \
-              --chrome "$CHROME_BIN" \
-              --url "http://127.0.0.1:4185/app/app.html?showcase=invite-ai&lang=$LANG" \
-              --width 1000 --height 1100 --wait-ms 18000 \
-              --ready-selector 'html[data-chatchat-invite-ai-showcase="complete"]' \
-              --focus-selector '[data-chatchat-invite-ai="true"]' \
-              --screenshot "artifacts/chatchat-invite-ai-$LANG.png" \
-              --dom "artifacts/chatchat-invite-ai-$LANG.html"
+          for TARGET in known custom; do
+            for LANG in en zh; do
+              node scripts/capture-chromium-proof.mjs \
+                --chrome "$CHROME_BIN" \
+                --url "http://127.0.0.1:4185/app/app.html?showcase=invite-ai&target=$TARGET&lang=$LANG" \
+                --width 1000 --height 1100 --wait-ms 18000 \
+                --ready-selector 'html[data-chatchat-invite-ai-showcase="complete"]' \
+                --focus-selector '[data-chatchat-invite-ai="true"]' \
+                --screenshot "artifacts/chatchat-invite-ai-$TARGET-$LANG.png" \
+                --dom "artifacts/chatchat-invite-ai-$TARGET-$LANG.html"
+            done
           done
 
       - name: Validate Invite AI semantics from ready DOM
         run: |
-          for LANG in en zh; do
-            DOM="artifacts/chatchat-invite-ai-$LANG.html"
-            grep -q 'data-chatchat-invite-ai-showcase="complete"' "$DOM"
-            grep -q 'data-chatchat-invite-ai-clicked="true"' "$DOM"
-            grep -q 'data-chatchat-invite-ai-created-count="1"' "$DOM"
-            grep -q 'data-chatchat-invite-ai-ready-seat=' "$DOM"
-            grep -q 'data-chatchat-invite-ai="true"' "$DOM"
-            grep -q 'claude.ai' "$DOM"
-            grep -q 'participant-row connection-ready is-ready' "$DOM"
+          for TARGET in known custom; do
+            for LANG in en zh; do
+              DOM="artifacts/chatchat-invite-ai-$TARGET-$LANG.html"
+              grep -q 'data-chatchat-invite-ai-showcase="complete"' "$DOM"
+              grep -q 'data-chatchat-invite-ai-clicked="true"' "$DOM"
+              grep -q 'data-chatchat-invite-ai-created-count="1"' "$DOM"
+              grep -q 'data-chatchat-invite-ai-ready-seat=' "$DOM"
+              grep -q 'data-chatchat-invite-ai="true"' "$DOM"
+              grep -q 'participant-row connection-ready is-ready' "$DOM"
+              grep -q "data-chatchat-invite-ai-target=\"$TARGET\"" "$DOM"
+            done
           done
-          grep -Fq '+ Invite AI' artifacts/chatchat-invite-ai-en.html
-          grep -Fq '＋ 邀请 AI' artifacts/chatchat-invite-ai-zh.html
-          grep -Fq 'Paste any AI website URL' artifacts/chatchat-invite-ai-en.html
-          grep -Fq '粘贴任意 AI 网站 URL' artifacts/chatchat-invite-ai-zh.html
+
+          for LANG in en zh; do
+            KNOWN="artifacts/chatchat-invite-ai-known-$LANG.html"
+            CUSTOM="artifacts/chatchat-invite-ai-custom-$LANG.html"
+            grep -q 'claude.ai' "$KNOWN"
+            grep -q 'data-chatchat-invite-ai-provider-id="anthropic-claude"' "$KNOWN"
+            grep -q 'council-lab.example' "$CUSTOM"
+            grep -q 'data-chatchat-invite-ai-provider-id="custom"' "$CUSTOM"
+            grep -q 'data-chatchat-invite-ai-auto-setup-count="1"' "$CUSTOM"
+            grep -q 'data-chatchat-invite-ai-auto-setup-profile="https://council-lab.example"' "$CUSTOM"
+            grep -q 'data-chatchat-invite-ai-custom-recipe="complete"' "$CUSTOM"
+          done
+
+          grep -Fq '+ Invite AI' artifacts/chatchat-invite-ai-known-en.html
+          grep -Fq '＋ 邀请 AI' artifacts/chatchat-invite-ai-known-zh.html
+          grep -Fq 'Paste any AI website URL' artifacts/chatchat-invite-ai-custom-en.html
+          grep -Fq '粘贴任意 AI 网站 URL' artifacts/chatchat-invite-ai-custom-zh.html
 
       - name: Reject blank screenshots
         run: node scripts/check-png-content.mjs artifacts/chatchat-invite-ai-*.png

@@ -3,9 +3,13 @@
   if (params.get("showcase") !== "invite-ai") return;
 
   const zh = params.get("lang") === "zh";
-  const TARGET_URL = "https://claude.ai/";
+  const custom = params.get("target") === "custom";
+  const TARGET_URL = custom ? "https://council-lab.example/" : "https://claude.ai/";
+  const TARGET_HOST = custom ? "council-lab.example" : "claude.ai";
   const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
+  const RECIPES_KEY = "chatchat.extension.recipes.v1";
 
+  document.documentElement.dataset.chatchatInviteAiTarget = custom ? "custom" : "known";
   void verify();
 
   async function verify() {
@@ -47,23 +51,43 @@
       const rows = [...document.querySelectorAll(".participant-row")];
       return rows.find((row) => {
         const host = row.querySelector(".participant-main > small")?.textContent?.trim();
-        return host === "claude.ai"
+        return host === TARGET_HOST
           && row.classList.contains("connection-ready")
           && row.classList.contains("is-ready");
       }) ?? null;
     }, 18_000);
-    if (!(readyRow instanceof HTMLElement)) return fail("Invited Claude seat never reached READY.");
+    if (!(readyRow instanceof HTMLElement)) return fail(`Invited ${TARGET_HOST} seat never reached READY.`);
 
-    const stored = await (window.chrome.storage.session ?? window.chrome.storage.local).get(PARTICIPANTS_KEY);
+    const sessionStore = window.chrome.storage.session ?? window.chrome.storage.local;
+    const stored = await sessionStore.get(PARTICIPANTS_KEY);
     const participants = Array.isArray(stored?.[PARTICIPANTS_KEY]) ? stored[PARTICIPANTS_KEY] : [];
-    const claude = participants.find((participant) => participant?.hostname === "claude.ai");
-    if (!claude?.createdByChatChat) return fail("Invited AI did not become a ChatChat-owned clean consultation seat.");
+    const invited = participants.find((participant) => participant?.hostname === TARGET_HOST);
+    if (!invited?.createdByChatChat) return fail("Invited AI did not become a ChatChat-owned clean consultation seat.");
     if (document.documentElement.dataset.chatchatInviteAiCreatedCount !== "1") {
       return fail(`Invite AI should open exactly one Provider tab; saw ${document.documentElement.dataset.chatchatInviteAiCreatedCount ?? "0"}.`);
     }
     if (!isVisible(entry)) return fail("Invite AI entry disappeared after a successful invitation.");
 
-    document.documentElement.dataset.chatchatInviteAiReadySeat = String(claude.seatId ?? "ready");
+    if (custom) {
+      if (invited.providerId !== "custom") return fail(`Unknown URL should use custom provider identity; got ${String(invited.providerId)}.`);
+      const expectedOrigin = new URL(TARGET_URL).origin;
+      if (invited.origin !== expectedOrigin) return fail(`Unexpected custom origin: ${String(invited.origin)}.`);
+      if (document.documentElement.dataset.chatchatInviteAiAutoSetupCount !== "1") {
+        return fail(`Custom URL must run AUTO_SETUP exactly once; saw ${document.documentElement.dataset.chatchatInviteAiAutoSetupCount ?? "0"}.`);
+      }
+      if (document.documentElement.dataset.chatchatInviteAiAutoSetupProfile !== expectedOrigin) {
+        return fail(`AUTO_SETUP profile must be the custom origin; got ${document.documentElement.dataset.chatchatInviteAiAutoSetupProfile ?? "missing"}.`);
+      }
+      const local = await window.chrome.storage.local.get(RECIPES_KEY);
+      const recipe = local?.[RECIPES_KEY]?.[expectedOrigin];
+      if (!recipe?.composerSelector || !recipe?.sendSelector || !recipe?.responseSelector) {
+        return fail("Custom URL AUTO_SETUP did not persist a complete browser recipe.");
+      }
+      document.documentElement.dataset.chatchatInviteAiCustomRecipe = "complete";
+    }
+
+    document.documentElement.dataset.chatchatInviteAiProviderId = String(invited.providerId ?? "unknown");
+    document.documentElement.dataset.chatchatInviteAiReadySeat = String(invited.seatId ?? "ready");
     document.documentElement.dataset.chatchatInviteAiShowcase = "complete";
   }
 
