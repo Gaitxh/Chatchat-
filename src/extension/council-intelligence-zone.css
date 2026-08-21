@@ -1,0 +1,36 @@
+html[data-surface="web-app"] .council-intelligence-zone {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 18px;
+  margin: 4px 0 18px;
+}
+
+html[data-surface="web-app"] .council-intelligence-zone[data-council-intelligence="empty"] {
+  display: none;
+}
+
+html[data-surface="web-app"] .council-intelligence-zone > div:empty {
+  display: none;
+}
+
+html[data-surface="web-app"] .council-intelligence-zone .research-roster,
+html[data-surface="web-app"] .council-intelligence-zone .investigation-trail {
+  margin: 0;
+  border-radius: 24px;
+  box-shadow: 0 14px 36px rgba(35, 37, 39, .045);
+}
+
+html[data-surface="web-app"] .council-intelligence-zone .research-roster {
+  background: rgba(255, 255, 255, .62);
+}
+
+html[data-surface="web-app"] .council-intelligence-zone .investigation-trail {
+  background: rgba(250, 248, 243, .76);
+}
+
+@media (max-width: 959px) {
+  html[data-surface="web-app"] .council-intelligence-zone {
+    margin-bottom: 14px;
+    gap: 14px;
+  }
+}
