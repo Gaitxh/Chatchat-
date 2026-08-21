@@ -26,6 +26,9 @@ export interface ProviderExecutionAuditEvent {
   pinnedOpenIssueEventIds?: readonly string[];
   pinnedIssueSourceEventIds?: readonly string[];
   latestRoundEventIds?: readonly string[];
+  latestRoundActorIds?: readonly string[];
+  latestRoundSelectedActorIds?: readonly string[];
+  latestRoundOmittedActorIds?: readonly string[];
   attempt?: 1 | 2;
   contributionKinds?: readonly CouncilEventKind[];
   error?: string;
@@ -76,11 +79,14 @@ export function providerAuditBase(
     snapshotEventIds: selection.events.map((event) => event.id),
     contextSelectionObserved: true,
     // Keep explicit empties on modern records. Otherwise a short modern meeting
-    // with zero pins is indistinguishable from an archive written before memory
-    // provenance existed.
+    // with zero pins/omissions is indistinguishable from an older archive that
+    // predates memory provenance.
     pinnedOpenIssueEventIds: [...selection.pinnedEventIds],
     pinnedIssueSourceEventIds: [...selection.pinnedIssueSourceEventIds],
     latestRoundEventIds: [...selection.latestRoundEventIds],
+    latestRoundActorIds: [...selection.latestRoundActorIds],
+    latestRoundSelectedActorIds: [...selection.latestRoundSelectedActorIds],
+    latestRoundOmittedActorIds: [...selection.latestRoundOmittedActorIds],
   };
 }
 
@@ -96,6 +102,15 @@ export function cloneProviderExecutionAudit(event: ProviderExecutionAuditEvent):
       : {}),
     ...(event.latestRoundEventIds !== undefined
       ? { latestRoundEventIds: [...event.latestRoundEventIds] }
+      : {}),
+    ...(event.latestRoundActorIds !== undefined
+      ? { latestRoundActorIds: [...event.latestRoundActorIds] }
+      : {}),
+    ...(event.latestRoundSelectedActorIds !== undefined
+      ? { latestRoundSelectedActorIds: [...event.latestRoundSelectedActorIds] }
+      : {}),
+    ...(event.latestRoundOmittedActorIds !== undefined
+      ? { latestRoundOmittedActorIds: [...event.latestRoundOmittedActorIds] }
       : {}),
     ...(event.contributionKinds ? { contributionKinds: [...event.contributionKinds] } : {}),
   };
