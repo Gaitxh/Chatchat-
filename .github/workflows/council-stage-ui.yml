@@ -1,0 +1,113 @@
+name: Council Stage UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: chatchat-council-stage-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  council-stage:
+    name: Council Stage · calm default / auditable detail
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install and build production extension
+        run: |
+          npm ci
+          npm run check
+          npm test
+          npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Locate Chromium browser
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_BIN"
+          echo "CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
+
+      - name: Start production preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4186 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-council-stage-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4186/manifest.json >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4186/manifest.json >/dev/null
+
+      - name: Capture bilingual default Council Stage
+        run: |
+          for LANG in en zh; do
+            node scripts/capture-chromium-proof.mjs \
+              --chrome "$CHROME_BIN" \
+              --url "http://127.0.0.1:4186/app/app.html?showcase=consultation&lang=$LANG" \
+              --width 1440 --height 2000 --wait-ms 22000 \
+              --ready-selector 'html[data-chatchat-room-showcase="complete"][data-chatchat-stage-hierarchy="council-first"]' \
+              --screenshot "artifacts/chatchat-council-stage-$LANG.png" \
+              --dom "artifacts/chatchat-council-stage-$LANG.html"
+          done
+
+      - name: Validate calm default and visible automation boundary
+        run: |
+          for LANG in en zh; do
+            DOM="artifacts/chatchat-council-stage-$LANG.html"
+            grep -q 'data-chatchat-stage-hierarchy="council-first"' "$DOM"
+            grep -q 'data-chatchat-audit-vault="closed"' "$DOM"
+            grep -q 'data-chatchat-visual-layer="stage"' "$DOM"
+            grep -q 'data-chatchat-visual-layer="audit"' "$DOM"
+            grep -q 'data-tab-ownership="user-owned"' "$DOM"
+            grep -q 'automation-boundary-chip is-user-owned' "$DOM"
+            grep -q 'id="consultation-theater-root"' "$DOM"
+            grep -q 'id="final-position-floor-root"' "$DOM"
+            grep -q 'id="consultation-receipt-root"' "$DOM"
+          done
+          grep -Fq 'Audit &amp; evidence' artifacts/chatchat-council-stage-en.html || grep -Fq 'Audit & evidence' artifacts/chatchat-council-stage-en.html
+          grep -Fq '审计与证据' artifacts/chatchat-council-stage-zh.html
+          grep -Fq 'Your tab' artifacts/chatchat-council-stage-en.html
+          grep -Fq '你的标签页' artifacts/chatchat-council-stage-zh.html
+
+      - name: Prove audit detail still opens for focused protocol evidence
+        run: |
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url 'http://127.0.0.1:4186/app/app.html?showcase=consultation&lang=en&memory-proof=coverage' \
+            --width 1440 --height 1600 --wait-ms 26000 \
+            --ready-selector 'html[data-chatchat-provider-memory-showcase="complete"][data-chatchat-stage-hierarchy="council-first"]' \
+            --focus-selector '[data-provider-memory-coverage="audited"]' \
+            --screenshot artifacts/chatchat-council-audit-open-en.png \
+            --dom artifacts/chatchat-council-audit-open-en.html
+          grep -q 'data-chatchat-audit-vault="open"' artifacts/chatchat-council-audit-open-en.html
+          grep -q 'data-provider-memory-coverage="audited"' artifacts/chatchat-council-audit-open-en.html
+
+      - name: Reject blank screenshots
+        run: node scripts/check-png-content.mjs artifacts/chatchat-council-*.png
+
+      - name: Save preview log
+        if: always()
+        run: cp /tmp/chatchat-council-stage-preview.log artifacts/preview.log 2>/dev/null || true
+
+      - name: Upload Council Stage browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-council-stage-ui
+          path: artifacts/**
+          if-no-files-found: warn
+          retention-days: 14
