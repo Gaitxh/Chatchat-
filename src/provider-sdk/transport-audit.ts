@@ -19,6 +19,13 @@ export interface ProviderTransportAuditRecord {
   pinnedOpenIssueEventIds?: readonly string[];
   pinnedIssueSourceEventIds?: readonly string[];
   latestRoundEventIds?: readonly string[];
+  /**
+   * Optional equality fingerprint of exact serialized CONSULTATION_EVENTS_JSON.
+   * Absent records predate payload-level auditing and must not be post-hoc
+   * upgraded. This is not a cryptographic signature or truth proof.
+   */
+  publicPayloadFingerprint?: string;
+  publicPayloadEventCount?: number;
   repairAttempt: boolean;
   tabId: number;
   promptChars: number;
@@ -47,6 +54,12 @@ export function recordProviderTransportAudit(record: ProviderTransportAuditRecor
         pinnedOpenIssueEventIds: [...promptSelection.pinnedOpenIssueEventIds],
         pinnedIssueSourceEventIds: [...promptSelection.pinnedIssueSourceEventIds],
         latestRoundEventIds: [...promptSelection.latestRoundEventIds],
+        ...(promptSelection.publicPayloadFingerprint !== null
+          ? { publicPayloadFingerprint: promptSelection.publicPayloadFingerprint }
+          : {}),
+        ...(promptSelection.publicPayloadEventCount !== null
+          ? { publicPayloadEventCount: promptSelection.publicPayloadEventCount }
+          : {}),
       }
     : record;
   const copy = cloneProviderTransportAudit(enriched);
