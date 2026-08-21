@@ -1,4 +1,5 @@
 import { rememberProviderPromptMemorySelection } from "../provider-sdk/prompt-memory-audit.js";
+import { rememberProviderPublicDeck } from "../provider-sdk/public-deck-audit.js";
 
 declare const chrome: any;
 
@@ -15,8 +16,9 @@ installPromptMemoryObserver();
  *
  * This wrapper must never mutate the payload, response, ordering, timeout or
  * retry behavior. Its only job is to remember explicit ChatChat memory metadata
- * so transport receipts can later prove what was actually sent rather than
- * relying only on selector intent.
+ * and the exact serialized public Blackboard deck so transport receipts and
+ * fairness audits can prove what was actually sent rather than relying only on
+ * selector intent.
  */
 function installPromptMemoryObserver(): void {
   const tabs = typeof chrome !== "undefined" ? chrome?.tabs : undefined;
@@ -32,7 +34,9 @@ function installPromptMemoryObserver(): void {
       && typeof payload.prompt === "string"
       && !isHandshakePrompt(payload.prompt)
     ) {
-      rememberProviderPromptMemorySelection(String(payload.prompt));
+      const prompt = String(payload.prompt);
+      rememberProviderPromptMemorySelection(prompt);
+      rememberProviderPublicDeck(prompt);
     }
     return original(tabId, payload, ...rest);
   }) as ObservedSendMessage;
