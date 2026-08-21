@@ -7,6 +7,7 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Assertion failed: ${message}`);
 }
 
+const SAME_FINGERPRINT = "fnv1a64:1234567890abcdef:300";
 const participants: CouncilParticipant[] = [
   { id: "a", name: "Alpha", provider: "alpha" },
   { id: "b", name: "Beta", provider: "beta" },
@@ -22,17 +23,17 @@ assert(verified.rounds[0]?.latestRoundRepresentationComplete, "All previous-roun
 assert(verified.actualPromptTurns === 3, "Every seat must carry actual Prompt evidence in the baseline fixture.");
 
 const payloadMismatch = transports.map(cloneTransport);
-payloadMismatch[1]!.publicContextFingerprint = "fnv1a32:deadbeef:321";
+payloadMismatch[1]!.publicContextFingerprint = "fnv1a64:deadbeefdeadbeef:321";
 const payloadMismatchModel = deriveProviderMemoryFairness(participants, audits, payloadMismatch);
 assert(payloadMismatchModel.state === "public_payload_mismatch", "Same-round equal peers with different actual public JSON fingerprints must fail payload fairness even if ids still match.");
 assert(payloadMismatchModel.publicPayloadMismatchRounds === 1, "Payload mismatch must be reported at round granularity.");
 
-const repaired = [...transports.map(cloneTransport), repairPrompt("a", 100, "fnv1a32:12345678:300")];
+const repaired = [...transports.map(cloneTransport), repairPrompt("a", 100, SAME_FINGERPRINT)];
 const repairedModel = deriveProviderMemoryFairness(participants, audits, repaired);
 assert(repairedModel.state === "verified", "A format repair with the exact same public deck must preserve fairness.");
 assert(repairedModel.turns.find((turn) => turn.actorId === "a")?.repairContextConsistent === true, "Repair parity must be explicitly auditable when repair occurs.");
 
-const repairDrift = [...transports.map(cloneTransport), repairPrompt("a", 100, "fnv1a32:87654321:301")];
+const repairDrift = [...transports.map(cloneTransport), repairPrompt("a", 100, "fnv1a64:8765432187654321:301")];
 const repairDriftModel = deriveProviderMemoryFairness(participants, audits, repairDrift);
 assert(repairDriftModel.state === "repair_context_drift", "Repair that changes the public payload must be a distinct protocol violation.");
 assert(repairDriftModel.repairContextMismatchTurns === 1, "Exact repair-context mismatch turn must be counted.");
@@ -105,7 +106,7 @@ function firstPrompt(actorId: string, tabId: number): ProviderTransportAuditReco
     pinnedIssueSourceEventIds: [],
     latestRoundEventIds: ["e1", "e2", "e3"],
     latestRoundSelectedActorIds: ["a", "b", "c"],
-    publicContextFingerprint: "fnv1a32:12345678:300",
+    publicContextFingerprint: SAME_FINGERPRINT,
     repairAttempt: false,
     tabId,
     promptChars: 1000,
