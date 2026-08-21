@@ -5,10 +5,10 @@ import type {
   CouncilPhaseUpdate,
 } from "../core/types.js";
 import {
-  directPeerRequestTarget,
-  explicitlyAnswersRequest,
-  type DirectPeerRequestKind,
-} from "../consultation/structured-response.js";
+  deriveDirectResponseReceipts,
+  type DirectResponseReceipt,
+} from "../consultation/direct-response-receipts.js";
+import type { DirectPeerRequestKind } from "../consultation/structured-response.js";
 
 export type PeerExchangeRequestKind = DirectPeerRequestKind;
 export type PeerExchangeState = "queued" | "responding" | "answered" | "turn_failed" | "unresolved";
@@ -40,9 +40,11 @@ export interface PeerExchangeModel {
 }
 
 /**
- * Converts explicit public peer-directed events into a response queue. A request
- * becomes answered only when a later structured event from the target participant
- * explicitly cites the request. Topical prose is intentionally ignored.
+ * Converts the canonical direct-response receipt ledger into the live response
+ * queue. Theater owns only presentation state (queued/responding/turn_failed/
+ * unresolved). Whether a request is actually answered, and by which exact event,
+ * comes from the same receipt truth used by Open Issues, Provider Inbox and the
+ * Orchestrator. The UI never re-infers closure from prose or its own rules.
  */
 export function buildPeerExchangeModel(
   participants: readonly CouncilParticipant[],
@@ -52,43 +54,13 @@ export function buildPeerExchangeModel(
 ): PeerExchangeModel {
   const participantById = new Map(participants.map((participant) => [participant.id, participant] as const));
   const eventById = new Map(events.map((event) => [event.id, event] as const));
-  const eventIndex = new Map(events.map((event, index) => [event.id, index] as const));
-  const items: PeerExchangeItem[] = [];
-
-  for (const request of events) {
-    const target = directPeerRequestTarget(request, eventById);
-    if (!target || target.actorId === request.actorId) continue;
-    if (!participantById.has(request.actorId) || !participantById.has(target.actorId)) continue;
-
-    const requestIndex = eventIndex.get(request.id) ?? -1;
-    const response = events.slice(requestIndex + 1).find((candidate) =>
-      candidate.actorId === target.actorId && explicitlyAnswersRequest(candidate, request.id),
-    );
-    const state = response
-      ? "answered"
-      : derivePendingState(target.actorId, request.round, activities, phase);
-
-    const targetEvent = target.targetEventId ? eventById.get(target.targetEventId) : undefined;
-    items.push({
-      requestEventId: request.id,
-      requestKind: target.kind,
-      requestRound: request.round,
-      requestActorId: request.actorId,
-      requestActorName: participantById.get(request.actorId)?.name ?? request.actorId,
-      targetActorId: target.actorId,
-      targetActorName: participantById.get(target.actorId)?.name ?? target.actorId,
-      requestContent: compact(eventText(request), 220),
-      ...(target.targetEventId ? { targetEventId: target.targetEventId } : {}),
-      ...(targetEvent ? { targetExcerpt: compact(eventText(targetEvent), 160) } : {}),
-      state,
-      ...(response ? {
-        responseEventId: response.id,
-        responseKind: response.kind,
-        responseExcerpt: compact(eventText(response), 220),
-        responseRound: response.round,
-      } : {}),
+  const items = deriveDirectResponseReceipts(events)
+    .flatMap((receipt): PeerExchangeItem[] => {
+      const request = eventById.get(receipt.requestEventId);
+      if (!request) return [];
+      if (!participantById.has(receipt.fromActorId) || !participantById.has(receipt.targetActorId)) return [];
+      return [receiptItem(receipt, request, eventById, participantById, activities, phase)];
     });
-  }
 
   items.sort((a, b) => {
     const stateRank = (state: PeerExchangeState) => state === "responding" ? 0 : state === "queued" ? 1 : state === "turn_failed" ? 2 : state === "unresolved" ? 3 : 4;
@@ -101,6 +73,44 @@ export function buildPeerExchangeModel(
     respondingCount: items.filter((item) => item.state === "responding").length,
     answeredCount: items.filter((item) => item.state === "answered").length,
     unresolvedCount: items.filter((item) => item.state === "unresolved").length,
+  };
+}
+
+function receiptItem(
+  receipt: DirectResponseReceipt,
+  request: CouncilEvent,
+  eventById: ReadonlyMap<string, CouncilEvent>,
+  participantById: ReadonlyMap<string, CouncilParticipant>,
+  activities: Readonly<Record<string, CouncilParticipantTurnUpdate>>,
+  phase: CouncilPhaseUpdate | null,
+): PeerExchangeItem {
+  const targetEventId = (request.kind === "challenge" || request.kind === "evidence")
+    ? request.targetEventId
+    : undefined;
+  const targetEvent = targetEventId ? eventById.get(targetEventId) : undefined;
+  const response = receipt.responseEventId ? eventById.get(receipt.responseEventId) : undefined;
+  const state: PeerExchangeState = receipt.status === "answered"
+    ? "answered"
+    : derivePendingState(receipt.targetActorId, receipt.requestRound, activities, phase);
+
+  return {
+    requestEventId: receipt.requestEventId,
+    requestKind: receipt.requestKind,
+    requestRound: receipt.requestRound,
+    requestActorId: receipt.fromActorId,
+    requestActorName: participantById.get(receipt.fromActorId)?.name ?? receipt.fromActorId,
+    targetActorId: receipt.targetActorId,
+    targetActorName: participantById.get(receipt.targetActorId)?.name ?? receipt.targetActorId,
+    requestContent: compact(eventText(request), 220),
+    ...(targetEventId ? { targetEventId } : {}),
+    ...(targetEvent ? { targetExcerpt: compact(eventText(targetEvent), 160) } : {}),
+    state,
+    ...(response ? {
+      responseEventId: response.id,
+      responseKind: response.kind,
+      responseExcerpt: compact(eventText(response), 220),
+      responseRound: response.round,
+    } : {}),
   };
 }
 

@@ -53,6 +53,9 @@ assert(visibleIds.includes("old-q"), "An id cannot be presented as a pinned resp
 assert(longPrompt.includes("this block adds attention, not new evidence"), "Pinned issue attention must not masquerade as evidence.");
 assert(longPrompt.includes("no event extra authority, truth status, vote weight, speaking priority"), "Pinned issue attention must preserve participant equality.");
 assert(longPrompt.includes("address it when reasonably possible before adding unrelated new points"), "A restored old direct request should become a real response opportunity.");
+assert(longPrompt.includes("CHATCHAT_DIRECT_PEER_INBOX"), "A pinned old request aimed at Claude must re-enter Claude's direct inbox, not merely exist as generic conflict memory.");
+const longInbox = parseJsonLine(longPrompt, "PEER_INBOX_JSON") as Array<{ eventId?: string; receiptStatus?: string }>;
+assert(longInbox.some((item) => item.eventId === "old-q" && item.receiptStatus === "pending"), "The restored old question must carry an explicit pending response receipt in the bounded Provider prompt.");
 
 const shortEvents: CouncilEvent[] = [oldQuestion, ...longEvents.slice(-6)];
 const shortContext: CouncilContext = {
@@ -65,9 +68,35 @@ const shortContext: CouncilContext = {
 const shortPrompt = buildProviderConsultationPrompt(shortContext);
 assert(!shortPrompt.includes("CHATCHAT_PINNED_OPEN_ISSUES"), "An open issue already inside the normal bounded snapshot should not receive a second artificial priority block.");
 assert((parseJsonLine(shortPrompt, "PINNED_OPEN_ISSUE_EVENT_IDS_JSON") as unknown[]).length === 0, "Normal visible open issues must not be mislabeled as context pins.");
+const shortInbox = parseJsonLine(shortPrompt, "PEER_INBOX_JSON") as Array<{ eventId?: string }>;
+assert(shortInbox.some((item) => item.eventId === "old-q"), "A normally visible unresolved direct question must still appear in the same canonical peer inbox as a pinned one.");
+
+const answeredEvents: CouncilEvent[] = [
+  ...longEvents,
+  event({
+    id: "claude-old-q-answer",
+    round: 7,
+    actorId: participant.id,
+    kind: "argument",
+    stance: "A",
+    content: "Claude finally answers the old direct question with exact provenance.",
+    confidence: .82,
+    replyToEventId: "old-q",
+  }),
+];
+const answeredContext: CouncilContext = {
+  ...longContext,
+  sessionId: "pinned-prompt-answered",
+  round: 8,
+  publicEvents: answeredEvents,
+  ownEvents: answeredEvents.filter((item) => item.actorId === participant.id),
+};
+const answeredPrompt = buildProviderConsultationPrompt(answeredContext);
+assert(!answeredPrompt.includes("CHATCHAT_PINNED_OPEN_ISSUES"), "Once Claude creates an exact response receipt, the old question must leave the pinned Open Issues attention surface entirely.");
+assert(!answeredPrompt.includes("CHATCHAT_DIRECT_PEER_INBOX"), "With no other direct response debt in this fixture, the answered old question must also leave Claude's Direct Peer Inbox entirely.");
 
 console.log("✓ ChatChat pinned old issue response-opportunity prompt tests passed");
-console.log("✓ Conflict memory restores attention without turning every open issue into privileged content");
+console.log("✓ Bounded conflict memory restores pending named requests directly to the participant who owes the response, then removes both attention surfaces after an exact receipt closes");
 
 function event<T extends Omit<CouncilEvent, "sessionId" | "createdAt">>(value: T): CouncilEvent {
   return {
