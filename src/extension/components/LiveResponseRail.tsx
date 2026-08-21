@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type {
   CouncilEvent,
   CouncilParticipant,
@@ -21,6 +21,8 @@ interface LiveResponseRailProps {
   locale: Locale;
   onFocusEvent(eventId: string): void;
 }
+
+const LIVE_RESPONSE_ROUTE_EVENT = "chatchat:live-response-route";
 
 const COPY = {
   en: {
@@ -68,6 +70,22 @@ export function LiveResponseRail({
     [participants, events, activities, phase],
   );
   const item = model.items[0];
+
+  useEffect(() => {
+    if (!item || (item.state !== "queued" && item.state !== "responding")) return;
+    // Read-only presentation receipt. It carries no prompt/response prose and
+    // cannot drive the meeting; consumers may only observe a route that the
+    // canonical Peer Exchange model already committed to the live DOM.
+    window.dispatchEvent(new CustomEvent(LIVE_RESPONSE_ROUTE_EVENT, {
+      detail: {
+        state: item.state,
+        requestEventId: item.requestEventId,
+        requestRound: item.requestRound,
+        targetActorId: item.targetActorId,
+      },
+    }));
+  }, [item?.requestEventId, item?.requestRound, item?.state, item?.targetActorId]);
+
   if (!item) return null;
   const copy = COPY[locale];
 
@@ -77,6 +95,7 @@ export function LiveResponseRail({
       data-live-response-rail="canonical-peer-exchange"
       data-live-response-state={item.state}
       data-live-response-request-event={item.requestEventId}
+      data-live-response-request-round={item.requestRound}
       data-live-response-target-actor={item.targetActorId}
       data-live-response-pending-count={model.pendingCount}
       data-live-response-responding-count={model.respondingCount}
