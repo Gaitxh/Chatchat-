@@ -6,6 +6,7 @@ const tests = [
   "dist/tests/automatic-team.test.js",
   "dist/tests/login-state.test.js",
   "dist/tests/provider-recovery.test.js",
+  "dist/tests/provider-tab-boundary.test.js",
   "dist/tests/provider-sdk.test.js",
   "dist/tests/teach-mode.test.js",
   "dist/tests/test-speech.test.js",

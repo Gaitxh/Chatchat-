@@ -6,6 +6,8 @@ const [
   inspection,
   identity,
   concierge,
+  tabBoundary,
+  consultationPanel,
   worker,
   contentScript,
   app,
@@ -16,6 +18,8 @@ const [
   readFile("src/extension/provider-page-inspection.ts", "utf8"),
   readFile("src/extension/participant-row-identity.ts", "utf8"),
   readFile("src/extension/login-concierge.ts", "utf8"),
+  readFile("src/extension/provider-tab-boundary.ts", "utf8"),
+  readFile("src/extension/consultation-panel.tsx", "utf8"),
   readFile("extension-public/service-worker.js", "utf8"),
   readFile("extension-public/content-script.js", "utf8"),
   readFile("app/app.html", "utf8"),
@@ -57,6 +61,31 @@ if (concierge.includes("chrome.scripting.executeScript")) {
   fail("Login Concierge must not maintain a second Provider-page inspection implementation.");
 }
 
+requireText(tabBoundary, "participant.createdByChatChat === true", "fail-closed managed-tab ownership receipt");
+requireText(tabBoundary, "mayAutomaticallyNavigateProviderTab", "single automatic-navigation policy");
+requireText(tabBoundary, "mayAutomaticallyResumeProviderTab", "single background-resume policy");
+requireText(
+  consultationPanel,
+  "if (!mayAutomaticallyResumeProviderTab(participant)) continue;",
+  "hydration boundary that leaves user-owned tabs untouched",
+);
+requireText(
+  consultationPanel,
+  "if (mayAutomaticallyNavigateProviderTab(participant)) {",
+  "consultation session navigation ownership gate",
+);
+requireText(
+  consultationPanel,
+  "await chrome.tabs.update(participant.tabId, { url: participant.startUrl });",
+  "managed clean-session navigation primitive",
+);
+const automaticSessionNavigations = consultationPanel.match(
+  /chrome\.tabs\.update\(participant\.tabId,\s*\{\s*url:\s*participant\.startUrl\s*\}\)/g,
+) ?? [];
+if (automaticSessionNavigations.length !== 1) {
+  fail(`Expected exactly one Provider session navigation primitive behind the managed-tab gate; found ${automaticSessionNavigations.length}.`);
+}
+
 requireText(coordinator, "CLAIM_PROVIDER_SELF_HEALING", "single-winner recovery claim");
 requireText(coordinator, "chrome.tabs.update", "one clean navigation primitive");
 requireText(coordinator, "tabs.onUpdated auto-resume", "existing retry ownership boundary");
@@ -85,6 +114,7 @@ for (const forbidden of [
 }
 
 console.log("✓ ChatChat zero-config Provider self-healing product boundary passed");
+console.log("✓ User-owned Provider tabs cannot gain automatic navigation or background reconnect authority");
 
 function requireText(haystack, needle, label) {
   if (!haystack.includes(needle)) fail(`Missing ${label}: ${needle}`);
