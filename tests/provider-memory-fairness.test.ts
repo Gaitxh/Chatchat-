@@ -17,8 +17,9 @@ const audits = participants.map((participant) => audit(participant.id));
 const transports = participants.map((participant, index) => firstPrompt(participant.id, 100 + index));
 
 const verified = deriveProviderMemoryFairness(participants, audits, transports);
-assert(verified.state === "verified", "Equal actual public payloads with complete actor representation must be verified.");
+assert(verified.state === "verified", "Equal actual public payloads with complete actor representation and metadata parity must be verified.");
 assert(verified.rounds[0]?.publicPayloadConsistent, "Same fingerprint across equal peers must prove actual public payload equality.");
+assert(verified.rounds[0]?.promptMetadataMismatchSeats === 0, "Baseline actual Prompt metadata must match payload ids for every seat.");
 assert(verified.rounds[0]?.latestRoundRepresentationComplete, "All previous-round actors must be represented.");
 assert(verified.actualPromptTurns === 3, "Every seat must carry actual Prompt evidence in the baseline fixture.");
 
@@ -27,6 +28,14 @@ payloadMismatch[1]!.publicContextFingerprint = "fnv1a64:deadbeefdeadbeef:321";
 const payloadMismatchModel = deriveProviderMemoryFairness(participants, audits, payloadMismatch);
 assert(payloadMismatchModel.state === "public_payload_mismatch", "Same-round equal peers with different actual public JSON fingerprints must fail payload fairness even if ids still match.");
 assert(payloadMismatchModel.publicPayloadMismatchRounds === 1, "Payload mismatch must be reported at round granularity.");
+
+const metadataDrift = transports.map(cloneTransport);
+metadataDrift[1]!.declaredSnapshotEventIds = ["e1", "e3"];
+metadataDrift[1]!.snapshotMetadataMatchesPayload = false;
+const metadataDriftModel = deriveProviderMemoryFairness(participants, audits, metadataDrift);
+assert(metadataDriftModel.state === "prompt_metadata_drift", "Prompt-declared snapshot ids that disagree with actual public payload ids must be a distinct procedural violation.");
+assert(metadataDriftModel.promptMetadataMismatchTurns === 1, "Exact metadata↔payload mismatch turn must be counted.");
+assert(metadataDriftModel.publicPayloadMismatchRounds === 0, "Metadata drift must remain distinct from equal-peer payload mismatch when actual payloads are still equal.");
 
 const repaired = [...transports.map(cloneTransport), repairPrompt("a", 100, SAME_FINGERPRINT)];
 const repairedModel = deriveProviderMemoryFairness(participants, audits, repaired);
@@ -68,7 +77,7 @@ const legacyAudits = audits.map((item) => {
 const legacy = deriveProviderMemoryFairness(participants, legacyAudits, []);
 assert(legacy.state === "legacy_unverified", "Old archives without explicit modern fairness provenance must stay legacy-unverified.");
 
-console.log("✓ Provider public-memory fairness separates payload equality, repair parity, actor coverage, prompt proof and legacy evidence");
+console.log("✓ Provider public-memory fairness separates payload equality, metadata parity, repair parity, actor coverage, prompt proof and legacy evidence");
 
 function audit(actorId: string): ProviderExecutionAuditEvent {
   return {
@@ -101,6 +110,8 @@ function firstPrompt(actorId: string, tabId: number): ProviderTransportAuditReco
     mode: "live-provider-tabs",
     observedAt: `2026-08-21T00:03:${String(tabId - 100).padStart(2, "0")}.000Z`,
     snapshotEventIds: ["e1", "e2", "e3"],
+    declaredSnapshotEventIds: ["e1", "e2", "e3"],
+    snapshotMetadataMatchesPayload: true,
     promptMemoryObserved: true,
     pinnedOpenIssueEventIds: [],
     pinnedIssueSourceEventIds: [],
@@ -140,6 +151,7 @@ function cloneTransport(item: ProviderTransportAuditRecord): ProviderTransportAu
   return {
     ...item,
     snapshotEventIds: [...item.snapshotEventIds],
+    ...(item.declaredSnapshotEventIds !== undefined ? { declaredSnapshotEventIds: [...item.declaredSnapshotEventIds] } : {}),
     ...(item.pinnedOpenIssueEventIds !== undefined ? { pinnedOpenIssueEventIds: [...item.pinnedOpenIssueEventIds] } : {}),
     ...(item.pinnedIssueSourceEventIds !== undefined ? { pinnedIssueSourceEventIds: [...item.pinnedIssueSourceEventIds] } : {}),
     ...(item.latestRoundEventIds !== undefined ? { latestRoundEventIds: [...item.latestRoundEventIds] } : {}),
