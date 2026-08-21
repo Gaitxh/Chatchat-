@@ -1,0 +1,381 @@
+html[data-surface="web-app"] body {
+  background: #f2efe8;
+}
+
+html[data-surface="web-app"] .consultation-app {
+  width: min(1460px, 100%);
+  padding: 30px clamp(22px, 3.2vw, 52px) 72px;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  column-gap: clamp(22px, 2.4vw, 36px);
+  background:
+    radial-gradient(circle at 82% 3%, rgba(212, 157, 72, .13), transparent 25%),
+    radial-gradient(circle at 4% 30%, rgba(73, 102, 155, .07), transparent 28%),
+    #f2efe8;
+}
+
+html[data-surface="web-app"] .consultation-header {
+  padding: 2px 4px 24px;
+}
+
+html[data-surface="web-app"] .consultation-hero {
+  min-height: 286px;
+  margin-bottom: 28px;
+  padding: clamp(38px, 4.6vw, 68px);
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at 86% 18%, rgba(232, 180, 94, .20), transparent 27%),
+    linear-gradient(138deg, #171b22 0%, #222833 68%, #2c2e38 100%);
+  box-shadow: 0 26px 70px rgba(28, 31, 38, .13);
+}
+
+html[data-surface="web-app"] .consultation-hero h1 {
+  max-width: 920px;
+  font-size: clamp(42px, 5vw, 72px);
+  line-height: .96;
+  letter-spacing: -.055em;
+}
+
+html[data-surface="web-app"] .consultation-hero p {
+  max-width: 720px;
+  margin-top: 18px;
+  font-size: 16px;
+  line-height: 1.72;
+  color: #d0d3dc;
+}
+
+html[data-surface="web-app"] .principle-strip {
+  width: fit-content;
+  max-width: 860px;
+  margin-top: 24px;
+  padding: 13px 16px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
+  background: rgba(255,255,255,.055);
+  font-size: 12px;
+}
+
+html[data-surface="web-app"] .consultation-card {
+  margin-bottom: 18px;
+  padding: 24px;
+  border-radius: 26px;
+  border-color: rgba(87, 80, 67, .12);
+  background: rgba(255,255,255,.90);
+  box-shadow: 0 14px 42px rgba(37, 38, 42, .045);
+}
+
+html[data-surface="web-app"] .participants-card {
+  top: 22px;
+  padding: 22px;
+}
+
+html[data-surface="web-app"] .participants-card .section-heading h2,
+html[data-surface="web-app"] .proposal-card .section-heading h2,
+html[data-surface="web-app"] .shared-board-card .section-heading h2 {
+  font-size: 23px;
+  letter-spacing: -.035em;
+}
+
+html[data-surface="web-app"] .section-description {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+html[data-surface="web-app"] .participant-list {
+  gap: 10px;
+}
+
+html[data-surface="web-app"] .participant-row {
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 17px;
+  background: #f6f4ef;
+}
+
+html[data-surface="web-app"] .participant-row.is-ready {
+  background: #f1f6ef;
+  border-color: #d9e5d4;
+}
+
+html[data-surface="web-app"] .participant-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+}
+
+html[data-surface="web-app"] .participant-title-line {
+  flex-wrap: wrap;
+  row-gap: 5px;
+}
+
+html[data-surface="web-app"] .participant-title-line strong {
+  font-size: 13px;
+}
+
+html[data-surface="web-app"] .automation-boundary-chip {
+  padding: 3px 7px !important;
+  border: 1px solid transparent;
+  border-radius: 999px !important;
+  font-size: 8px !important;
+  letter-spacing: .025em;
+  white-space: nowrap;
+}
+
+html[data-surface="web-app"] .automation-boundary-chip.is-managed {
+  background: #e9f1ff !important;
+  border-color: #cfddf5;
+  color: #3d5f8f !important;
+}
+
+html[data-surface="web-app"] .automation-boundary-chip.is-user-owned {
+  background: #f3eee4 !important;
+  border-color: #e3d8c6;
+  color: #745f40 !important;
+}
+
+html[data-surface="web-app"] .proposal-card {
+  padding: 30px;
+  border-color: rgba(55, 61, 72, .13);
+  box-shadow: 0 18px 54px rgba(32, 36, 45, .06);
+}
+
+html[data-surface="web-app"] .proposal-card textarea {
+  min-height: 188px;
+  margin-top: 18px;
+  padding: 20px;
+  border-radius: 17px;
+  font-size: 15px;
+  line-height: 1.7;
+  background: #fbfaf7;
+}
+
+html[data-surface="web-app"] .proposal-footer {
+  margin-top: 14px;
+}
+
+html[data-surface="web-app"] .start-button {
+  padding: 13px 19px;
+  border-radius: 13px;
+  font-size: 12px;
+}
+
+html[data-surface="web-app"] .consultation-progress {
+  padding: 16px 20px;
+}
+
+html[data-surface="web-app"] .live-room-card {
+  padding: 28px;
+  overflow: hidden;
+}
+
+html[data-surface="web-app"] .live-room-heading h2 {
+  font-size: clamp(25px, 2.2vw, 34px);
+  letter-spacing: -.04em;
+}
+
+html[data-surface="web-app"] .live-seat-grid {
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  gap: 12px;
+}
+
+html[data-surface="web-app"] .live-seat {
+  min-height: 150px;
+  padding: 18px;
+  border-radius: 18px;
+}
+
+html[data-surface="web-app"] .room-event-banner {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 18px;
+}
+
+html[data-surface="web-app"] .shared-board-card {
+  padding: 26px;
+}
+
+html[data-surface="web-app"] .shared-board-card .consultation-events {
+  max-height: 560px;
+  padding-right: 8px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+html[data-surface="web-app"] .consultation-event {
+  min-height: 0;
+  padding: 14px 15px;
+  border-radius: 14px;
+}
+
+html[data-surface="web-app"] .consultation-event p {
+  font-size: 12px;
+  line-height: 1.62;
+}
+
+html[data-surface="web-app"] .outcome-card {
+  padding: clamp(28px, 3vw, 42px);
+  border-color: rgba(66, 86, 72, .15);
+  background:
+    radial-gradient(circle at 94% 8%, rgba(125, 166, 116, .10), transparent 30%),
+    rgba(255,255,255,.94);
+}
+
+html[data-surface="web-app"] .outcome-hero h2 {
+  font-size: clamp(30px, 3.2vw, 46px);
+  letter-spacing: -.05em;
+}
+
+html[data-surface="web-app"] .final-position-list {
+  gap: 14px;
+}
+
+html[data-surface="web-app"] .final-position-list article {
+  padding: 16px;
+  border-radius: 15px;
+}
+
+html[data-surface="web-app"] #chatchat-audit-vault {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 18px 0 10px;
+  border: 1px solid rgba(67, 65, 60, .14);
+  border-radius: 26px;
+  background: rgba(247, 245, 240, .88);
+  overflow: clip;
+  box-shadow: inset 0 1px rgba(255,255,255,.7);
+}
+
+html[data-surface="web-app"] #chatchat-audit-vault > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  padding: 20px 24px;
+  cursor: pointer;
+  user-select: none;
+}
+
+html[data-surface="web-app"] #chatchat-audit-vault > summary::-webkit-details-marker {
+  display: none;
+}
+
+html[data-surface="web-app"] .chatchat-audit-summary-copy {
+  display: grid;
+  gap: 4px;
+}
+
+html[data-surface="web-app"] .chatchat-audit-summary-copy strong {
+  font-size: 15px;
+  letter-spacing: -.02em;
+  color: #34332f;
+}
+
+html[data-surface="web-app"] .chatchat-audit-summary-copy span {
+  max-width: 760px;
+  color: #77736b;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+html[data-surface="web-app"] .chatchat-audit-action {
+  flex: 0 0 auto;
+  padding: 8px 11px;
+  border-radius: 999px;
+  background: #e9e5dc;
+  color: #5f5b54;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+html[data-surface="web-app"] #chatchat-audit-vault[open] .chatchat-audit-action {
+  background: #20242c;
+  color: #fff;
+}
+
+html[data-surface="web-app"] .chatchat-audit-vault-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 0 18px 18px;
+  border-top: 1px solid rgba(67, 65, 60, .09);
+}
+
+html[data-surface="web-app"] .chatchat-audit-vault-body > [data-chatchat-visual-layer="audit"] {
+  min-width: 0;
+  padding-top: 14px;
+}
+
+html[data-surface="web-app"] .chatchat-audit-vault-body > [data-chatchat-visual-layer="audit"]:empty {
+  display: none;
+}
+
+html[data-surface="web-app"] .setup-card {
+  opacity: .88;
+}
+
+html[data-surface="web-app"] .privacy-card {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding-inline: 4px;
+  color: #77736b;
+}
+
+@media (max-width: 1040px) {
+  html[data-surface="web-app"] .consultation-app {
+    grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
+    column-gap: 18px;
+  }
+
+  html[data-surface="web-app"] .consultation-events,
+  html[data-surface="web-app"] .final-position-list,
+  html[data-surface="web-app"] .chatchat-audit-vault-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-surface="web-app"] .consultation-app {
+    display: block;
+    padding: 14px 14px 44px;
+  }
+
+  html[data-surface="web-app"] .consultation-header {
+    padding-bottom: 14px;
+  }
+
+  html[data-surface="web-app"] .consultation-hero {
+    min-height: 0;
+    padding: 30px 22px;
+    border-radius: 25px;
+  }
+
+  html[data-surface="web-app"] .consultation-hero h1 {
+    font-size: 35px;
+  }
+
+  html[data-surface="web-app"] .consultation-card {
+    padding: 19px;
+    border-radius: 20px;
+  }
+
+  html[data-surface="web-app"] .participants-card {
+    position: static;
+  }
+
+  html[data-surface="web-app"] .proposal-card textarea {
+    min-height: 150px;
+  }
+
+  html[data-surface="web-app"] #chatchat-audit-vault > summary {
+    align-items: flex-start;
+    padding: 17px;
+  }
+
+  html[data-surface="web-app"] .chatchat-audit-vault-body {
+    padding: 0 12px 12px;
+  }
+}
