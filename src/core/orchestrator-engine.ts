@@ -1,3 +1,4 @@
+import { pendingDirectRequestEventIds } from "../consultation/direct-response-receipts.js";
 import { Blackboard } from "./blackboard.js";
 import { createId } from "./ids.js";
 import type {
@@ -16,6 +17,7 @@ import type {
 } from "./types.js";
 
 const DEFAULT_MODE: CouncilConsultationMode = "balanced";
+const FIRST_PUBLIC_DEBATE_ROUND = 2;
 
 export class CouncilOrchestrator {
   readonly #agents: readonly CouncilAgent[];
@@ -82,7 +84,11 @@ export class CouncilOrchestrator {
     for (let round = 2; round <= maxRounds; round += 1) {
       const alignmentRatio = this.#consensusRatio(blackboard);
       const debateRoundsCompleted = round - 2;
-      const triggerEventIds = this.#peerFollowUpEventIds(previousDebateEvents);
+      const unansweredDirectRequestEventIds = this.#unansweredDirectRequestEventIds(blackboard.events);
+      const triggerEventIds = unique([
+        ...this.#peerFollowUpEventIds(previousDebateEvents),
+        ...unansweredDirectRequestEventIds,
+      ]);
       const reason = this.#debateReason(
         round,
         debateRoundsCompleted,
@@ -130,7 +136,8 @@ export class CouncilOrchestrator {
 
       const convergenceReached = this.#consensusRatio(blackboard) >= convergenceThreshold;
       const minimumReached = round - 1 >= minDebateRounds;
-      const needsPeerFollowUp = this.#roundNeedsPeerFollowUp(roundEvents);
+      const unansweredAfterRound = this.#unansweredDirectRequestEventIds(blackboard.events);
+      const needsPeerFollowUp = this.#roundNeedsPeerFollowUp(roundEvents) || unansweredAfterRound.length > 0;
       if (minimumReached && convergenceReached && !needsPeerFollowUp) {
         stopReason = "stable_alignment_no_new_signal";
         break;
@@ -311,6 +318,13 @@ export class CouncilOrchestrator {
     }
   }
 
+  #unansweredDirectRequestEventIds(events: readonly CouncilEvent[]): string[] {
+    const pending = new Set(pendingDirectRequestEventIds(events));
+    return events
+      .filter((event) => event.round >= FIRST_PUBLIC_DEBATE_ROUND && pending.has(event.id))
+      .map((event) => event.id);
+  }
+
   #consensusRatio(blackboard: Blackboard) {
     const positions = this.#agents
       .map((agent) => blackboard.latestPositionEvent(agent.participant.id))
@@ -344,6 +358,10 @@ export class CouncilOrchestrator {
     const laneRecord = Object.keys(researchLaneAssignments).length
       ? { researchLaneAssignments: { ...researchLaneAssignments } }
       : {};
+    const unansweredDirectRequestEventIds = this.#unansweredDirectRequestEventIds(blackboard.events);
+    const directResponseRecord = unansweredDirectRequestEventIds.length
+      ? { unansweredDirectRequestEventIds }
+      : {};
     const winner = [...groups.entries()].sort((a, b) => b[1].length - a[1].length)[0];
     if (!winner) {
       return {
@@ -352,6 +370,7 @@ export class CouncilOrchestrator {
         mode,
         stopReason,
         ...laneRecord,
+        ...directResponseRecord,
         consensusStance: null,
         consensusRatio: 0,
         confidence: 0,
@@ -368,6 +387,7 @@ export class CouncilOrchestrator {
       mode,
       stopReason,
       ...laneRecord,
+      ...directResponseRecord,
       consensusStance: winnerPositions[0]?.stance ?? null,
       consensusRatio: winnerPositions.length / this.#agents.length,
       confidence: winnerPositions.reduce((sum, position) => sum + position.confidence, 0) / winnerPositions.length,
@@ -381,4 +401,8 @@ export class CouncilOrchestrator {
 
 function normalizeStance(stance: string): string {
   return stance.trim().toLocaleLowerCase();
+}
+
+function unique<T>(values: readonly T[]): T[] {
+  return [...new Set(values)];
 }

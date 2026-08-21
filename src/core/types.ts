@@ -149,6 +149,12 @@ export interface CouncilReport {
   stopReason?: CouncilStopReason;
   /** Optional for old archives. Research lanes are equal-status investigation assignments, not roles of authority. */
   researchLaneAssignments?: Record<string, CouncilResearchLane>;
+  /**
+   * Exact direct question/challenge/evidence event ids still lacking a structured
+   * response receipt when deliberation closed. Presence is transparency, not a
+   * claim that the requester was correct or that the target should have agreed.
+   */
+  unansweredDirectRequestEventIds?: string[];
   consensusStance: string | null;
   consensusRatio: number;
   confidence: number;
@@ -163,7 +169,7 @@ export interface CouncilPhaseUpdate {
   round: number;
   /** Engine-owned explanation of why this phase/round exists. Optional keeps older callers/archives compatible. */
   reason?: CouncilPhaseReason;
-  /** Exact previous-round events that forced another peer-visible debate snapshot. */
+  /** Exact public events that forced another peer-visible debate snapshot, including older unanswered direct requests. */
   triggerEventIds?: readonly string[];
   /** Descriptive alignment before this phase begins; never authority or a vote. */
   alignmentRatio?: number;
