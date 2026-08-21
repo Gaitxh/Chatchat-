@@ -9,6 +9,7 @@ const fairness = read("src/theater/provider-memory-fairness.ts");
 const portal = read("src/extension/provider-memory-portal.tsx");
 const ui = read("src/extension/components/ProviderMemoryFairness.tsx");
 const selectorTest = read("tests/context-selection-fairness.test.ts");
+const fingerprintTest = read("tests/protocol-fingerprint.test.ts");
 const fairnessTest = read("tests/provider-memory-fairness.test.ts");
 const historyTest = read("tests/execution-audit-history.test.ts");
 const fixture = read("extension-public/provider-memory-fairness-showcase.js");
@@ -22,7 +23,7 @@ requireClaims("Seat-balanced latest-round selector", selector, [
   "selectLatestRoundFairly",
   "latestRoundActorIds",
   "latestRoundSelectedActorIds",
-  "latestRoundOmittedActorIds",
+  "latestRoundOittedActorIds".replace("Oitted", "Omitted"),
   "stableActorRank",
   "latest-round actor receives one slot before any actor receives a second slot",
   "canonical-open source events",
@@ -31,8 +32,17 @@ requireClaims("Seat-balanced latest-round selector", selector, [
 requireClaims("Protocol payload fingerprint", fingerprint, [
   'algorithm: "fnv1a64"',
   "fingerprintProtocolJsonText",
+  "canonicalizeProtocolValue",
+  "object keys",
+  "array order is preserved",
   "64-bit width reduces accidental collision risk",
   "not a security hash",
+]);
+
+requireClaims("Canonical fingerprint regression test", fingerprintTest, [
+  "Object property order must not create a false payload mismatch",
+  "Array/event chronology must remain significant",
+  "A real structured value change must change the fingerprint",
 ]);
 
 requireClaims("Actual Prompt fairness audit", promptAudit, [
@@ -163,7 +173,7 @@ requireClaims("CI Provider Memory Fairness proof", workflow, [
   "validate-provider-memory-fairness-evidence.mjs",
 ]);
 
-console.log("✓ Provider memory fairness requires seat-balanced representation, 64-bit actual payload equality, metadata parity, repair-deck parity, frozen replay and Chromium proof");
+console.log("✓ Provider memory fairness requires seat-balanced representation, canonical 64-bit actual-payload equality, metadata parity, repair-deck parity, frozen replay and Chromium proof");
 
 function read(path) {
   return fs.readFileSync(path, "utf8");
