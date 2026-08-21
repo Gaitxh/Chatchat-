@@ -39,12 +39,18 @@ export interface PeerExchangeModel {
   unresolvedCount: number;
 }
 
+const FIRST_PUBLIC_DEBATE_ROUND = 2;
+
 /**
  * Converts the canonical direct-response receipt ledger into the live response
  * queue. Theater owns only presentation state (queued/responding/turn_failed/
  * unresolved). Whether a request is actually answered, and by which exact event,
  * comes from the same receipt truth used by Open Issues, Provider Inbox and the
  * Orchestrator. The UI never re-infers closure from prose or its own rules.
+ *
+ * Sealed Round 1 stays private to each participant. Even if a synthetic or legacy
+ * event happens to carry a target there, it is not a public response obligation
+ * and must never surface on the live Peer Exchange / response rail.
  */
 export function buildPeerExchangeModel(
   participants: readonly CouncilParticipant[],
@@ -55,6 +61,7 @@ export function buildPeerExchangeModel(
   const participantById = new Map(participants.map((participant) => [participant.id, participant] as const));
   const eventById = new Map(events.map((event) => [event.id, event] as const));
   const items = deriveDirectResponseReceipts(events)
+    .filter((receipt) => receipt.requestRound >= FIRST_PUBLIC_DEBATE_ROUND)
     .flatMap((receipt): PeerExchangeItem[] => {
       const request = eventById.get(receipt.requestEventId);
       if (!request) return [];
