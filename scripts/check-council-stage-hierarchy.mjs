@@ -36,6 +36,8 @@ for (const selector of [".consultation-progress", ".live-room-card", ".shared-bo
 }
 requireText(stageCss, "grid-column: 1 / -1", "full-width Council Stage rail");
 requireText(stageCss, ".council-audit-drawer", "Audit Drawer visual treatment");
+requireText(stageCss, ".council-audit-drawer:not([open]) > .council-audit-content { display: none; }", "explicit closed Audit Drawer state");
+requireText(stageCss, ".council-audit-drawer[open] > .council-audit-content { display: grid; }", "explicit open Audit Drawer state");
 requireText(stageCss, "repeat(3, minmax(0, 1fr))", "spacious desktop Blackboard grid");
 
 requireText(proofBootstrap, 'params.get("showcase") === "consultation"', "production proof Audit Drawer opt-in");
