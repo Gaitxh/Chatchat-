@@ -1,0 +1,296 @@
+html[data-surface="web-app"] body {
+  background:
+    radial-gradient(circle at 82% 12%, rgba(232, 171, 82, .12), transparent 26%),
+    linear-gradient(180deg, #f7f4ed 0%, #f2eee6 54%, #f7f5f0 100%);
+}
+
+/*
+ * Council Stage
+ * -------------
+ * The novice surface should read like one meeting, not a wall of diagnostic
+ * cards. The first row is deliberately simple: participants + the user's
+ * question. Once the meeting starts, the phase rail, live floor, Blackboard,
+ * and outcome all take the full stage width.
+ */
+html[data-surface="web-app"] .consultation-app {
+  width: min(1600px, 100%);
+  padding: 28px clamp(22px, 3.4vw, 58px) 72px;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  column-gap: clamp(24px, 3vw, 46px);
+  row-gap: 4px;
+}
+
+html[data-surface="web-app"] .consultation-header {
+  padding: 4px 2px 22px;
+}
+
+html[data-surface="web-app"] .consultation-logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+}
+
+html[data-surface="web-app"] .consultation-brand strong { font-size: 19px; }
+html[data-surface="web-app"] .consultation-brand span { font-size: 12px; }
+
+html[data-surface="web-app"] .consultation-hero {
+  min-height: 300px;
+  margin-bottom: 28px;
+  padding: clamp(38px, 5vw, 70px);
+  border-radius: 34px;
+  box-shadow: 0 30px 80px rgba(23, 30, 43, .13);
+}
+
+html[data-surface="web-app"] .consultation-hero h1 {
+  max-width: 1020px;
+  font-size: clamp(42px, 5vw, 72px);
+  letter-spacing: -.045em;
+}
+
+html[data-surface="web-app"] .consultation-hero p {
+  max-width: 840px;
+  margin-top: 22px;
+  font-size: 16px;
+  line-height: 1.72;
+}
+
+html[data-surface="web-app"] .principle-strip {
+  max-width: 900px;
+  margin-top: 24px;
+  padding: 13px 16px;
+  font-size: 12px;
+  border-radius: 12px;
+}
+
+html[data-surface="web-app"] .consultation-card {
+  margin-bottom: 18px;
+  padding: 24px;
+  border-radius: 26px;
+  border-color: rgba(24, 31, 44, .08);
+  box-shadow: 0 16px 44px rgba(35, 37, 39, .055);
+}
+
+html[data-surface="web-app"] .participants-card {
+  position: static;
+  padding: 24px 22px;
+}
+
+html[data-surface="web-app"] .proposal-card {
+  padding: 28px;
+}
+
+html[data-surface="web-app"] .consultation-progress,
+html[data-surface="web-app"] .live-room-card,
+html[data-surface="web-app"] .shared-board-card,
+html[data-surface="web-app"] .outcome-card {
+  grid-column: 1 / -1;
+}
+
+html[data-surface="web-app"] .consultation-progress {
+  margin-top: 8px;
+  padding: 18px 26px;
+}
+
+html[data-surface="web-app"] .section-heading h2 { font-size: 24px; }
+html[data-surface="web-app"] .section-description { font-size: 13px; line-height: 1.6; }
+html[data-surface="web-app"] .eyebrow { font-size: 10px; letter-spacing: .15em; }
+
+html[data-surface="web-app"] .participant-list { gap: 10px; }
+html[data-surface="web-app"] .participant-row {
+  padding: 14px;
+  gap: 12px;
+  border-radius: 18px;
+}
+html[data-surface="web-app"] .participant-avatar {
+  width: 48px;
+  height: 48px;
+  font-size: 13px;
+}
+html[data-surface="web-app"] .participant-title-line strong { font-size: 14px; }
+html[data-surface="web-app"] .participant-main > small,
+html[data-surface="web-app"] .participant-status-line span,
+html[data-surface="web-app"] .connection-friendly-status { font-size: 11px; line-height: 1.45; }
+
+html[data-surface="web-app"] .proposal-card textarea {
+  min-height: 220px;
+  padding: 20px;
+  border-radius: 18px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+html[data-surface="web-app"] .proposal-footer { margin-top: 15px; }
+html[data-surface="web-app"] .start-button {
+  min-height: 46px;
+  padding: 12px 20px;
+  border-radius: 14px;
+  font-size: 13px;
+}
+
+html[data-surface="web-app"] .phase-track { gap: 14px; }
+html[data-surface="web-app"] .phase-item { min-width: 150px; }
+html[data-surface="web-app"] .phase-item b,
+html[data-surface="web-app"] .active-line { font-size: 12px; }
+
+html[data-surface="web-app"] .live-room-card {
+  padding: clamp(28px, 3vw, 38px);
+  border-radius: 32px;
+  box-shadow: 0 26px 64px rgba(22, 28, 40, .18);
+}
+
+html[data-surface="web-app"] .live-room-heading h2 { font-size: clamp(26px, 2.5vw, 36px); }
+html[data-surface="web-app"] .live-room-heading p { max-width: 760px; font-size: 13px; line-height: 1.65; }
+html[data-surface="web-app"] .alignment-meter b { font-size: 28px; }
+
+html[data-surface="web-app"] .live-seat-grid {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+html[data-surface="web-app"] .live-seat {
+  min-height: 150px;
+  padding: 18px;
+  border-radius: 18px;
+}
+
+html[data-surface="web-app"] .live-seat strong { font-size: 13px; }
+html[data-surface="web-app"] .live-seat > span { font-size: 12px; line-height: 1.5; }
+html[data-surface="web-app"] .room-event-banner { margin-top: 16px; padding: 16px 18px; border-radius: 18px; }
+html[data-surface="web-app"] .room-event-banner strong { font-size: 14px; }
+html[data-surface="web-app"] .room-event-banner span { font-size: 12px; line-height: 1.55; }
+
+html[data-surface="web-app"] .shared-board-card {
+  padding: clamp(26px, 3vw, 34px);
+  background: rgba(255, 255, 255, .72);
+}
+
+html[data-surface="web-app"] .consultation-events {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+html[data-surface="web-app"] .consultation-event {
+  min-height: 138px;
+  padding: 15px 16px;
+  border-radius: 17px;
+}
+html[data-surface="web-app"] .consultation-event p { font-size: 12px; line-height: 1.56; }
+html[data-surface="web-app"] .event-topline strong { font-size: 12px; }
+html[data-surface="web-app"] .event-topline span,
+html[data-surface="web-app"] .event-topline small { font-size: 10px; }
+
+html[data-surface="web-app"] .outcome-card {
+  padding: clamp(30px, 4vw, 46px);
+  border-radius: 32px;
+  box-shadow: 0 28px 72px rgba(31, 38, 53, .10);
+}
+
+html[data-surface="web-app"] .outcome-hero h2 {
+  max-width: 1000px;
+  font-size: clamp(30px, 3.4vw, 48px);
+  line-height: 1.06;
+}
+html[data-surface="web-app"] .outcome-hero p { font-size: 13px; }
+html[data-surface="web-app"] .confidence-orb { width: 96px; height: 96px; }
+html[data-surface="web-app"] .confidence-orb b { font-size: 28px; }
+
+html[data-surface="web-app"] .final-position-list {
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 12px;
+}
+
+/*
+ * Audit Drawer
+ * ------------
+ * Provider receipts, bounded-memory coverage, payload parity, and execution
+ * integrity stay fully available, but they no longer get to precede the user's
+ * question. Synthetic Chromium proofs can open this drawer explicitly.
+ */
+html[data-surface="web-app"] .council-audit-drawer {
+  width: min(1484px, calc(100% - 44px));
+  margin: 4px auto 48px;
+  border: 1px solid rgba(26, 34, 47, .10);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, .66);
+  box-shadow: 0 18px 54px rgba(42, 39, 34, .06);
+  overflow: clip;
+}
+
+html[data-surface="web-app"] .council-audit-drawer > summary {
+  min-height: 76px;
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+html[data-surface="web-app"] .council-audit-drawer > summary::-webkit-details-marker { display: none; }
+html[data-surface="web-app"] .council-audit-drawer > summary > span { display: grid; gap: 4px; }
+html[data-surface="web-app"] .council-audit-drawer > summary strong { font-size: 15px; color: #202634; }
+html[data-surface="web-app"] .council-audit-drawer > summary small { font-size: 11px; color: #6e746f; }
+html[data-surface="web-app"] .council-audit-drawer > summary > b {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #202634;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 500;
+  transition: transform .18s ease;
+}
+html[data-surface="web-app"] .council-audit-drawer[open] > summary > b { transform: rotate(45deg); }
+html[data-surface="web-app"] .council-audit-drawer[open] > summary { border-bottom: 1px solid rgba(26, 34, 47, .08); }
+
+html[data-surface="web-app"] .council-audit-content {
+  padding: 22px;
+  display: grid;
+  gap: 18px;
+  background: rgba(246, 248, 246, .72);
+}
+
+html[data-surface="web-app"] .council-audit-content > div:empty { display: none; }
+html[data-surface="web-app"] .council-audit-content .execution-provenance,
+html[data-surface="web-app"] .council-audit-content .provider-memory-view,
+html[data-surface="web-app"] .council-audit-content .meeting-integrity-card {
+  margin: 0;
+}
+
+html[data-surface="web-app"] .audit-label-zh,
+html[data-surface="web-app"] .audit-note-zh { display: none; }
+html[data-surface="web-app"]:lang(zh) .audit-label-en,
+html[data-surface="web-app"]:lang(zh) .audit-note-en,
+html[data-surface="web-app"]:lang(zh-CN) .audit-label-en,
+html[data-surface="web-app"]:lang(zh-CN) .audit-note-en { display: none; }
+html[data-surface="web-app"]:lang(zh) .audit-label-zh,
+html[data-surface="web-app"]:lang(zh) .audit-note-zh,
+html[data-surface="web-app"]:lang(zh-CN) .audit-label-zh,
+html[data-surface="web-app"]:lang(zh-CN) .audit-note-zh { display: inline; }
+
+@media (max-width: 1120px) {
+  html[data-surface="web-app"] .consultation-app {
+    grid-template-columns: minmax(250px, 310px) minmax(0, 1fr);
+    column-gap: 20px;
+    padding-inline: 20px;
+  }
+  html[data-surface="web-app"] .consultation-events { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 959px) {
+  html[data-surface="web-app"] .consultation-app { display: block; padding: 14px; }
+  html[data-surface="web-app"] .consultation-hero { min-height: 0; padding: 30px 22px; border-radius: 26px; }
+  html[data-surface="web-app"] .consultation-hero h1 { font-size: 34px; }
+  html[data-surface="web-app"] .consultation-card { border-radius: 22px; }
+  html[data-surface="web-app"] .consultation-events,
+  html[data-surface="web-app"] .final-position-list { grid-template-columns: 1fr; }
+  html[data-surface="web-app"] .council-audit-drawer {
+    width: calc(100% - 28px);
+    margin-bottom: 28px;
+    border-radius: 20px;
+  }
+  html[data-surface="web-app"] .council-audit-content { padding: 12px; }
+}
