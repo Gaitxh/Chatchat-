@@ -6,6 +6,7 @@ export type ProviderMemoryFairnessState =
   | "verified"
   | "representation_limited"
   | "public_payload_mismatch"
+  | "prompt_metadata_drift"
   | "repair_context_drift"
   | "selector_actor_drift"
   | "prompt_unverified"
@@ -19,6 +20,7 @@ export interface ProviderMemoryFairnessTurn {
   round: number;
   selectorObserved: boolean;
   actualPromptObserved: boolean;
+  snapshotMetadataMatchesPayload: boolean | null;
   publicContextFingerprint?: string;
   selectorLatestRoundActorIds: string[];
   selectorSelectedActorIds: string[];
@@ -36,6 +38,7 @@ export interface ProviderMemoryFairnessRound {
   turns: ProviderMemoryFairnessTurn[];
   seatCount: number;
   actualPromptSeatCount: number;
+  promptMetadataMismatchSeats: number;
   publicPayloadFingerprints: string[];
   publicPayloadConsistent: boolean;
   selectorActorMismatchSeats: number;
@@ -55,6 +58,7 @@ export interface ProviderMemoryFairnessModel {
   auditedTurns: number;
   actualPromptTurns: number;
   publicPayloadMismatchRounds: number;
+  promptMetadataMismatchTurns: number;
   repairContextMismatchTurns: number;
   selectorActorMismatchTurns: number;
   representationLimitedRounds: number;
@@ -63,12 +67,14 @@ export interface ProviderMemoryFairnessModel {
 /**
  * Procedural fairness for bounded public memory.
  *
- * This model never judges answer quality or semantic importance. It asks four
+ * This model never judges answer quality or semantic importance. It asks five
  * mechanical questions only:
  * 1) did the hard cap still represent every actor from the previous public round;
  * 2) did equal peers receive equivalent normalized public event payloads;
- * 3) did selector actor coverage agree with what the actual Prompt contained;
- * 4) did a repair attempt preserve exactly the same public deck as attempt one.
+ * 3) did PUBLIC_SNAPSHOT_EVENT_IDS_JSON match ids parsed independently from the
+ *    actual CONSULTATION_EVENTS_JSON payload;
+ * 4) did selector actor coverage agree with what the actual Prompt contained;
+ * 5) did a repair attempt preserve exactly the same public deck as attempt one.
  */
 export function deriveProviderMemoryFairness(
   participants: readonly CouncilParticipant[],
@@ -109,6 +115,7 @@ export function deriveProviderMemoryFairness(
       round: audit.round,
       selectorObserved,
       actualPromptObserved: Boolean(first),
+      snapshotMetadataMatchesPayload: first?.snapshotMetadataMatchesPayload ?? null,
       ...(first?.publicContextFingerprint ? { publicContextFingerprint: first.publicContextFingerprint } : {}),
       selectorLatestRoundActorIds: selectorActors,
       selectorSelectedActorIds: selectorSelected,
@@ -137,6 +144,7 @@ export function deriveProviderMemoryFairness(
       turns: roundTurns,
       seatCount: roundTurns.length,
       actualPromptSeatCount: roundTurns.filter((turn) => turn.actualPromptObserved).length,
+      promptMetadataMismatchSeats: roundTurns.filter((turn) => turn.snapshotMetadataMatchesPayload === false).length,
       publicPayloadFingerprints: actualFingerprints,
       publicPayloadConsistent: actualFingerprints.length <= 1,
       selectorActorMismatchSeats: roundTurns.filter((turn) => turn.selectorActorCoverageMatchesActual === false).length,
@@ -149,6 +157,7 @@ export function deriveProviderMemoryFairness(
   }).sort((a, b) => a.round - b.round || phaseRank(a.phase) - phaseRank(b.phase));
 
   const publicPayloadMismatchRounds = rounds.filter((round) => !round.publicPayloadConsistent).length;
+  const promptMetadataMismatchTurns = turns.filter((turn) => turn.snapshotMetadataMatchesPayload === false).length;
   const repairContextMismatchTurns = turns.filter((turn) => turn.repairContextConsistent === false).length;
   const selectorActorMismatchTurns = turns.filter((turn) => turn.selectorActorCoverageMatchesActual === false).length;
   const representationLimitedRounds = rounds.filter((round) => !round.latestRoundRepresentationComplete).length;
@@ -157,17 +166,19 @@ export function deriveProviderMemoryFairness(
 
   const state: ProviderMemoryFairnessState = publicPayloadMismatchRounds > 0
     ? "public_payload_mismatch"
-    : repairContextMismatchTurns > 0
-      ? "repair_context_drift"
-      : selectorActorMismatchTurns > 0
-        ? "selector_actor_drift"
-        : representationLimitedRounds > 0
-          ? "representation_limited"
-          : allLegacy
-            ? "legacy_unverified"
-            : actualPromptTurns < turns.length
-              ? "prompt_unverified"
-              : "verified";
+    : promptMetadataMismatchTurns > 0
+      ? "prompt_metadata_drift"
+      : repairContextMismatchTurns > 0
+        ? "repair_context_drift"
+        : selectorActorMismatchTurns > 0
+          ? "selector_actor_drift"
+          : representationLimitedRounds > 0
+            ? "representation_limited"
+            : allLegacy
+              ? "legacy_unverified"
+              : actualPromptTurns < turns.length
+                ? "prompt_unverified"
+                : "verified";
 
   return {
     state,
@@ -178,6 +189,7 @@ export function deriveProviderMemoryFairness(
     auditedTurns: turns.length,
     actualPromptTurns,
     publicPayloadMismatchRounds,
+    promptMetadataMismatchTurns,
     repairContextMismatchTurns,
     selectorActorMismatchTurns,
     representationLimitedRounds,
@@ -186,14 +198,18 @@ export function deriveProviderMemoryFairness(
 
 function samePromptDeck(a: ProviderTransportAuditRecord, b: ProviderTransportAuditRecord): boolean {
   return JSON.stringify({
-    snapshot: a.snapshotEventIds,
+    actualSnapshot: a.snapshotEventIds,
+    declaredSnapshot: a.declaredSnapshotEventIds ?? null,
+    metadataParity: a.snapshotMetadataMatchesPayload ?? null,
     latest: a.latestRoundEventIds ?? [],
     pinned: a.pinnedOpenIssueEventIds ?? [],
     sources: a.pinnedIssueSourceEventIds ?? [],
     actors: a.latestRoundSelectedActorIds ?? [],
     payload: a.publicContextFingerprint ?? null,
   }) === JSON.stringify({
-    snapshot: b.snapshotEventIds,
+    actualSnapshot: b.snapshotEventIds,
+    declaredSnapshot: b.declaredSnapshotEventIds ?? null,
+    metadataParity: b.snapshotMetadataMatchesPayload ?? null,
     latest: b.latestRoundEventIds ?? [],
     pinned: b.pinnedOpenIssueEventIds ?? [],
     sources: b.pinnedIssueSourceEventIds ?? [],
@@ -258,6 +274,7 @@ function emptyModel(): ProviderMemoryFairnessModel {
     auditedTurns: 0,
     actualPromptTurns: 0,
     publicPayloadMismatchRounds: 0,
+    promptMetadataMismatchTurns: 0,
     repairContextMismatchTurns: 0,
     selectorActorMismatchTurns: 0,
     representationLimitedRounds: 0,
