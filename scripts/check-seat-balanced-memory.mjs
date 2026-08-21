@@ -5,13 +5,23 @@ const test = fs.readFileSync("tests/context-selection-seat-fairness.test.ts", "u
 const doc = fs.readFileSync("docs/SEAT_BALANCED_MEMORY.md", "utf8");
 
 for (const claim of [
+  "balancedRoundIds",
   "const byActor = new Map",
   "stableRotation",
   "const actorCycle = rotate",
+  "selected.add",
+  "return events.filter((event) => selected.has(event.id))",
   "publication position receives preference",
-  "return latest.filter((event) => selected.has(event.id))",
-]) assert(selector.includes(claim), `Seat-balanced selector is missing ${claim}.`);
+]) assert(selector.includes(claim), `Seat-balanced selector is missing semantic structure: ${claim}.`);
 
+assert(
+  /function latestRoundIds[\s\S]*?return balancedRoundIds\(latest, maxEvents,/.test(selector),
+  "Newest-round overflow must delegate to the shared deterministic actor-balanced allocator.",
+);
+assert(
+  /function balancedRoundIds[\s\S]*?const byActor = new Map[\s\S]*?const actorCycle = rotate[\s\S]*?return events\.filter\(\(event\) => selected\.has\(event\.id\)\)/.test(selector),
+  "Seat-balanced allocator must group by actor, rotate deterministically, and restore selected events to input Blackboard chronology.",
+);
 assert(
   !/filter\(\(event\) => event\.round === latestRound\)[\s\S]{0,100}slice\(-maxEvents\)/.test(selector),
   "Latest-round overflow must never fall back to publication-tail slice(-maxEvents).",
