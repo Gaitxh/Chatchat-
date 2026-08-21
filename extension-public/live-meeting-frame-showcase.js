@@ -1,30 +1,100 @@
 (() => {
   const params = new URLSearchParams(location.search);
-  if (params.get("showcase") !== "consultation" || params.get("live-proof") !== "persuasion") return;
+  const proofMode = params.get("live-proof");
+  if (params.get("showcase") !== "consultation" || (proofMode !== "persuasion" && proofMode !== "response")) return;
 
   const locale = params.get("lang") === "en" ? "en" : "zh-CN";
   const ROOT_ATTR = "data-chatchat-live-proof-showcase";
   const FRAME_ATTR = "data-chatchat-live-proof-frame";
   const STRONG_SELECTOR = '[data-persuasion-strength="strong"][data-persuasion-cause-event][data-persuasion-action-event]';
+  const RESPONDING_SELECTOR = '[data-live-response-rail="canonical-peer-exchange"][data-live-response-state="responding"]';
+  const QUEUED_SELECTOR = '[data-live-response-rail="canonical-peer-exchange"][data-live-response-state="queued"]';
+  const QUEUED_FALLBACK_MS = 900;
+  let queuedFallbackTimer = 0;
+  let observer = null;
 
   function capture() {
-    if (document.querySelector(`[${FRAME_ATTR}="persuasion"]`)) return true;
+    return proofMode === "response" ? captureResponse() : capturePersuasion();
+  }
 
+  function capturePersuasion() {
+    if (document.querySelector(`[${FRAME_ATTR}="persuasion"]`)) return true;
     const strong = document.querySelector(STRONG_SELECTOR);
     const floor = strong?.closest(".live-participant-floor") ?? document.querySelector(".live-participant-floor");
     if (!(strong instanceof HTMLElement) || !(floor instanceof HTMLElement)) return false;
 
+    return freezeFloor({
+      mode: "persuasion",
+      floor,
+      frameDataset: {
+        persuasionCauseEvent: strong.dataset.persuasionCauseEvent ?? "",
+        persuasionActionEvent: strong.dataset.persuasionActionEvent ?? "",
+      },
+      heading: locale === "zh-CN"
+        ? `<span>REAL CHROMIUM · LIVE FRAME</span><h1>AI 大会正在发生</h1><p>这个画面在真实 consultation 第一次出现可追溯的强影响事件时冻结。下面不是静态 mock：它是当时真实 Live Floor 的 DOM 快照。</p><b>↻ 已捕获一次“谁说服了谁”</b>`
+        : `<span>REAL CHROMIUM · LIVE FRAME</span><h1>The AI assembly is happening now</h1><p>This frame freezes the real consultation DOM at the first traceable strong-influence event. It is not a static mock; it is the actual Live Floor at that moment.</p><b>↻ Captured one “who moved whom” event</b>`,
+    });
+  }
+
+  function captureResponse({ allowQueued = false } = {}) {
+    if (document.querySelector(`[${FRAME_ATTR}="response"]`)) return true;
+
+    const responding = document.querySelector(RESPONDING_SELECTOR);
+    if (responding instanceof HTMLElement) {
+      clearQueuedFallback();
+      return freezeResponseFloor(responding);
+    }
+
+    const queued = document.querySelector(QUEUED_SELECTOR);
+    if (!(queued instanceof HTMLElement)) return false;
+    if (allowQueued) return freezeResponseFloor(queued);
+    scheduleQueuedFallback();
+    return false;
+  }
+
+  function scheduleQueuedFallback() {
+    if (queuedFallbackTimer) return;
+    queuedFallbackTimer = window.setTimeout(() => {
+      queuedFallbackTimer = 0;
+      if (captureResponse({ allowQueued: true })) observer?.disconnect();
+    }, QUEUED_FALLBACK_MS);
+  }
+
+  function clearQueuedFallback() {
+    if (!queuedFallbackTimer) return;
+    window.clearTimeout(queuedFallbackTimer);
+    queuedFallbackTimer = 0;
+  }
+
+  function freezeResponseFloor(rail) {
+    const floor = rail.closest(".live-participant-floor");
+    if (!(floor instanceof HTMLElement)) return false;
+    const state = rail.dataset.liveResponseState ?? "";
+    if (state !== "responding" && state !== "queued") return false;
+    return freezeFloor({
+      mode: "response",
+      floor,
+      frameDataset: {
+        liveResponseState: state,
+        liveResponseRequestEvent: rail.dataset.liveResponseRequestEvent ?? "",
+        liveResponseTargetActor: rail.dataset.liveResponseTargetActor ?? "",
+      },
+      heading: locale === "zh-CN"
+        ? `<span>REAL CHROMIUM · RESPONSE FRAME</span><h1>点名答辩正在发生</h1><p>这个画面冻结在真实公开协商中：一位 AI 已经点名另一位 AI，回应正在生成，或已进入下一轮待回应队列。状态直接来自 canonical Peer Exchange。</p><b>⚔ 正在追踪一条真实答辩路线</b>`
+        : `<span>REAL CHROMIUM · RESPONSE FRAME</span><h1>One AI is waiting on another</h1><p>This frame freezes the real open consultation while a named response is actively being produced or queued for the next debate turn. The state comes directly from canonical Peer Exchange.</p><b>⚔ Tracking one real response route</b>`,
+    });
+  }
+
+  function freezeFloor({ mode, floor, frameDataset, heading }) {
+    if (document.querySelector(`[${FRAME_ATTR}="${mode}"]`)) return true;
     const frame = document.createElement("main");
     frame.className = "chatchat-live-proof-frame consultation-full-room";
-    frame.setAttribute(FRAME_ATTR, "persuasion");
-    frame.dataset.persuasionCauseEvent = strong.dataset.persuasionCauseEvent ?? "";
-    frame.dataset.persuasionActionEvent = strong.dataset.persuasionActionEvent ?? "";
+    frame.setAttribute(FRAME_ATTR, mode);
+    for (const [key, value] of Object.entries(frameDataset)) frame.dataset[key] = value;
 
-    const heading = document.createElement("header");
-    heading.className = "chatchat-live-proof-frame__heading";
-    heading.innerHTML = locale === "zh-CN"
-      ? `<span>REAL CHROMIUM · LIVE FRAME</span><h1>AI 大会正在发生</h1><p>这个画面在真实 consultation 第一次出现可追溯的强影响事件时冻结。下面不是静态 mock：它是当时真实 Live Floor 的 DOM 快照。</p><b>↻ 已捕获一次“谁说服了谁”</b>`
-      : `<span>REAL CHROMIUM · LIVE FRAME</span><h1>The AI assembly is happening now</h1><p>This frame freezes the real consultation DOM at the first traceable strong-influence event. It is not a static mock; it is the actual Live Floor at that moment.</p><b>↻ Captured one “who moved whom” event</b>`;
+    const headingElement = document.createElement("header");
+    headingElement.className = "chatchat-live-proof-frame__heading";
+    headingElement.innerHTML = heading;
 
     const proposal = document.createElement("section");
     proposal.className = "chatchat-live-proof-frame__proposal";
@@ -39,7 +109,7 @@
     if (!(liveClone instanceof HTMLElement)) return false;
     liveClone.dataset.liveProofClone = "true";
 
-    frame.append(heading, proposal, liveClone);
+    frame.append(headingElement, proposal, liveClone);
     document.body.append(frame);
     installStyle();
     document.body.style.overflow = "hidden";
@@ -156,9 +226,10 @@
 
   function start() {
     if (capture()) return;
-    const observer = new MutationObserver(() => {
+    observer = new MutationObserver(() => {
       if (!capture()) return;
       observer.disconnect();
+      clearQueuedFallback();
     });
     observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
   }
