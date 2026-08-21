@@ -9,15 +9,29 @@ for (const claim of [
   "selectPinnedIssueMemory",
   "selectOrdinaryRecentIds",
   "balancedRoundIds",
-  "same structural priority and the same source round",
-  "Only the oldest boundary round that cannot fit is truncated",
-  "Issue context groups are indivisible",
   "stableRotation(`${sessionId}|pin|${cohortKey}`",
   "stableRotation(seed, actorIds.length)",
+  "pinned.size + additions.length > maxPinnedIssueEvents",
 ]) {
-  assert(selector.includes(claim), `Bounded-memory fairness selector is missing ${claim}.`);
+  assert(selector.includes(claim), `Bounded-memory fairness selector is missing semantic structure: ${claim}.`);
 }
-
+assert(
+  /const key = `\$\{issueMemoryRank\(issue\)\}\|\$\{issue\.round\}`/.test(selector),
+  "Pin cohorts must be defined by structural priority plus source round before actor balancing resolves ties.",
+);
+assert(
+  /const byActor = new Map<string, OpenMeetingIssueProvenance\[\]>/[Symbol.match](selector)
+    && /const actorCycle = rotate\(actorIds, stableRotation\(`\$\{sessionId\}\|pin\|\$\{cohortKey\}`/.test(selector),
+  "Equal-rank/equal-round pin candidates must be grouped by source actor and traversed with deterministic rotation.",
+);
+assert(
+  /function selectOrdinaryRecentIds[\s\S]*?rounds[\s\S]*?sort\(\(a, b\) => b - a\)[\s\S]*?balancedRoundIds\(roundEvents, remaining/.test(selector),
+  "Ordinary recency must preserve newer rounds first and delegate only the truncated boundary round to actor balancing.",
+);
+assert(
+  /function balancedRoundIds[\s\S]*?return events\.filter\(\(event\) => selected\.has\(event\.id\)\)/.test(selector),
+  "Shared actor-balanced allocator must restore selected events to input Blackboard chronology.",
+);
 assert(!selector.includes("ordinaryCandidates.slice(-remaining)"), "Ordinary recency must not regress to publication-tail slice(-remaining).");
 assert(!/issueMemoryRank\(a\)[\s\S]{0,180}indexById\.get\(a\.sourceEventId\)/.test(selector), "Pin selection must not rely on a global source-index tiebreak after rank/round without source-actor balancing.");
 
