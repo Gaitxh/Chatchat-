@@ -13,10 +13,15 @@ const focusSelector = typeof args.focusSelector === "string" ? args.focusSelecto
 const width = positiveInteger(args.width ?? "1440", "--width");
 const height = positiveInteger(args.height ?? "2800", "--height");
 const waitMs = positiveInteger(args.waitMs ?? "26000", "--wait-ms");
+// --wait-ms remains the product readiness budget. Individual DevTools RPCs get
+// a smaller ceiling so a wedged Page.navigate / Runtime.evaluate / screenshot
+// cannot consume the entire GitHub Actions job without an actionable failure.
+const cdpCallTimeoutMs = Math.min(8000, Math.max(2500, Math.floor(waitMs / 2)));
 const port = await freeDebugPort();
 const profile = await fs.mkdtemp(path.join(os.tmpdir(), "chatchat-chromium-proof-"));
 
 let browser;
+let stderrChunks = [];
 try {
   browser = spawn(chrome, [
     "--headless=new",
@@ -30,12 +35,19 @@ try {
     "about:blank",
   ], { stdio: ["ignore", "pipe", "pipe"] });
 
-  const stderr = [];
-  browser.stderr?.on("data", (chunk) => stderr.push(String(chunk)));
+  browser.stderr?.on("data", (chunk) => {
+    stderrChunks.push(String(chunk));
+    if (stderrChunks.length > 80) stderrChunks = stderrChunks.slice(-80);
+  });
   browser.stdout?.resume();
 
-  const target = await waitForPageTarget(port, waitMs);
-  const cdp = await connectCdp(target.webSocketDebuggerUrl);
+  const target = await waitForPageTarget(
+    port,
+    waitMs,
+    () => browser?.exitCode ?? null,
+    () => stderrTail(stderrChunks),
+  );
+  const cdp = connectCdp(target.webSocketDebuggerUrl, cdpCallTimeoutMs);
   try {
     await cdp.call("Page.enable");
     await cdp.call("Runtime.enable");
@@ -80,7 +92,8 @@ try {
     cdp.close();
   }
 } catch (error) {
-  console.error(`Chromium proof capture failed: ${message(error)}`);
+  const tail = stderrTail(stderrChunks);
+  console.error(`Chromium proof capture failed: ${message(error)}${tail ? `\nChromium stderr tail:\n${tail}` : ""}`);
   throw error;
 } finally {
   if (browser && !browser.killed) browser.kill("SIGTERM");
@@ -134,9 +147,14 @@ async function evaluate(cdp, expression) {
   return result?.result?.value;
 }
 
-async function waitForPageTarget(port, timeoutMs) {
+async function waitForPageTarget(port, timeoutMs, exitCode, diagnostics) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
+    const exited = exitCode?.();
+    if (exited !== null && exited !== undefined) {
+      const tail = diagnostics?.();
+      throw new Error(`Chromium exited before exposing a DevTools page target (exit ${exited})${tail ? `. stderr: ${singleLine(tail)}` : "."}`);
+    }
     try {
       const response = await fetch(`http://127.0.0.1:${port}/json/list`);
       if (response.ok) {
@@ -147,10 +165,11 @@ async function waitForPageTarget(port, timeoutMs) {
     } catch {}
     await sleep(80);
   }
-  throw new Error(`Chromium DevTools endpoint did not expose a page target on port ${port}.`);
+  const tail = diagnostics?.();
+  throw new Error(`Chromium DevTools endpoint did not expose a page target on port ${port}${tail ? `. stderr: ${singleLine(tail)}` : "."}`);
 }
 
-function connectCdp(wsUrl) {
+function connectCdp(wsUrl, callTimeoutMs) {
   const socket = new WebSocket(wsUrl);
   let nextId = 1;
   const pending = new Map();
@@ -165,20 +184,36 @@ function connectCdp(wsUrl) {
     const waiter = pending.get(payload.id);
     if (!waiter) return;
     pending.delete(payload.id);
+    clearTimeout(waiter.timer);
     if (payload.error) waiter.reject(new Error(`CDP ${waiter.method} failed: ${JSON.stringify(payload.error)}`));
     else waiter.resolve(payload.result);
   });
   socket.addEventListener("close", () => {
-    for (const waiter of pending.values()) waiter.reject(new Error(`CDP socket closed while waiting for ${waiter.method}.`));
+    for (const waiter of pending.values()) {
+      clearTimeout(waiter.timer);
+      waiter.reject(new Error(`CDP socket closed while waiting for ${waiter.method}.`));
+    }
     pending.clear();
   });
   return {
     async call(method, params = {}) {
-      await opened;
+      await withDeadline(opened, callTimeoutMs, `CDP WebSocket open timed out before ${method}.`);
       const id = nextId++;
       return new Promise((resolve, reject) => {
-        pending.set(id, { resolve, reject, method });
-        socket.send(JSON.stringify({ id, method, params }));
+        const timer = setTimeout(() => {
+          const waiter = pending.get(id);
+          if (!waiter) return;
+          pending.delete(id);
+          reject(new Error(`CDP ${method} timed out after ${callTimeoutMs} ms.`));
+        }, callTimeoutMs);
+        pending.set(id, { resolve, reject, method, timer });
+        try {
+          socket.send(JSON.stringify({ id, method, params }));
+        } catch (error) {
+          clearTimeout(timer);
+          pending.delete(id);
+          reject(error);
+        }
       });
     },
     close() { socket.close(); },
@@ -229,5 +264,22 @@ function required(value, flag) {
   return value;
 }
 
+function withDeadline(promise, timeoutMs, errorMessage) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
+function stderrTail(chunks) {
+  const text = chunks.join("").trim();
+  if (!text) return "";
+  return text.split(/\r?\n/).slice(-12).join("\n").slice(-4000);
+}
+
+function singleLine(value) { return String(value).replace(/\s+/g, " ").trim().slice(-1200); }
 function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 function message(error) { return error instanceof Error ? error.message : String(error); }
