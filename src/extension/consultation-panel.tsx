@@ -51,6 +51,10 @@ import {
   CONNECTION_RETRY_REQUESTED_EVENT,
   type ConnectionRetryRequestedDetail,
 } from "./connection-retry-wire.js";
+import {
+  mayAutomaticallyNavigateProviderTab,
+  mayAutomaticallyResumeProviderTab,
+} from "./provider-tab-boundary.js";
 import { createSerializedRecordMutation } from "./serialized-record-mutation.js";
 import "./consultation-panel.css";
 import "./consultation-live.css";
@@ -250,6 +254,7 @@ function ConsultationApp() {
         const connection = hydratedConnections[participant.seatId];
         const recipe = storedRecipes[participant.origin];
         if (connection?.state === "ready" && adapterRecipeComplete(recipe)) continue;
+        if (!mayAutomaticallyResumeProviderTab(participant)) continue;
         void autoConnectParticipant(participant, recipe);
       }
     } catch (caught) {
@@ -869,8 +874,10 @@ function createTabConsultationAgent(participant: ExtensionParticipant, recipe: A
       return { responseText: result.responseText, elapsedMs: result.elapsedMs };
     },
     async () => {
-      await chrome.tabs.update(participant.tabId, { url: participant.startUrl });
-      await waitForTabComplete(participant.tabId, 35_000);
+      if (mayAutomaticallyNavigateProviderTab(participant)) {
+        await chrome.tabs.update(participant.tabId, { url: participant.startUrl });
+        await waitForTabComplete(participant.tabId, 35_000);
+      }
       await ensureBridge(participant.tabId);
       await sendBridge(participant.tabId, { type: "AWAIT_RECIPE", recipe: participantRecipe, timeoutMs: 35_000 });
     },
