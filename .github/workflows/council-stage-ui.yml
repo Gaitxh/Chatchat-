@@ -130,8 +130,45 @@ jobs:
           grep -Fq 'Response duty ≠ agreement duty' artifacts/chatchat-response-obligations-en.html
           grep -Fq '回应义务 ≠ 同意义务' artifacts/chatchat-response-obligations-zh.html
 
+      - name: Capture bilingual live response rail
+        run: |
+          for LANG in en zh; do
+            node scripts/capture-chromium-proof.mjs \
+              --chrome "$CHROME_BIN" \
+              --url "http://127.0.0.1:4186/app/app.html?showcase=consultation&lang=$LANG&live-proof=response" \
+              --width 1200 --height 760 --wait-ms 26000 \
+              --ready-selector '.chatchat-live-proof-frame[data-chatchat-live-proof-frame="response"][data-live-response-phase="debate"][data-live-response-state] [data-live-response-rail="canonical-peer-exchange"]' \
+              --focus-selector '.chatchat-live-proof-frame[data-chatchat-live-proof-frame="response"] [data-live-response-rail="canonical-peer-exchange"]' \
+              --screenshot "artifacts/chatchat-live-response-rail-$LANG.png" \
+              --dom "artifacts/chatchat-live-response-rail-$LANG.html"
+          done
+
+      - name: Validate live response rail provenance
+        run: |
+          for LANG in en zh; do
+            DOM="artifacts/chatchat-live-response-rail-$LANG.html"
+            grep -q 'data-chatchat-live-proof-frame="response"' "$DOM"
+            grep -q 'data-live-response-phase="debate"' "$DOM"
+            grep -Eq 'data-chatchat-live-proof-frame="response"[^>]*data-live-response-state="(responding|queued)"' "$DOM"
+            grep -q 'data-live-response-rail="canonical-peer-exchange"' "$DOM"
+            grep -Eq 'data-live-response-state="(responding|queued)"' "$DOM"
+            grep -q 'data-live-response-request-event=' "$DOM"
+            grep -q 'data-live-response-target-actor=' "$DOM"
+            grep -q 'data-live-response-pending-count=' "$DOM"
+            grep -q 'data-live-response-responding-count=' "$DOM"
+            grep -q 'data-live-response-answered-count=' "$DOM"
+            grep -q 'peer-exchange-queue' "$DOM"
+          done
+          grep -Fq 'REAL CHROMIUM · RESPONSE FRAME' artifacts/chatchat-live-response-rail-en.html
+          grep -Fq 'One AI is waiting on another' artifacts/chatchat-live-response-rail-en.html
+          grep -Fq 'LIVE RESPONSE' artifacts/chatchat-live-response-rail-en.html
+          grep -Fq 'Response duty ≠ agreement duty' artifacts/chatchat-live-response-rail-en.html
+          grep -Fq '点名答辩正在发生' artifacts/chatchat-live-response-rail-zh.html
+          grep -Fq '实时答辩' artifacts/chatchat-live-response-rail-zh.html
+          grep -Fq '回应义务 ≠ 同意义务' artifacts/chatchat-live-response-rail-zh.html
+
       - name: Reject blank screenshots
-        run: node scripts/check-png-content.mjs artifacts/chatchat-council-*.png artifacts/chatchat-response-obligations-*.png
+        run: node scripts/check-png-content.mjs artifacts/chatchat-council-*.png artifacts/chatchat-response-obligations-*.png artifacts/chatchat-live-response-rail-*.png
 
       - name: Save preview log
         if: always()

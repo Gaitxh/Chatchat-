@@ -10,6 +10,7 @@ import { researchLaneDefinition } from "../../consultation/research-lanes.js";
 import type { Locale } from "../../i18n/index.js";
 import { CONSULTATION_FOCUS_EVENT } from "../provenance-wire.js";
 import { LivePersuasionPulse } from "./LivePersuasionPulse.js";
+import { LiveResponseRail } from "./LiveResponseRail.js";
 import { PeerExchangeQueue } from "./PeerExchangeQueue.js";
 import "./live-participant-floor.css";
 
@@ -123,6 +124,15 @@ export function LiveParticipantFloor({
       </header>
 
       <RoundRail phase={phase} events={events} counts={roundCounts} locale={locale} />
+
+      <LiveResponseRail
+        participants={participants}
+        events={events}
+        activities={activities}
+        phase={phase}
+        locale={locale}
+        onFocusEvent={focusEvent}
+      />
 
       <div className="live-participant-grid">
         {participants.map((participant) => (
