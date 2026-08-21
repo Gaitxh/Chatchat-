@@ -9,8 +9,6 @@
   const STRONG_SELECTOR = '[data-persuasion-strength="strong"][data-persuasion-cause-event][data-persuasion-action-event]';
   const RESPONDING_SELECTOR = '[data-live-response-rail="canonical-peer-exchange"][data-live-response-state="responding"]';
   const QUEUED_SELECTOR = '[data-live-response-rail="canonical-peer-exchange"][data-live-response-state="queued"]';
-  const QUEUED_FALLBACK_MS = 900;
-  let queuedFallbackTimer = 0;
   let observer = null;
 
   function capture() {
@@ -36,34 +34,10 @@
     });
   }
 
-  function captureResponse({ allowQueued = false } = {}) {
+  function captureResponse() {
     if (document.querySelector(`[${FRAME_ATTR}="response"]`)) return true;
-
-    const responding = document.querySelector(RESPONDING_SELECTOR);
-    if (responding instanceof HTMLElement) {
-      clearQueuedFallback();
-      return freezeResponseFloor(responding);
-    }
-
-    const queued = document.querySelector(QUEUED_SELECTOR);
-    if (!(queued instanceof HTMLElement)) return false;
-    if (allowQueued) return freezeResponseFloor(queued);
-    scheduleQueuedFallback();
-    return false;
-  }
-
-  function scheduleQueuedFallback() {
-    if (queuedFallbackTimer) return;
-    queuedFallbackTimer = window.setTimeout(() => {
-      queuedFallbackTimer = 0;
-      if (captureResponse({ allowQueued: true })) observer?.disconnect();
-    }, QUEUED_FALLBACK_MS);
-  }
-
-  function clearQueuedFallback() {
-    if (!queuedFallbackTimer) return;
-    window.clearTimeout(queuedFallbackTimer);
-    queuedFallbackTimer = 0;
+    const rail = document.querySelector(RESPONDING_SELECTOR) ?? document.querySelector(QUEUED_SELECTOR);
+    return rail instanceof HTMLElement ? freezeResponseFloor(rail) : false;
   }
 
   function freezeResponseFloor(rail) {
@@ -175,7 +149,7 @@
         right: 28px;
         padding: 8px 11px;
         border-radius: 999px;
-        background: rgba(171, 103, 199,.12);
+        background: rgba(171, 103, 199, .12);
         color: #d7ade8;
         font: 700 11px/1 ui-sans-serif, system-ui, sans-serif;
       }
@@ -231,7 +205,6 @@
     observer = new MutationObserver(() => {
       if (!capture()) return;
       observer.disconnect();
-      clearQueuedFallback();
     });
     observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
   }
