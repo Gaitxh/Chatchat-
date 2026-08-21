@@ -35,12 +35,17 @@ export interface ProviderVisibleConsultationContext {
  * This selector never scores prose, stance popularity, model identity or
  * confidence. Pinned events gain memory priority only — never authority.
  *
- * If the newest round itself exceeds the hard budget, ChatChat allocates that
- * round seat-by-seat instead of using Blackboard publication order. Each actor
- * gets one newest event before any actor gets a second, then one second-newest
- * before any actor gets a third, and so on. A deterministic per-session rotation
- * decides only mathematically unavoidable remainder slots; no Provider brand,
- * stance, confidence, speed or publication position receives preference.
+ * Bounded-memory procedural fairness has three independent layers:
+ * 1) an overflowing newest round is balanced across active source actors;
+ * 2) equal-priority / equal-round pin candidates are round-robin allocated by
+ *    source actor while preserving structural issue priority and older-round
+ *    anti-starvation;
+ * 3) ordinary recency keeps whole newer rounds first and only balances the one
+ *    older boundary round that cannot fit completely.
+ *
+ * Deterministic rotation resolves only mathematically unavoidable remainders.
+ * No Provider brand, stance, confidence, speed, majority membership, evidence
+ * popularity or Blackboard publication position receives preference.
  */
 export function selectProviderContextEvents(
   publicEvents: readonly CouncilEvent[],
@@ -71,31 +76,19 @@ export function selectProviderContextEvents(
     requestedPinned,
     Math.max(0, maxEvents - protectedLatest.size),
   );
-
-  const issues = [...deriveOpenMeetingIssueProvenance(publicEvents)].sort((a, b) =>
-    issueMemoryRank(a) - issueMemoryRank(b)
-      || a.round - b.round
-      || (indexById.get(a.sourceEventId) ?? Number.MAX_SAFE_INTEGER)
-        - (indexById.get(b.sourceEventId) ?? Number.MAX_SAFE_INTEGER),
+  const issues = deriveOpenMeetingIssueProvenance(publicEvents);
+  const { pinned, pinnedIssueSourceEventIds } = selectPinnedIssueMemory(
+    issues,
+    publicEvents,
+    eventById,
+    indexById,
+    protectedLatest,
+    maxPinnedIssueEvents,
   );
-
-  const pinned = new Set<string>();
-  const pinnedIssueSourceEventIds: string[] = [];
-  for (const issue of issues) {
-    if (pinned.size >= maxPinnedIssueEvents) break;
-    const group = issueContextGroup(issue, eventById, indexById);
-    const additions = group.filter((eventId) => !pinned.has(eventId) && !protectedLatest.has(eventId));
-    if (!additions.length) continue;
-    if (pinned.size + additions.length > maxPinnedIssueEvents) continue;
-    for (const eventId of additions) pinned.add(eventId);
-    pinnedIssueSourceEventIds.push(issue.sourceEventId);
-  }
 
   const remaining = Math.max(0, maxEvents - protectedLatest.size - pinned.size);
   const ordinaryCandidates = publicEvents.filter((event) => !pinned.has(event.id) && !protectedLatest.has(event.id));
-  const ordinaryRecent = remaining > 0
-    ? ordinaryCandidates.slice(-remaining).map((event) => event.id)
-    : [];
+  const ordinaryRecent = selectOrdinaryRecentIds(ordinaryCandidates, remaining);
   const recent = [...ordinaryRecent, ...latestRoundEventIds]
     .sort((a, b) => (indexById.get(a) ?? 0) - (indexById.get(b) ?? 0));
   const selectedIds = new Set([...pinned, ...recent]);
@@ -127,6 +120,109 @@ export function providerVisibleConsultationContext(
       publicEvents: selection.events,
     },
   };
+}
+
+function selectPinnedIssueMemory(
+  issues: readonly OpenMeetingIssueProvenance[],
+  publicEvents: readonly CouncilEvent[],
+  eventById: ReadonlyMap<string, CouncilEvent>,
+  indexById: ReadonlyMap<string, number>,
+  protectedLatest: ReadonlySet<string>,
+  maxPinnedIssueEvents: number,
+): { pinned: Set<string>; pinnedIssueSourceEventIds: string[] } {
+  const pinned = new Set<string>();
+  const pinnedIssueSourceEventIds: string[] = [];
+  if (maxPinnedIssueEvents <= 0 || !issues.length) return { pinned, pinnedIssueSourceEventIds };
+
+  const cohorts = new Map<string, OpenMeetingIssueProvenance[]>();
+  for (const issue of issues) {
+    const key = `${issueMemoryRank(issue)}|${issue.round}`;
+    const group = cohorts.get(key) ?? [];
+    group.push(issue);
+    cohorts.set(key, group);
+  }
+  const orderedCohorts = [...cohorts.entries()].sort(([a], [b]) => {
+    const [rankA, roundA] = a.split("|").map(Number);
+    const [rankB, roundB] = b.split("|").map(Number);
+    return (rankA ?? 0) - (rankB ?? 0) || (roundA ?? 0) - (roundB ?? 0);
+  });
+  const sessionId = publicEvents[0]?.sessionId ?? "";
+
+  for (const [cohortKey, cohort] of orderedCohorts) {
+    if (pinned.size >= maxPinnedIssueEvents) break;
+    const byActor = new Map<string, OpenMeetingIssueProvenance[]>();
+    for (const issue of [...cohort].sort((a, b) =>
+      (indexById.get(a.sourceEventId) ?? Number.MAX_SAFE_INTEGER)
+        - (indexById.get(b.sourceEventId) ?? Number.MAX_SAFE_INTEGER),
+    )) {
+      const bucket = byActor.get(issue.actorId) ?? [];
+      bucket.push(issue);
+      byActor.set(issue.actorId, bucket);
+    }
+    const actorIds = [...byActor.keys()].sort((a, b) => a.localeCompare(b));
+    const actorCycle = rotate(actorIds, stableRotation(`${sessionId}|pin|${cohortKey}`, actorIds.length));
+    const cursor = new Map(actorIds.map((actorId) => [actorId, 0] as const));
+
+    while (pinned.size < maxPinnedIssueEvents) {
+      let addedThisPass = false;
+      let inspectedThisPass = false;
+      for (const actorId of actorCycle) {
+        const bucket = byActor.get(actorId) ?? [];
+        let index = cursor.get(actorId) ?? 0;
+        while (index < bucket.length) {
+          inspectedThisPass = true;
+          const issue = bucket[index]!;
+          index += 1;
+          cursor.set(actorId, index);
+          const issueGroup = issueContextGroup(issue, eventById, indexById);
+          const additions = issueGroup.filter((eventId) => !pinned.has(eventId) && !protectedLatest.has(eventId));
+          if (!additions.length) continue;
+          // Issue context groups are indivisible. A challenge/question must not
+          // be pinned without the bounded structural context that makes it
+          // intelligible merely to fill the final one or two slots.
+          if (pinned.size + additions.length > maxPinnedIssueEvents) continue;
+          for (const eventId of additions) pinned.add(eventId);
+          pinnedIssueSourceEventIds.push(issue.sourceEventId);
+          addedThisPass = true;
+          break;
+        }
+        if (pinned.size >= maxPinnedIssueEvents) break;
+      }
+      if (!addedThisPass && !inspectedThisPass) break;
+      if (!addedThisPass && actorIds.every((actorId) => (cursor.get(actorId) ?? 0) >= (byActor.get(actorId)?.length ?? 0))) break;
+    }
+  }
+
+  return { pinned, pinnedIssueSourceEventIds };
+}
+
+function selectOrdinaryRecentIds(
+  ordinaryCandidates: readonly CouncilEvent[],
+  capacity: number,
+): string[] {
+  if (capacity <= 0 || !ordinaryCandidates.length) return [];
+  if (ordinaryCandidates.length <= capacity) return ordinaryCandidates.map((event) => event.id);
+
+  const rounds = unique(ordinaryCandidates.map((event) => event.round)).sort((a, b) => b - a);
+  const selected = new Set<string>();
+  const sessionId = ordinaryCandidates[0]?.sessionId ?? "";
+  for (const round of rounds) {
+    const remaining = capacity - selected.size;
+    if (remaining <= 0) break;
+    const roundEvents = ordinaryCandidates.filter((event) => event.round === round);
+    if (roundEvents.length <= remaining) {
+      for (const event of roundEvents) selected.add(event.id);
+      continue;
+    }
+    // Only the oldest boundary round that cannot fit is truncated. Balance that
+    // unavoidable truncation across active actors, then stop: older rounds must
+    // never displace a newer complete round in the name of seat equality.
+    for (const eventId of balancedRoundIds(roundEvents, remaining, `${sessionId}|ordinary|${round}`)) {
+      selected.add(eventId);
+    }
+    break;
+  }
+  return ordinaryCandidates.filter((event) => selected.has(event.id)).map((event) => event.id);
 }
 
 function issueContextGroup(
@@ -175,23 +271,30 @@ function latestRoundIds(events: readonly CouncilEvent[], maxEvents: number): str
   const latestRound = Math.max(...events.map((event) => event.round));
   const latest = events.filter((event) => event.round === latestRound);
   if (latest.length <= maxEvents) return latest.map((event) => event.id);
+  const sessionId = latest[0]?.sessionId ?? "";
+  return balancedRoundIds(latest, maxEvents, `${sessionId}|${latestRound}`);
+}
 
+function balancedRoundIds(
+  events: readonly CouncilEvent[],
+  capacity: number,
+  seed: string,
+): string[] {
+  if (capacity <= 0 || !events.length) return [];
+  if (events.length <= capacity) return events.map((event) => event.id);
   const byActor = new Map<string, CouncilEvent[]>();
-  for (const event of latest) {
+  for (const event of events) {
     const bucket = byActor.get(event.actorId) ?? [];
     bucket.push(event);
     byActor.set(event.actorId, bucket);
   }
-
   const actorIds = [...byActor.keys()].sort((a, b) => a.localeCompare(b));
   if (!actorIds.length) return [];
-  const sessionId = latest[0]?.sessionId ?? "";
-  const rotation = stableRotation(`${sessionId}|${latestRound}`, actorIds.length);
-  const actorCycle = rotate(actorIds, rotation);
+  const actorCycle = rotate(actorIds, stableRotation(seed, actorIds.length));
   const cursor = new Map(actorIds.map((actorId) => [actorId, (byActor.get(actorId)?.length ?? 0) - 1] as const));
   const selected = new Set<string>();
 
-  while (selected.size < maxEvents) {
+  while (selected.size < capacity) {
     let addedThisPass = false;
     for (const actorId of actorCycle) {
       const bucket = byActor.get(actorId) ?? [];
@@ -200,14 +303,11 @@ function latestRoundIds(events: readonly CouncilEvent[], maxEvents: number): str
       selected.add(bucket[index]!.id);
       cursor.set(actorId, index - 1);
       addedThisPass = true;
-      if (selected.size >= maxEvents) break;
+      if (selected.size >= capacity) break;
     }
     if (!addedThisPass) break;
   }
-
-  // Allocation order is an internal fairness mechanism only. Providers still
-  // receive the selected public events in exact Blackboard chronology.
-  return latest.filter((event) => selected.has(event.id)).map((event) => event.id);
+  return events.filter((event) => selected.has(event.id)).map((event) => event.id);
 }
 
 function stableRotation(seed: string, size: number): number {
@@ -271,6 +371,6 @@ function nonNegativeInteger(value: number | undefined, fallback: number): number
   return value;
 }
 
-function unique(values: readonly string[]): string[] {
+function unique<T>(values: readonly T[]): T[] {
   return [...new Set(values)];
 }
