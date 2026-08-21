@@ -122,15 +122,21 @@ function FinalPositionFloorPortal() {
       }
 
       document.documentElement.classList.add("chatchat-final-position-floor-active");
-      const integrityCard = document.querySelector(".meeting-integrity-card");
-      const integrityRoot = integrityCard?.closest("#meeting-integrity-root");
-      if (integrityRoot?.parentElement) {
-        integrityRoot.insertAdjacentElement("afterend", root);
+      const outcome = document.querySelector(".outcome-card");
+      if (outcome?.parentElement) {
+        outcome.insertAdjacentElement("afterend", root);
         settled = true;
         return;
       }
-      const outcome = document.querySelector(".outcome-card");
-      if (outcome?.parentElement) outcome.insertAdjacentElement("afterend", root);
+
+      // Legacy/non-Web surfaces may still place Meeting Integrity beside the
+      // result. Never follow that root into the Web Room's Audit Drawer.
+      const integrityCard = document.querySelector(".meeting-integrity-card");
+      const integrityRoot = integrityCard?.closest("#meeting-integrity-root");
+      if (integrityRoot?.parentElement && !integrityRoot.closest("#council-audit-drawer")) {
+        integrityRoot.insertAdjacentElement("afterend", root);
+        settled = true;
+      }
     };
 
     place();
