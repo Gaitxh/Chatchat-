@@ -1,0 +1,99 @@
+name: Invite AI UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: chatchat-invite-ai-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  invite-ai:
+    name: Invite AI · URL to READY seat
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install and build production extension
+        run: |
+          npm ci
+          npm run check
+          npm test
+          npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Locate Chromium browser
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_BIN"
+          echo "CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
+
+      - name: Start production preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4185 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-invite-ai-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4185/manifest.json >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4185/manifest.json >/dev/null
+
+      - name: Capture bilingual Invite AI journey
+        run: |
+          for LANG in en zh; do
+            node scripts/capture-chromium-proof.mjs \
+              --chrome "$CHROME_BIN" \
+              --url "http://127.0.0.1:4185/app/app.html?showcase=invite-ai&lang=$LANG" \
+              --width 1000 --height 1100 --wait-ms 18000 \
+              --ready-selector 'html[data-chatchat-invite-ai-showcase="complete"]' \
+              --focus-selector '[data-chatchat-invite-ai="true"]' \
+              --screenshot "artifacts/chatchat-invite-ai-$LANG.png" \
+              --dom "artifacts/chatchat-invite-ai-$LANG.html"
+          done
+
+      - name: Validate Invite AI semantics from ready DOM
+        run: |
+          for LANG in en zh; do
+            DOM="artifacts/chatchat-invite-ai-$LANG.html"
+            grep -q 'data-chatchat-invite-ai-showcase="complete"' "$DOM"
+            grep -q 'data-chatchat-invite-ai-clicked="true"' "$DOM"
+            grep -q 'data-chatchat-invite-ai-created-count="1"' "$DOM"
+            grep -q 'data-chatchat-invite-ai-ready-seat=' "$DOM"
+            grep -q 'data-chatchat-invite-ai="true"' "$DOM"
+            grep -q 'claude.ai' "$DOM"
+            grep -q 'participant-row connection-ready is-ready' "$DOM"
+          done
+          grep -Fq '+ Invite AI' artifacts/chatchat-invite-ai-en.html
+          grep -Fq '＋ 邀请 AI' artifacts/chatchat-invite-ai-zh.html
+          grep -Fq 'Paste any AI website URL' artifacts/chatchat-invite-ai-en.html
+          grep -Fq '粘贴任意 AI 网站 URL' artifacts/chatchat-invite-ai-zh.html
+
+      - name: Reject blank screenshots
+        run: node scripts/check-png-content.mjs artifacts/chatchat-invite-ai-*.png
+
+      - name: Save preview log
+        if: always()
+        run: cp /tmp/chatchat-invite-ai-preview.log artifacts/preview.log 2>/dev/null || true
+
+      - name: Upload Invite AI browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-invite-ai-ui
+          path: artifacts/**
+          if-no-files-found: warn
+          retention-days: 14
