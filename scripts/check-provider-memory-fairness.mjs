@@ -37,9 +37,12 @@ requireClaims("Protocol payload fingerprint", fingerprint, [
 
 requireClaims("Actual Prompt fairness audit", promptAudit, [
   "CONSULTATION_EVENTS_JSON",
+  "declaredSnapshotEventIds",
+  "actualPublicEventIds",
+  "snapshotMetadataMatchesPayload",
   "publicContextFingerprint",
   "latestRoundSelectedActorIds",
-  "fingerprintProtocolJsonText",
+  "PUBLIC_SNAPSHOT_EVENT_IDS_JSON is not allowed to certify itself",
 ]);
 
 requireClaims("Selector fairness audit", execution, [
@@ -50,18 +53,22 @@ requireClaims("Selector fairness audit", execution, [
 ]);
 
 requireClaims("Transport fairness receipt", transport, [
+  "declaredSnapshotEventIds",
+  "snapshotMetadataMatchesPayload",
   "publicContextFingerprint",
   "latestRoundSelectedActorIds",
-  "promptMemoryObserved: true",
+  "actual CONSULTATION_EVENTS_JSON payload",
 ]);
 
 requireClaims("Provider Memory Fairness model", fairness, [
   '"representation_limited"',
   '"public_payload_mismatch"',
+  '"prompt_metadata_drift"',
   '"repair_context_drift"',
   '"selector_actor_drift"',
   '"prompt_unverified"',
   '"legacy_unverified"',
+  "promptMetadataMismatchTurns",
   "samePromptDeck",
   "selectorActorCoverageMatchesActual",
 ]);
@@ -75,7 +82,9 @@ requireClaims("Provider Memory Fairness UI", ui, [
   "PUBLIC MEMORY PROCEDURAL FAIRNESS",
   "data-provider-memory-fairness",
   "data-memory-fairness-payload-consistent",
-  "data-memory-fairness-actor-omitted",
+  "data-memory-fairness-metadata-mismatch-turns",
+  "metadata = actual IDs",
+  "PROMPT METADATA DRIFT",
   "repair keeps deck",
   "REPRESENTATION LIMITED",
 ]);
@@ -89,6 +98,7 @@ requireClaims("Seat-order regression test", selectorTest, [
 
 requireClaims("Fairness state regression test", fairnessTest, [
   "public_payload_mismatch",
+  "prompt_metadata_drift",
   "repair_context_drift",
   "selector_actor_drift",
   "representation_limited",
@@ -97,10 +107,12 @@ requireClaims("Fairness state regression test", fairnessTest, [
 ]);
 
 requireClaims("Durable fairness receipt test", historyTest, [
+  "declaredSnapshotEventIds",
+  "snapshotMetadataMatchesPayload",
   "latestRoundSelectedActorIds",
   "latestRoundOmittedActorIds",
   "publicContextFingerprint",
-  "frozen selector audit must own omitted actor ids",
+  "frozen receipt must own declared snapshot ids",
 ]);
 
 requireClaims("Overfull latest-round browser fixture", fixture, [
@@ -114,13 +126,15 @@ requireClaims("Provider Memory Fairness browser guard", guard, [
   'data-memory-fairness-round="3"',
   "data-memory-fairness-actor-represented",
   "data-memory-fairness-payload-consistent",
-  "data-provider-memory-latest-count",
+  "data-memory-fairness-metadata-mismatch-seats",
+  "data-chatchat-provider-memory-fairness-metadata-parity",
   "chatchatProviderMemoryFairnessShowcase",
 ]);
 
 requireClaims("Frozen Provider Memory Fairness replay", historyGuard, [
   "chatchatProviderMemoryFairnessHistoryReplayShowcase",
   'data-provider-memory-fairness-view="archive"',
+  "data-memory-fairness-metadata-mismatch-turns",
   "Historical Provider Memory Fairness",
   "not-applicable",
 ]);
@@ -131,6 +145,7 @@ requireClaims("Provider Memory Fairness evidence validator", validator, [
   "three actors spoke in the overfull latest round",
   "must preserve all three latest-round actors",
   "same normalized public payload",
+  "snapshot ids must equal ids independently parsed from actual public JSON",
 ]);
 
 requireClaims("Full Room fairness proof scripts", app, [
@@ -146,7 +161,7 @@ requireClaims("CI Provider Memory Fairness proof", workflow, [
   "validate-provider-memory-fairness-evidence.mjs",
 ]);
 
-console.log("✓ Provider memory fairness requires seat-balanced representation, 64-bit actual-payload equality, repair-deck parity, frozen replay and dedicated Chromium proof");
+console.log("✓ Provider memory fairness requires seat-balanced representation, 64-bit actual payload equality, metadata parity, repair-deck parity, frozen replay and Chromium proof");
 
 function read(path) {
   return fs.readFileSync(path, "utf8");
