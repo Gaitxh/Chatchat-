@@ -1,5 +1,6 @@
 import type { CouncilPhase } from "../core/types.js";
 import { providerPromptMemorySelectionFor } from "./prompt-memory-audit.js";
+import { providerPublicDeckObservationFor } from "./public-deck-audit.js";
 
 export const PROVIDER_TRANSPORT_AUDIT_EVENT = "chatchat:provider-transport";
 export type ProviderExecutionMode = "synthetic-showcase" | "live-provider-tabs";
@@ -19,6 +20,11 @@ export interface ProviderTransportAuditRecord {
   pinnedOpenIssueEventIds?: readonly string[];
   pinnedIssueSourceEventIds?: readonly string[];
   latestRoundEventIds?: readonly string[];
+  /** True only when the exact serialized CONSULTATION_EVENTS_JSON line was observed on RUN_SPEECH. */
+  publicDeckObserved?: true;
+  /** Diagnostic fingerprint of the exact public deck. Equality decisions never rely on the fingerprint. */
+  publicDeckFingerprint?: string;
+  publicDeckPayloadCharacters?: number;
   repairAttempt: boolean;
   tabId: number;
   promptChars: number;
@@ -39,7 +45,7 @@ export function recordProviderTransportAudit(record: ProviderTransportAuditRecor
   // this proof if the inner observer has not executed yet; received/failed will
   // carry it once the exact Prompt has passed through the browser API.
   const promptSelection = providerPromptMemorySelectionFor(record);
-  const enriched: ProviderTransportAuditRecord = promptSelection
+  const memoryEnriched: ProviderTransportAuditRecord = promptSelection
     ? {
         ...record,
         promptMemoryObserved: true,
@@ -49,6 +55,15 @@ export function recordProviderTransportAudit(record: ProviderTransportAuditRecor
         latestRoundEventIds: [...promptSelection.latestRoundEventIds],
       }
     : record;
+  const publicDeck = providerPublicDeckObservationFor(record);
+  const enriched: ProviderTransportAuditRecord = publicDeck
+    ? {
+        ...memoryEnriched,
+        publicDeckObserved: true,
+        publicDeckFingerprint: publicDeck.fingerprint,
+        publicDeckPayloadCharacters: publicDeck.payloadCharacters,
+      }
+    : memoryEnriched;
   const copy = cloneProviderTransportAudit(enriched);
   buffer.push(copy);
   if (buffer.length > MAX_BUFFERED_RECORDS) buffer.splice(0, buffer.length - MAX_BUFFERED_RECORDS);
