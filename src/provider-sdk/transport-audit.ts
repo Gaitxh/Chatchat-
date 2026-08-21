@@ -13,8 +13,12 @@ export interface ProviderTransportAuditRecord {
   state: ProviderTransportAuditState;
   mode: ProviderExecutionMode;
   observedAt: string;
+  /** Final truth for visible public events: ids parsed from actual CONSULTATION_EVENTS_JSON when Prompt observation exists. */
   snapshotEventIds: readonly string[];
-  /** True only when metadata was parsed from the actual RUN_SPEECH prompt. */
+  /** The Prompt's independent PUBLIC_SNAPSHOT_EVENT_IDS_JSON declaration. */
+  declaredSnapshotEventIds?: readonly string[];
+  snapshotMetadataMatchesPayload?: boolean;
+  /** True only when metadata/payload were parsed from the actual RUN_SPEECH prompt. */
   promptMemoryObserved?: true;
   pinnedOpenIssueEventIds?: readonly string[];
   pinnedIssueSourceEventIds?: readonly string[];
@@ -38,15 +42,16 @@ const buffer: ProviderTransportAuditRecord[] = [];
 export function recordProviderTransportAudit(record: ProviderTransportAuditRecord): void {
   // A lightweight prompt observer remembers metadata from the exact RUN_SPEECH
   // string. Enrich any later receipt for the same first/repair attempt from that
-  // independent observation. The outgoing `sending` receipt is allowed to lack
-  // this proof if the inner observer has not executed yet; received/failed will
-  // carry it once the exact Prompt has passed through the browser API.
+  // independent observation. The actual CONSULTATION_EVENTS_JSON payload, not
+  // its metadata declaration, becomes the final truth for snapshotEventIds.
   const promptSelection = providerPromptMemorySelectionFor(record);
   const enriched: ProviderTransportAuditRecord = promptSelection
     ? {
         ...record,
         promptMemoryObserved: true,
-        snapshotEventIds: [...promptSelection.snapshotEventIds],
+        snapshotEventIds: [...promptSelection.actualPublicEventIds],
+        declaredSnapshotEventIds: [...promptSelection.declaredSnapshotEventIds],
+        snapshotMetadataMatchesPayload: promptSelection.snapshotMetadataMatchesPayload,
         pinnedOpenIssueEventIds: [...promptSelection.pinnedOpenIssueEventIds],
         pinnedIssueSourceEventIds: [...promptSelection.pinnedIssueSourceEventIds],
         latestRoundEventIds: [...promptSelection.latestRoundEventIds],
@@ -76,6 +81,9 @@ export function cloneProviderTransportAudit(record: ProviderTransportAuditRecord
   return {
     ...record,
     snapshotEventIds: [...record.snapshotEventIds],
+    ...(record.declaredSnapshotEventIds !== undefined
+      ? { declaredSnapshotEventIds: [...record.declaredSnapshotEventIds] }
+      : {}),
     ...(record.pinnedOpenIssueEventIds !== undefined
       ? { pinnedOpenIssueEventIds: [...record.pinnedOpenIssueEventIds] }
       : {}),
