@@ -18,6 +18,7 @@ export * from "./council-agent.js";
 export * from "./council-parser.js";
 export * from "./fresh-session.js";
 export * from "./profile.js";
+export * from "./public-deck-audit.js";
 export * from "./recipe.js";
 export * from "./recipe-candidate.js";
 export * from "./session-runtime.js";
