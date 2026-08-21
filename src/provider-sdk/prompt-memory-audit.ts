@@ -1,4 +1,5 @@
 import type { CouncilPhase } from "../core/types.js";
+import { fingerprintProtocolJsonText } from "./protocol-fingerprint.js";
 
 export interface ProviderPromptMemorySelection {
   sessionId: string;
@@ -10,6 +11,11 @@ export interface ProviderPromptMemorySelection {
   pinnedOpenIssueEventIds: string[];
   pinnedIssueSourceEventIds: string[];
   latestRoundEventIds: string[];
+  latestRoundActorIds: string[];
+  latestRoundSelectedActorIds: string[];
+  latestRoundOmittedActorIds: string[];
+  /** Fingerprint of the exact normalized CONSULTATION_EVENTS_JSON payload. */
+  publicContextFingerprint?: string;
   observedAt: string;
 }
 
@@ -19,6 +25,8 @@ const selections = new Map<string, ProviderPromptMemorySelection>();
 /**
  * Parse only explicit ChatChat protocol metadata from the exact RUN_SPEECH
  * string. This does not inspect Provider reasoning or infer memory from prose.
+ * The public payload fingerprint stores only hash algorithm/hash/character-count,
+ * never a second copy of the Prompt or Blackboard prose.
  */
 export function parseProviderPromptMemorySelection(prompt: string): ProviderPromptMemorySelection | null {
   const phaseText = prompt.match(/PHASE:\s*(sealed|debate|final)/i)?.[1]?.toLowerCase() ?? "consultation";
@@ -27,6 +35,10 @@ export function parseProviderPromptMemorySelection(prompt: string): ProviderProm
   const sessionId = prompt.match(/SESSION_ID:\s*([^\n]+)/)?.[1]?.trim() ?? "";
   const actorId = prompt.match(/YOUR_ACTOR_ID:\s*([^\n]+)/)?.[1]?.trim() ?? "";
   if (!sessionId || !actorId || !Number.isFinite(round)) return null;
+  const publicContextRaw = parseRawLine(prompt, "CONSULTATION_EVENTS_JSON");
+  const publicContextFingerprint = publicContextRaw
+    ? fingerprintProtocolJsonText(publicContextRaw)?.value
+    : undefined;
   return {
     sessionId,
     actorId,
@@ -35,11 +47,12 @@ export function parseProviderPromptMemorySelection(prompt: string): ProviderProm
     repairAttempt: /\nREPAIR ATTEMPT:\s*/i.test(prompt),
     snapshotEventIds: parseJsonLine(prompt, "PUBLIC_SNAPSHOT_EVENT_IDS_JSON"),
     pinnedOpenIssueEventIds: parseJsonLine(prompt, "PINNED_OPEN_ISSUE_EVENT_IDS_JSON"),
-    // In the mode-aware prompt this line lives in CHATCHAT_PINNED_OPEN_ISSUES
-    // only when a source actually had to be restored. Absence therefore means
-    // an observed modern zero-pin Prompt, not a guessed legacy value.
     pinnedIssueSourceEventIds: parseJsonLine(prompt, "PINNED_OPEN_ISSUE_SOURCE_EVENT_IDS_JSON"),
     latestRoundEventIds: parseJsonLine(prompt, "LATEST_ROUND_EVENT_IDS_JSON"),
+    latestRoundActorIds: parseJsonLine(prompt, "LATEST_ROUND_ACTOR_IDS_JSON"),
+    latestRoundSelectedActorIds: parseJsonLine(prompt, "LATEST_ROUND_SELECTED_ACTOR_IDS_JSON"),
+    latestRoundOmittedActorIds: parseJsonLine(prompt, "LATEST_ROUND_OMITTED_ACTOR_IDS_JSON"),
+    ...(publicContextFingerprint ? { publicContextFingerprint } : {}),
     observedAt: new Date().toISOString(),
   };
 }
@@ -66,12 +79,14 @@ export function cloneProviderPromptMemorySelection(selection: ProviderPromptMemo
     pinnedOpenIssueEventIds: [...selection.pinnedOpenIssueEventIds],
     pinnedIssueSourceEventIds: [...selection.pinnedIssueSourceEventIds],
     latestRoundEventIds: [...selection.latestRoundEventIds],
+    latestRoundActorIds: [...selection.latestRoundActorIds],
+    latestRoundSelectedActorIds: [...selection.latestRoundSelectedActorIds],
+    latestRoundOmittedActorIds: [...selection.latestRoundOmittedActorIds],
   };
 }
 
 function parseJsonLine(prompt: string, label: string): string[] {
-  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const raw = prompt.match(new RegExp(`${escaped}:\\s*([^\\n]+)`))?.[1];
+  const raw = parseRawLine(prompt, label);
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -81,6 +96,11 @@ function parseJsonLine(prompt: string, label: string): string[] {
   } catch {
     return [];
   }
+}
+
+function parseRawLine(prompt: string, label: string): string | null {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return prompt.match(new RegExp(`${escaped}:\\s*([^\\n]+)`))?.[1]?.trim() ?? null;
 }
 
 function selectionKey(
