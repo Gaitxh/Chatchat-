@@ -7,7 +7,11 @@ export interface ProviderPromptMemorySelection {
   phase: CouncilPhase | "consultation";
   round: number;
   repairAttempt: boolean;
-  snapshotEventIds: string[];
+  /** Metadata declared by PUBLIC_SNAPSHOT_EVENT_IDS_JSON. */
+  declaredSnapshotEventIds: string[];
+  /** Event ids parsed from the actual CONSULTATION_EVENTS_JSON payload. */
+  actualPublicEventIds: string[];
+  snapshotMetadataMatchesPayload: boolean;
   pinnedOpenIssueEventIds: string[];
   pinnedIssueSourceEventIds: string[];
   latestRoundEventIds: string[];
@@ -25,6 +29,11 @@ const selections = new Map<string, ProviderPromptMemorySelection>();
  * string. This does not inspect Provider reasoning or infer memory from prose.
  * The public payload fingerprint stores only hash algorithm/hash/character-count,
  * never a second copy of the Prompt or Blackboard prose.
+ *
+ * Crucially, PUBLIC_SNAPSHOT_EVENT_IDS_JSON is not allowed to certify itself.
+ * We independently parse ids from CONSULTATION_EVENTS_JSON and retain both lines
+ * of evidence. The actual public payload is the final truth for what a Provider
+ * could see; metadata parity is audited separately.
  */
 export function parseProviderPromptMemorySelection(prompt: string): ProviderPromptMemorySelection | null {
   const phaseText = prompt.match(/PHASE:\s*(sealed|debate|final)/i)?.[1]?.toLowerCase() ?? "consultation";
@@ -33,11 +42,16 @@ export function parseProviderPromptMemorySelection(prompt: string): ProviderProm
   const sessionId = prompt.match(/SESSION_ID:\s*([^\n]+)/)?.[1]?.trim() ?? "";
   const actorId = prompt.match(/YOUR_ACTOR_ID:\s*([^\n]+)/)?.[1]?.trim() ?? "";
   if (!sessionId || !actorId || !Number.isFinite(round)) return null;
+
+  const declaredSnapshotEventIds = parseJsonLine(prompt, "PUBLIC_SNAPSHOT_EVENT_IDS_JSON");
   const publicContextRaw = parseRawLine(prompt, "CONSULTATION_EVENTS_JSON");
   const publicContextFingerprint = publicContextRaw
     ? fingerprintProtocolJsonText(publicContextRaw)?.value
     : undefined;
   const publicEvents = parseJsonArrayOfRecords(publicContextRaw);
+  const actualPublicEventIds = unique(publicEvents.flatMap((event) =>
+    typeof event.id === "string" && event.id.trim() ? [event.id] : [],
+  ));
   const latestRoundEventIds = parseJsonLine(prompt, "LATEST_ROUND_EVENT_IDS_JSON");
   const latestSet = new Set(latestRoundEventIds);
   const latestRoundSelectedActorIds = unique(publicEvents.flatMap((event) =>
@@ -45,13 +59,16 @@ export function parseProviderPromptMemorySelection(prompt: string): ProviderProm
       ? [event.actorId]
       : [],
   ));
+
   return {
     sessionId,
     actorId,
     phase,
     round,
     repairAttempt: /\nREPAIR ATTEMPT:\s*/i.test(prompt),
-    snapshotEventIds: parseJsonLine(prompt, "PUBLIC_SNAPSHOT_EVENT_IDS_JSON"),
+    declaredSnapshotEventIds,
+    actualPublicEventIds,
+    snapshotMetadataMatchesPayload: sameOrderedIds(declaredSnapshotEventIds, actualPublicEventIds),
     pinnedOpenIssueEventIds: parseJsonLine(prompt, "PINNED_OPEN_ISSUE_EVENT_IDS_JSON"),
     pinnedIssueSourceEventIds: parseJsonLine(prompt, "PINNED_OPEN_ISSUE_SOURCE_EVENT_IDS_JSON"),
     latestRoundEventIds,
@@ -79,7 +96,8 @@ export function providerPromptMemorySelectionFor(
 export function cloneProviderPromptMemorySelection(selection: ProviderPromptMemorySelection): ProviderPromptMemorySelection {
   return {
     ...selection,
-    snapshotEventIds: [...selection.snapshotEventIds],
+    declaredSnapshotEventIds: [...selection.declaredSnapshotEventIds],
+    actualPublicEventIds: [...selection.actualPublicEventIds],
     pinnedOpenIssueEventIds: [...selection.pinnedOpenIssueEventIds],
     pinnedIssueSourceEventIds: [...selection.pinnedIssueSourceEventIds],
     latestRoundEventIds: [...selection.latestRoundEventIds],
@@ -133,6 +151,10 @@ function trimSelections(): void {
 
 function isPhase(value: string): value is CouncilPhase {
   return value === "sealed" || value === "debate" || value === "final";
+}
+
+function sameOrderedIds(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 function unique<T>(values: readonly T[]): T[] {
