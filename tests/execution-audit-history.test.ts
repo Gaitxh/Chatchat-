@@ -20,6 +20,8 @@ const transports: ProviderTransportAuditRecord[] = [
     observedAt: "2026-08-15T01:00:00.000Z",
     promptMemoryObserved: true,
     snapshotEventIds: ["e1", "e2"],
+    declaredSnapshotEventIds: ["e1", "e2"],
+    snapshotMetadataMatchesPayload: true,
     pinnedOpenIssueEventIds: ["e1"],
     pinnedIssueSourceEventIds: ["e1"],
     latestRoundEventIds: ["e2"],
@@ -88,7 +90,9 @@ assert(archive.mode === "live-provider-tabs", "receipt must preserve live versus
 assert(archive.transports.length === 1, "receipt must exclude transport records from other sessions");
 assert(archive.execution.length === 1, "receipt must exclude execution audit records from other sessions");
 assert(archive.transports[0]?.promptMemoryObserved === true, "receipt must preserve actual-Prompt memory evidence strength");
-assert(archive.transports[0]?.snapshotEventIds.join(",") === "e1,e2", "receipt must freeze exact prompt snapshot ids");
+assert(archive.transports[0]?.snapshotEventIds.join(",") === "e1,e2", "receipt must freeze actual public payload ids");
+assert(archive.transports[0]?.declaredSnapshotEventIds?.join(",") === "e1,e2", "receipt must freeze independent Prompt-declared snapshot ids");
+assert(archive.transports[0]?.snapshotMetadataMatchesPayload === true, "receipt must freeze metadata↔actual payload parity");
 assert(archive.transports[0]?.pinnedOpenIssueEventIds?.join(",") === "e1", "receipt must freeze restored old event ids");
 assert(archive.transports[0]?.pinnedIssueSourceEventIds?.join(",") === "e1", "receipt must freeze exact canonical pin-reason source ids");
 assert(archive.transports[0]?.latestRoundEventIds?.join(",") === "e2", "receipt must freeze newest-round protected ids");
@@ -104,6 +108,7 @@ assert(archive.execution[0]?.contributionKinds?.[0] === "revision", "receipt mus
 // mutable live-ledger references. Historical replay is evidence about what
 // happened then; later runtime mutations must never rewrite that story.
 (transports[0]!.snapshotEventIds as string[]).push("mutated-after-freeze");
+(transports[0]!.declaredSnapshotEventIds as string[]).push("mutated-declaration");
 (transports[0]!.pinnedOpenIssueEventIds as string[]).push("mutated-pin");
 (transports[0]!.pinnedIssueSourceEventIds as string[]).push("mutated-source");
 (transports[0]!.latestRoundEventIds as string[]).push("mutated-latest");
@@ -115,7 +120,9 @@ assert(archive.execution[0]?.contributionKinds?.[0] === "revision", "receipt mus
 (execution[0]!.latestRoundSelectedActorIds as string[]).push("mutated-selected-actor");
 (execution[0]!.latestRoundOmittedActorIds as string[]).push("mutated-omitted-actor");
 (execution[0]!.contributionKinds as string[]).push("support");
-assert(archive.transports[0]?.snapshotEventIds.join(",") === "e1,e2", "frozen receipt must not change with live transport snapshot mutation");
+assert(archive.transports[0]?.snapshotEventIds.join(",") === "e1,e2", "frozen receipt must own actual public payload ids");
+assert(archive.transports[0]?.declaredSnapshotEventIds?.join(",") === "e1,e2", "frozen receipt must own declared snapshot ids");
+assert(archive.transports[0]?.snapshotMetadataMatchesPayload === true, "frozen receipt must preserve metadata parity");
 assert(archive.transports[0]?.pinnedOpenIssueEventIds?.join(",") === "e1", "frozen receipt must own pinned-event ids");
 assert(archive.transports[0]?.pinnedIssueSourceEventIds?.join(",") === "e1", "frozen receipt must own pin-reason source ids");
 assert(archive.transports[0]?.latestRoundEventIds?.join(",") === "e2", "frozen receipt must own latest-round ids");
@@ -133,4 +140,4 @@ const unknown = createExecutionAuditHistoryArchive("missing-session", transports
 assert(unknown.mode === "unknown", "receipt without transport evidence must not invent a live/synthetic mode");
 assert(unknown.transports.length === 0 && unknown.execution.length === 0, "missing session receipt must remain empty");
 
-console.log("✓ Durable Provider execution + memory/fairness receipt snapshot tests passed");
+console.log("✓ Durable Provider execution + memory/fairness/metadata-parity receipt snapshot tests passed");
