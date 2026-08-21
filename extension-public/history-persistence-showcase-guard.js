@@ -50,6 +50,7 @@
       if (!OWNS_HISTORY_UI) {
         document.documentElement.dataset.chatchatExecutionHistoryReplayShowcase = "not-applicable";
         document.documentElement.dataset.chatchatProviderMemoryHistoryReplayShowcase = "not-applicable";
+        document.documentElement.dataset.chatchatProviderPayloadHistoryReplayShowcase = "not-applicable";
         document.documentElement.dataset.chatchatHistoryPersistenceShowcase = "complete";
         return;
       }
@@ -86,13 +87,33 @@
         throw new Error("Historical Provider Memory Coverage did not preserve every modern Prompt receipt.");
       }
 
+      // Serialized Payload Integrity is a third, independently-derived consumer
+      // of the same frozen transport receipts. A modern archive must reproduce
+      // the send-time equality evidence rather than silently falling back to live
+      // ledgers or rebuilding fingerprints from today's Blackboard objects.
+      const payloadIntegrity = await waitForElement(() => {
+        const candidate = memoryView.querySelector('[data-provider-payload-view="archive"]');
+        return candidate?.getAttribute("data-provider-payload-session") === sessionId ? candidate : null;
+      });
+      if (payloadIntegrity.getAttribute("data-provider-payload-integrity") !== "verified") {
+        throw new Error("Historical Provider Payload Integrity did not preserve verified send-time receipts.");
+      }
+      const payloadTurns = Number(payloadIntegrity.getAttribute("data-provider-payload-total-turns") ?? "0");
+      const fingerprintedTurns = Number(payloadIntegrity.getAttribute("data-provider-payload-fingerprinted-turns") ?? "0");
+      const unverifiedTurns = Number(payloadIntegrity.getAttribute("data-provider-payload-unverified-turns") ?? "-1");
+      if (!(payloadTurns > 0 && fingerprintedTurns === payloadTurns && unverifiedTurns === 0)) {
+        throw new Error("Historical Provider Payload Integrity lost complete turn-level receipt coverage.");
+      }
+
       document.documentElement.dataset.chatchatExecutionHistoryReplayShowcase = "complete";
       document.documentElement.dataset.chatchatProviderMemoryHistoryReplayShowcase = "complete";
+      document.documentElement.dataset.chatchatProviderPayloadHistoryReplayShowcase = "complete";
       document.documentElement.dataset.chatchatHistoryPersistenceShowcase = "complete";
     } catch {
       document.documentElement.dataset.chatchatExecutionHistoryPersistenceShowcase = "failed";
       document.documentElement.dataset.chatchatExecutionHistoryReplayShowcase = "failed";
       document.documentElement.dataset.chatchatProviderMemoryHistoryReplayShowcase = "failed";
+      document.documentElement.dataset.chatchatProviderPayloadHistoryReplayShowcase = "failed";
       document.documentElement.dataset.chatchatHistoryPersistenceShowcase = "failed";
     } finally {
       checking = false;

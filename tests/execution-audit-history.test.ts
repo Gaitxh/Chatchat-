@@ -22,6 +22,8 @@ const transports: ProviderTransportAuditRecord[] = [
     pinnedOpenIssueEventIds: ["e1"],
     pinnedIssueSourceEventIds: ["e1"],
     latestRoundEventIds: ["e2"],
+    publicPayloadFingerprint: "eq64:0123456789abcdef",
+    publicPayloadEventCount: 2,
     repairAttempt: false,
     tabId: 7,
     promptChars: 4100,
@@ -86,6 +88,8 @@ assert(archive.transports[0]?.snapshotEventIds.join(",") === "e1,e2", "receipt m
 assert(archive.transports[0]?.pinnedOpenIssueEventIds?.join(",") === "e1", "receipt must freeze restored old event ids");
 assert(archive.transports[0]?.pinnedIssueSourceEventIds?.join(",") === "e1", "receipt must freeze exact canonical pin-reason source ids");
 assert(archive.transports[0]?.latestRoundEventIds?.join(",") === "e2", "receipt must freeze newest-round protected ids");
+assert(archive.transports[0]?.publicPayloadFingerprint === "eq64:0123456789abcdef", "receipt must preserve serialized public-payload equality fingerprint");
+assert(archive.transports[0]?.publicPayloadEventCount === 2, "receipt must preserve exact serialized public-payload event count");
 assert(archive.execution[0]?.contextSelectionObserved === true, "receipt must preserve modern selector-audit provenance");
 assert(archive.execution[0]?.contributionKinds?.[0] === "revision", "receipt must freeze structured contribution kinds");
 
@@ -96,6 +100,8 @@ assert(archive.execution[0]?.contributionKinds?.[0] === "revision", "receipt mus
 (transports[0]!.pinnedOpenIssueEventIds as string[]).push("mutated-pin");
 (transports[0]!.pinnedIssueSourceEventIds as string[]).push("mutated-source");
 (transports[0]!.latestRoundEventIds as string[]).push("mutated-latest");
+transports[0]!.publicPayloadFingerprint = "eq64:ffffffffffffffff";
+transports[0]!.publicPayloadEventCount = 99;
 (execution[0]!.pinnedOpenIssueEventIds as string[]).push("mutated-execution-pin");
 (execution[0]!.pinnedIssueSourceEventIds as string[]).push("mutated-execution-source");
 (execution[0]!.latestRoundEventIds as string[]).push("mutated-execution-latest");
@@ -104,6 +110,8 @@ assert(archive.transports[0]?.snapshotEventIds.join(",") === "e1,e2", "frozen re
 assert(archive.transports[0]?.pinnedOpenIssueEventIds?.join(",") === "e1", "frozen receipt must own pinned-event ids");
 assert(archive.transports[0]?.pinnedIssueSourceEventIds?.join(",") === "e1", "frozen receipt must own pin-reason source ids");
 assert(archive.transports[0]?.latestRoundEventIds?.join(",") === "e2", "frozen receipt must own latest-round ids");
+assert(archive.transports[0]?.publicPayloadFingerprint === "eq64:0123456789abcdef", "frozen receipt must own public-payload fingerprint scalar");
+assert(archive.transports[0]?.publicPayloadEventCount === 2, "frozen receipt must own public-payload event count scalar");
 assert(archive.execution[0]?.pinnedOpenIssueEventIds?.join(",") === "e1", "frozen execution audit must own pinned-event ids");
 assert(archive.execution[0]?.pinnedIssueSourceEventIds?.join(",") === "e1", "frozen execution audit must own pin-source ids");
 assert(archive.execution[0]?.latestRoundEventIds?.join(",") === "e2", "frozen execution audit must own latest-round ids");
@@ -113,4 +121,4 @@ const unknown = createExecutionAuditHistoryArchive("missing-session", transports
 assert(unknown.mode === "unknown", "receipt without transport evidence must not invent a live/synthetic mode");
 assert(unknown.transports.length === 0 && unknown.execution.length === 0, "missing session receipt must remain empty");
 
-console.log("✓ Durable Provider execution + actual-Prompt memory receipt snapshot tests passed");
+console.log("✓ Durable Provider execution + actual-Prompt memory + 64-bit public-payload equality receipt snapshot tests passed");

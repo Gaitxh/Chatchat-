@@ -19,8 +19,10 @@ import {
 import { deriveMeetingMemoryIntegrity } from "../theater/meeting-memory-integrity.js";
 import { deriveProviderMemoryCoverage } from "../theater/provider-memory-coverage.js";
 import { deriveProviderMemoryGaps } from "../theater/provider-memory-gaps.js";
+import { deriveProviderPublicPayloadIntegrity } from "../theater/provider-memory-payload-integrity.js";
 import { ProviderMemoryCoverage } from "./components/ProviderMemoryCoverage.js";
 import { ProviderMemoryGaps } from "./components/ProviderMemoryGaps.js";
+import { ProviderMemoryPayloadIntegrity } from "./components/ProviderMemoryPayloadIntegrity.js";
 import { focusConsultationEvent } from "./provenance-wire.js";
 
 const LIVE_EVENT = "chatchat:consultation-live";
@@ -28,19 +30,9 @@ const COMPLETE_EVENT = "chatchat:consultation-complete";
 const OPEN_ARCHIVE_EVENT = "chatchat:consultation-open-archive";
 const executionHistory = new ExecutionAuditHistoryStore();
 
-interface ConsultationLiveDetail {
-  participants?: CouncilParticipant[];
-  events?: CouncilEvent[];
-}
-
-interface ConsultationCompletionDetail {
-  report: CouncilReport;
-  events: CouncilEvent[];
-}
-
-interface OpenArchiveDetail {
-  archive: ConsultationArchive;
-}
+interface ConsultationLiveDetail { participants?: CouncilParticipant[]; events?: CouncilEvent[]; }
+interface ConsultationCompletionDetail { report: CouncilReport; events: CouncilEvent[]; }
+interface OpenArchiveDetail { archive: ConsultationArchive; }
 
 function ProviderMemoryPortal() {
   const [participants, setParticipants] = useState<CouncilParticipant[]>([]);
@@ -64,9 +56,7 @@ function ProviderMemoryPortal() {
         sessionRef.current = detail.sessionId;
         setExecution([]);
         setTransports([]);
-      } else {
-        sessionRef.current = detail.sessionId;
-      }
+      } else sessionRef.current = detail.sessionId;
       setExecution((current) => appendUniqueExecution(current, detail));
     };
     const onTransport = (event: Event) => {
@@ -124,7 +114,6 @@ function ProviderMemoryPortal() {
         setTransports([]);
       });
     };
-
     window.addEventListener(PROVIDER_EXECUTION_AUDIT_EVENT, onExecution);
     window.addEventListener(PROVIDER_TRANSPORT_AUDIT_EVENT, onTransport);
     window.addEventListener(LIVE_EVENT, onLive);
@@ -145,24 +134,16 @@ function ProviderMemoryPortal() {
     return () => observer.disconnect();
   }, []);
 
-  const coverage = useMemo(
-    () => deriveProviderMemoryCoverage(participants, events, execution, transports),
-    [participants, events, execution, transports],
-  );
-  const gaps = useMemo(
-    () => deriveProviderMemoryGaps(participants, events, coverage),
-    [participants, events, coverage],
-  );
+  const coverage = useMemo(() => deriveProviderMemoryCoverage(participants, events, execution, transports), [participants, events, execution, transports]);
+  const gaps = useMemo(() => deriveProviderMemoryGaps(participants, events, coverage), [participants, events, coverage]);
   const integrity = useMemo(() => deriveMeetingMemoryIntegrity(coverage, gaps), [coverage, gaps]);
+  const payloadIntegrity = useMemo(() => deriveProviderPublicPayloadIntegrity(transports), [transports]);
 
   if (!coverage.rounds.length) return null;
   return (
-    <div
-      className="provider-memory-view"
-      data-provider-memory-view={archive ? "archive" : "live"}
-      data-provider-memory-view-session={coverage.sessionId ?? ""}
-    >
+    <div className="provider-memory-view" data-provider-memory-view={archive ? "archive" : "live"} data-provider-memory-view-session={coverage.sessionId ?? ""}>
       <ProviderMemoryCoverage model={coverage} integrity={integrity} locale={locale} archive={archive} onFocusEvent={focusConsultationEvent} />
+      <ProviderMemoryPayloadIntegrity model={payloadIntegrity} locale={locale} archive={archive} />
       <ProviderMemoryGaps model={gaps} locale={locale} onFocusEvent={focusConsultationEvent} />
     </div>
   );

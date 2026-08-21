@@ -10,6 +10,14 @@ export interface ProviderPromptMemorySelection {
   pinnedOpenIssueEventIds: string[];
   pinnedIssueSourceEventIds: string[];
   latestRoundEventIds: string[];
+  /**
+   * Equality fingerprint of the exact serialized CONSULTATION_EVENTS_JSON text
+   * that appeared in this RUN_SPEECH Prompt. This is deliberately
+   * non-cryptographic and must never be presented as a signature,
+   * authenticity proof, or correctness signal. This equality aid is not a security primitive.
+   */
+  publicPayloadFingerprint: string | null;
+  publicPayloadEventCount: number | null;
   observedAt: string;
 }
 
@@ -27,6 +35,9 @@ export function parseProviderPromptMemorySelection(prompt: string): ProviderProm
   const sessionId = prompt.match(/SESSION_ID:\s*([^\n]+)/)?.[1]?.trim() ?? "";
   const actorId = prompt.match(/YOUR_ACTOR_ID:\s*([^\n]+)/)?.[1]?.trim() ?? "";
   if (!sessionId || !actorId || !Number.isFinite(round)) return null;
+
+  const publicPayloadRaw = parseJsonRawLine(prompt, "CONSULTATION_EVENTS_JSON");
+  const publicPayload = parseRawJson(publicPayloadRaw);
   return {
     sessionId,
     actorId,
@@ -40,6 +51,13 @@ export function parseProviderPromptMemorySelection(prompt: string): ProviderProm
     // an observed modern zero-pin Prompt, not a guessed legacy value.
     pinnedIssueSourceEventIds: parseJsonLine(prompt, "PINNED_OPEN_ISSUE_SOURCE_EVENT_IDS_JSON"),
     latestRoundEventIds: parseJsonLine(prompt, "LATEST_ROUND_EVENT_IDS_JSON"),
+    // Fingerprint the exact JSON text after the protocol label, not a parsed
+    // then re-stringified value. That way a wrapper/compaction/serialization
+    // change cannot be normalized away before equality is audited.
+    publicPayloadFingerprint: Array.isArray(publicPayload) && publicPayloadRaw !== null
+      ? equalityFingerprint(publicPayloadRaw)
+      : null,
+    publicPayloadEventCount: Array.isArray(publicPayload) ? publicPayload.length : null,
     observedAt: new Date().toISOString(),
   };
 }
@@ -70,17 +88,44 @@ export function cloneProviderPromptMemorySelection(selection: ProviderPromptMemo
 }
 
 function parseJsonLine(prompt: string, label: string): string[] {
+  const parsed = parseRawJson(parseJsonRawLine(prompt, label));
+  return Array.isArray(parsed)
+    ? [...new Set(parsed.filter((item): item is string => typeof item === "string" && Boolean(item.trim())))]
+    : [];
+}
+
+/**
+ * Return only the JSON text on the same protocol line. `[ \t]*` is deliberate:
+ * `\s*` could cross a newline and accidentally consume the next field when a
+ * malformed label has no value.
+ */
+function parseJsonRawLine(prompt: string, label: string): string | null {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const raw = prompt.match(new RegExp(`${escaped}:\\s*([^\\n]+)`))?.[1];
-  if (!raw) return [];
+  const raw = prompt.match(new RegExp(`${escaped}:[ \\t]*([^\\r\\n]+)`))?.[1];
+  return raw ?? null;
+}
+
+function parseRawJson(raw: string | null): unknown {
+  if (raw === null) return null;
   try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? [...new Set(parsed.filter((item): item is string => typeof item === "string" && Boolean(item.trim())))]
-      : [];
+    return JSON.parse(raw);
   } catch {
-    return [];
+    return null;
   }
+}
+
+/**
+ * 64-bit FNV-1a over UTF-8 bytes. Equality aid only — still deliberately not
+ * a cryptographic signature, MAC, authenticity proof, or tamper-proof receipt.
+ */
+function equalityFingerprint(value: string): string {
+  let hash = 0xcbf29ce484222325n;
+  const prime = 0x100000001b3n;
+  for (const byte of new TextEncoder().encode(value)) {
+    hash ^= BigInt(byte);
+    hash = BigInt.asUintN(64, hash * prime);
+  }
+  return `eq64:${hash.toString(16).padStart(16, "0")}`;
 }
 
 function selectionKey(
