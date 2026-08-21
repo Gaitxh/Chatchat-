@@ -34,6 +34,13 @@ export interface ProviderVisibleConsultationContext {
  *
  * This selector never scores prose, stance popularity, model identity or
  * confidence. Pinned events gain memory priority only — never authority.
+ *
+ * If the newest round itself exceeds the hard budget, ChatChat allocates that
+ * round seat-by-seat instead of using Blackboard publication order. Each actor
+ * gets one newest event before any actor gets a second, then one second-newest
+ * before any actor gets a third, and so on. A deterministic per-session rotation
+ * decides only mathematically unavoidable remainder slots; no Provider brand,
+ * stance, confidence, speed or publication position receives preference.
  */
 export function selectProviderContextEvents(
   publicEvents: readonly CouncilEvent[],
@@ -166,10 +173,57 @@ function structuralParent(event: CouncilEvent): string | undefined {
 function latestRoundIds(events: readonly CouncilEvent[], maxEvents: number): string[] {
   if (!events.length) return [];
   const latestRound = Math.max(...events.map((event) => event.round));
-  return events
-    .filter((event) => event.round === latestRound)
-    .slice(-maxEvents)
-    .map((event) => event.id);
+  const latest = events.filter((event) => event.round === latestRound);
+  if (latest.length <= maxEvents) return latest.map((event) => event.id);
+
+  const byActor = new Map<string, CouncilEvent[]>();
+  for (const event of latest) {
+    const bucket = byActor.get(event.actorId) ?? [];
+    bucket.push(event);
+    byActor.set(event.actorId, bucket);
+  }
+
+  const actorIds = [...byActor.keys()].sort((a, b) => a.localeCompare(b));
+  if (!actorIds.length) return [];
+  const sessionId = latest[0]?.sessionId ?? "";
+  const rotation = stableRotation(`${sessionId}|${latestRound}`, actorIds.length);
+  const actorCycle = rotate(actorIds, rotation);
+  const cursor = new Map(actorIds.map((actorId) => [actorId, (byActor.get(actorId)?.length ?? 0) - 1] as const));
+  const selected = new Set<string>();
+
+  while (selected.size < maxEvents) {
+    let addedThisPass = false;
+    for (const actorId of actorCycle) {
+      const bucket = byActor.get(actorId) ?? [];
+      const index = cursor.get(actorId) ?? -1;
+      if (index < 0) continue;
+      selected.add(bucket[index]!.id);
+      cursor.set(actorId, index - 1);
+      addedThisPass = true;
+      if (selected.size >= maxEvents) break;
+    }
+    if (!addedThisPass) break;
+  }
+
+  // Allocation order is an internal fairness mechanism only. Providers still
+  // receive the selected public events in exact Blackboard chronology.
+  return latest.filter((event) => selected.has(event.id)).map((event) => event.id);
+}
+
+function stableRotation(seed: string, size: number): number {
+  if (size <= 1) return 0;
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0) % size;
+}
+
+function rotate<T>(values: readonly T[], offset: number): T[] {
+  if (!values.length) return [];
+  const normalized = ((offset % values.length) + values.length) % values.length;
+  return [...values.slice(normalized), ...values.slice(0, normalized)];
 }
 
 function issueMemoryRank(issue: OpenMeetingIssueProvenance): number {
