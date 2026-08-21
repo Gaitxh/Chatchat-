@@ -1,11 +1,12 @@
 import { readFile } from "node:fs/promises";
 
-const [rail, floor, peerModel, runner, workflow] = await Promise.all([
+const [rail, floor, peerModel, runner, workflow, liveFrame] = await Promise.all([
   readFile("src/extension/components/LiveResponseRail.tsx", "utf8"),
   readFile("src/extension/components/LiveParticipantFloor.tsx", "utf8"),
   readFile("src/theater/peer-exchange.ts", "utf8"),
   readFile("scripts/run-test-suite.mjs", "utf8"),
   readFile(".github/workflows/council-stage-ui.yml", "utf8"),
+  readFile("extension-public/live-meeting-frame-showcase.js", "utf8"),
 ]);
 
 for (const text of [
@@ -53,14 +54,37 @@ for (const text of [
 requireText(runner, '"dist/tests/peer-exchange.test.js"', "canonical Peer Exchange deterministic test");
 
 for (const text of [
+  'proofMode !== "persuasion" && proofMode !== "response"',
+  'proofMode === "response" ? captureResponse() : capturePersuasion()',
+  'data-live-response-state="responding"',
+  'data-live-response-state="queued"',
+  "const QUEUED_FALLBACK_MS = 900",
+  'mode: "response"',
+  "liveResponseRequestEvent",
+  "liveResponseTargetActor",
+  "One AI is waiting on another",
+  "点名答辩正在发生",
+]) requireText(liveFrame, text, "real debate response-frame proof");
+requireText(liveFrame, 'mode: "persuasion"', "existing persuasion frame remains intact");
+if (liveFrame.includes('liveResponseState: "responding"') || liveFrame.includes('liveResponseState: "queued"')) {
+  fail("Response proof must copy the real rail state rather than hardcoding a proof state.");
+}
+
+for (const text of [
   "Capture bilingual live response rail",
-  'live-proof=persuasion',
+  'live-proof=response',
+  'data-chatchat-live-proof-frame="response"',
   'data-live-response-rail="canonical-peer-exchange"',
+  'data-live-response-state="(responding|queued)"',
   "Validate live response rail provenance",
 ]) requireText(workflow, text, "production Chromium live response rail proof");
+if (workflow.includes('chatchat-live-response-rail-$LANG') && workflow.includes('live-proof=persuasion"')) {
+  fail("The dedicated live response rail screenshot must not use the late persuasion/final snapshot.");
+}
 
 console.log("✓ Live Response Rail is a compact projection of canonical Peer Exchange state");
 console.log("✓ Rail stays above AI seats while the detailed Peer Exchange queue remains intact");
+console.log("✓ Chromium freezes a real responding/queued debate route, not the later final snapshot");
 console.log("✓ No majority, persuasion, prose-similarity or duplicate closure logic can drive the rail");
 
 function requireText(haystack, needle, label) {
