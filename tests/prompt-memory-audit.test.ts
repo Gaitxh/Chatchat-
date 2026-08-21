@@ -34,7 +34,7 @@ assert(parsed?.pinnedOpenIssueEventIds.join(",") === "q1", "Prompt audit must pr
 assert(parsed?.pinnedIssueSourceEventIds.join(",") === "q1", "Prompt audit must preserve the exact canonical pin-reason source event.");
 assert(parsed?.latestRoundEventIds.join(",") === "r2-1", "Prompt audit must preserve protected newest-round ids.");
 assert(parsed?.latestRoundSelectedActorIds.join(",") === "gemini", "Actual Prompt audit must derive represented latest-round actors only from payload it can see.");
-assert(/^fnv1a32:[0-9a-f]{8}:\d+$/.test(parsed?.publicContextFingerprint ?? ""), "Actual Prompt audit must preserve a bounded normalized public-payload fingerprint without storing duplicate prose.");
+assert(/^fnv1a64:[0-9a-f]{16}:\d+$/.test(parsed?.publicContextFingerprint ?? ""), "Actual Prompt audit must preserve a bounded 64-bit normalized public-payload fingerprint without storing duplicate prose.");
 assert(parsed?.repairAttempt === false, "First Prompt must not be mislabeled as repair.");
 
 const firstRemembered = rememberProviderPromptMemorySelection(prompt);
@@ -69,4 +69,4 @@ const zeroPin = parseProviderPromptMemorySelection([
 assert(zeroPin && zeroPin.pinnedOpenIssueEventIds.length === 0 && zeroPin.pinnedIssueSourceEventIds.length === 0, "Observed modern zero-pin Prompts must remain distinguishable from legacy missing audit data.");
 assert(zeroPin?.publicContextFingerprint, "Even an empty sealed public payload must have an actual Prompt fingerprint when the field exists.");
 
-console.log("✓ exact RUN_SPEECH memory metadata, public-payload fingerprint and repair parity are audited without prose inference");
+console.log("✓ exact RUN_SPEECH memory metadata, 64-bit public-payload fingerprint and repair parity are audited without prose inference");
