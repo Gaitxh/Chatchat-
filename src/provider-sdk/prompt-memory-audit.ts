@@ -11,9 +11,7 @@ export interface ProviderPromptMemorySelection {
   pinnedOpenIssueEventIds: string[];
   pinnedIssueSourceEventIds: string[];
   latestRoundEventIds: string[];
-  latestRoundActorIds: string[];
   latestRoundSelectedActorIds: string[];
-  latestRoundOmittedActorIds: string[];
   /** Fingerprint of the exact normalized CONSULTATION_EVENTS_JSON payload. */
   publicContextFingerprint?: string;
   observedAt: string;
@@ -39,6 +37,14 @@ export function parseProviderPromptMemorySelection(prompt: string): ProviderProm
   const publicContextFingerprint = publicContextRaw
     ? fingerprintProtocolJsonText(publicContextRaw)?.value
     : undefined;
+  const publicEvents = parseJsonArrayOfRecords(publicContextRaw);
+  const latestRoundEventIds = parseJsonLine(prompt, "LATEST_ROUND_EVENT_IDS_JSON");
+  const latestSet = new Set(latestRoundEventIds);
+  const latestRoundSelectedActorIds = unique(publicEvents.flatMap((event) =>
+    typeof event.id === "string" && latestSet.has(event.id) && typeof event.actorId === "string"
+      ? [event.actorId]
+      : [],
+  ));
   return {
     sessionId,
     actorId,
@@ -48,10 +54,8 @@ export function parseProviderPromptMemorySelection(prompt: string): ProviderProm
     snapshotEventIds: parseJsonLine(prompt, "PUBLIC_SNAPSHOT_EVENT_IDS_JSON"),
     pinnedOpenIssueEventIds: parseJsonLine(prompt, "PINNED_OPEN_ISSUE_EVENT_IDS_JSON"),
     pinnedIssueSourceEventIds: parseJsonLine(prompt, "PINNED_OPEN_ISSUE_SOURCE_EVENT_IDS_JSON"),
-    latestRoundEventIds: parseJsonLine(prompt, "LATEST_ROUND_EVENT_IDS_JSON"),
-    latestRoundActorIds: parseJsonLine(prompt, "LATEST_ROUND_ACTOR_IDS_JSON"),
-    latestRoundSelectedActorIds: parseJsonLine(prompt, "LATEST_ROUND_SELECTED_ACTOR_IDS_JSON"),
-    latestRoundOmittedActorIds: parseJsonLine(prompt, "LATEST_ROUND_OMITTED_ACTOR_IDS_JSON"),
+    latestRoundEventIds,
+    latestRoundSelectedActorIds,
     ...(publicContextFingerprint ? { publicContextFingerprint } : {}),
     observedAt: new Date().toISOString(),
   };
@@ -79,9 +83,7 @@ export function cloneProviderPromptMemorySelection(selection: ProviderPromptMemo
     pinnedOpenIssueEventIds: [...selection.pinnedOpenIssueEventIds],
     pinnedIssueSourceEventIds: [...selection.pinnedIssueSourceEventIds],
     latestRoundEventIds: [...selection.latestRoundEventIds],
-    latestRoundActorIds: [...selection.latestRoundActorIds],
     latestRoundSelectedActorIds: [...selection.latestRoundSelectedActorIds],
-    latestRoundOmittedActorIds: [...selection.latestRoundOmittedActorIds],
   };
 }
 
@@ -91,7 +93,19 @@ function parseJsonLine(prompt: string, label: string): string[] {
   try {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed)
-      ? [...new Set(parsed.filter((item): item is string => typeof item === "string" && Boolean(item.trim())))]
+      ? unique(parsed.filter((item): item is string => typeof item === "string" && Boolean(item.trim())))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseJsonArrayOfRecords(raw: string | null): Array<Record<string, unknown>> {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
       : [];
   } catch {
     return [];
@@ -119,4 +133,8 @@ function trimSelections(): void {
 
 function isPhase(value: string): value is CouncilPhase {
   return value === "sealed" || value === "debate" || value === "final";
+}
+
+function unique<T>(values: readonly T[]): T[] {
+  return [...new Set(values)];
 }
