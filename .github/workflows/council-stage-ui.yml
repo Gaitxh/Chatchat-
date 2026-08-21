@@ -72,16 +72,16 @@ jobs:
             grep -q 'data-chatchat-audit-vault="closed"' "$DOM"
             grep -q 'data-chatchat-visual-layer="stage"' "$DOM"
             grep -q 'data-chatchat-visual-layer="audit"' "$DOM"
-            grep -q 'data-tab-ownership="managed"' "$DOM"
-            grep -q 'automation-boundary-chip is-managed' "$DOM"
+            grep -q 'data-tab-ownership="user-owned"' "$DOM"
+            grep -q 'automation-boundary-chip is-user-owned' "$DOM"
             grep -q 'id="consultation-theater-root"' "$DOM"
             grep -q 'id="final-position-floor-root"' "$DOM"
             grep -q 'id="consultation-receipt-root"' "$DOM"
           done
           grep -Fq 'Audit &amp; evidence' artifacts/chatchat-council-stage-en.html || grep -Fq 'Audit & evidence' artifacts/chatchat-council-stage-en.html
           grep -Fq '审计与证据' artifacts/chatchat-council-stage-zh.html
-          grep -Fq 'Managed' artifacts/chatchat-council-stage-en.html
-          grep -Fq '托管席位' artifacts/chatchat-council-stage-zh.html
+          grep -Fq 'Your tab' artifacts/chatchat-council-stage-en.html
+          grep -Fq '你的标签页' artifacts/chatchat-council-stage-zh.html
 
       - name: Prove audit detail still opens for focused protocol evidence
         run: |
