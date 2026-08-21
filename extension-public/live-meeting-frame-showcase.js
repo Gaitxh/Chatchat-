@@ -6,14 +6,11 @@
   const locale = params.get("lang") === "en" ? "en" : "zh-CN";
   const ROOT_ATTR = "data-chatchat-live-proof-showcase";
   const FRAME_ATTR = "data-chatchat-live-proof-frame";
+  const LIVE_RESPONSE_ROUTE_EVENT = "chatchat:live-response-route";
   const STRONG_SELECTOR = '[data-persuasion-strength="strong"][data-persuasion-cause-event][data-persuasion-action-event]';
   const RESPONDING_SELECTOR = '[data-live-response-rail="canonical-peer-exchange"][data-live-response-state="responding"]';
   const QUEUED_SELECTOR = '[data-live-response-rail="canonical-peer-exchange"][data-live-response-state="queued"]';
   let observer = null;
-
-  function capture() {
-    return proofMode === "response" ? captureResponse() : capturePersuasion();
-  }
 
   function capturePersuasion() {
     if (document.querySelector(`[${FRAME_ATTR}="persuasion"]`)) return true;
@@ -34,18 +31,27 @@
     });
   }
 
-  function captureResponse() {
+  function captureResponse(expected = null) {
     if (document.querySelector(`[${FRAME_ATTR}="response"]`)) return true;
-    const rail = document.querySelector(RESPONDING_SELECTOR) ?? document.querySelector(QUEUED_SELECTOR);
+    const rail = expected ? matchingResponseRail(expected) : (document.querySelector(RESPONDING_SELECTOR) ?? document.querySelector(QUEUED_SELECTOR));
     return rail instanceof HTMLElement ? freezeResponseFloor(rail) : false;
+  }
+
+  function matchingResponseRail(expected) {
+    return [...document.querySelectorAll('[data-live-response-rail="canonical-peer-exchange"]')]
+      .find((node) => node instanceof HTMLElement
+        && node.dataset.liveResponseState === expected.state
+        && node.dataset.liveResponseRequestEvent === expected.requestEventId
+        && node.dataset.liveResponseTargetActor === expected.targetActorId
+        && Number(node.dataset.liveResponseRequestRound) === expected.requestRound) ?? null;
   }
 
   function freezeResponseFloor(rail) {
     const floor = rail.closest(".live-participant-floor");
     if (!(floor instanceof HTMLElement)) return false;
-    if (!floor.querySelector(".live-phase-chip.phase-debate")) return false;
     const state = rail.dataset.liveResponseState ?? "";
-    if (state !== "responding" && state !== "queued") return false;
+    const requestRound = Number(rail.dataset.liveResponseRequestRound ?? "0");
+    if ((state !== "responding" && state !== "queued") || requestRound < 2) return false;
     return freezeFloor({
       mode: "response",
       floor,
@@ -53,6 +59,7 @@
         liveResponsePhase: "debate",
         liveResponseState: state,
         liveResponseRequestEvent: rail.dataset.liveResponseRequestEvent ?? "",
+        liveResponseRequestRound: String(requestRound),
         liveResponseTargetActor: rail.dataset.liveResponseTargetActor ?? "",
       },
       heading: locale === "zh-CN"
@@ -200,10 +207,24 @@
       .replaceAll("'", "&#039;");
   }
 
+  function onLiveResponseRoute(event) {
+    const detail = event?.detail;
+    if (!detail || (detail.state !== "queued" && detail.state !== "responding")) return;
+    if (!detail.requestEventId || !detail.targetActorId || Number(detail.requestRound) < 2) return;
+    if (!captureResponse(detail)) return;
+    window.removeEventListener(LIVE_RESPONSE_ROUTE_EVENT, onLiveResponseRoute);
+  }
+
   function start() {
-    if (capture()) return;
+    if (proofMode === "response") {
+      if (captureResponse()) return;
+      window.addEventListener(LIVE_RESPONSE_ROUTE_EVENT, onLiveResponseRoute);
+      return;
+    }
+
+    if (capturePersuasion()) return;
     observer = new MutationObserver(() => {
-      if (!capture()) return;
+      if (!capturePersuasion()) return;
       observer.disconnect();
     });
     observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
