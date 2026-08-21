@@ -1,0 +1,168 @@
+.public-deck-integrity {
+  margin: 12px auto;
+  width: min(920px, calc(100% - 24px));
+  border: 1px solid #ddd7cd;
+  border-radius: 18px;
+  background: rgba(255, 253, 248, .96);
+  box-shadow: 0 12px 34px rgba(51, 45, 37, .06);
+  overflow: hidden;
+  color: #2f2b26;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.public-deck-integrity > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #ebe6dd;
+}
+
+.public-deck-integrity > header div {
+  min-width: 0;
+}
+
+.public-deck-integrity > header span {
+  display: block;
+  margin-bottom: 5px;
+  color: #8b8378;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .12em;
+}
+
+.public-deck-integrity > header strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.public-deck-integrity > header p {
+  margin: 7px 0 0;
+  max-width: 720px;
+  color: #736c63;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.public-deck-integrity > header > b {
+  flex: none;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #eeeae3;
+  color: #6f685f;
+  font-size: 10px;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+.public-deck-integrity.state-exact > header > b {
+  background: #e4f3eb;
+  color: #32664f;
+}
+
+.public-deck-integrity.state-mismatch {
+  border-color: #dfaaa3;
+}
+
+.public-deck-integrity.state-mismatch > header > b {
+  background: #fae6e2;
+  color: #993f35;
+}
+
+.public-deck-rounds {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.public-deck-round {
+  padding: 11px 12px;
+  border: 1px solid #ebe6dd;
+  border-radius: 13px;
+  background: #fffdfa;
+}
+
+.public-deck-round.state-exact {
+  border-color: #cfe6d9;
+  background: #fbfefc;
+}
+
+.public-deck-round.state-mismatch {
+  border-color: #edc0ba;
+  background: #fff9f7;
+}
+
+.public-deck-round__top,
+.public-deck-round__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.public-deck-round__top strong {
+  font-size: 11px;
+  letter-spacing: .07em;
+}
+
+.public-deck-round__top span {
+  color: #696158;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.public-deck-round__meta {
+  justify-content: flex-start;
+  margin-top: 7px;
+  color: #8a8277;
+}
+
+.public-deck-round__meta em,
+.public-deck-round__meta code {
+  font-size: 9px;
+  font-style: normal;
+}
+
+.public-deck-round__meta code {
+  padding: 3px 6px;
+  border-radius: 7px;
+  background: #f1eee8;
+  color: #605950;
+}
+
+.public-deck-warning,
+.public-deck-repair-ok {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed #e8e1d8;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.public-deck-warning {
+  color: #8f4037;
+}
+
+.public-deck-repair-ok {
+  color: #3b735a;
+}
+
+@media (max-width: 700px) {
+  .public-deck-integrity {
+    width: calc(100% - 14px);
+    margin: 7px auto;
+    border-radius: 14px;
+  }
+
+  .public-deck-integrity > header {
+    display: grid;
+    padding: 13px;
+  }
+
+  .public-deck-integrity > header > b {
+    justify-self: start;
+  }
+}
