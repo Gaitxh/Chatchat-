@@ -53,11 +53,13 @@ requireClaims("Selector fairness audit", execution, [
 ]);
 
 requireClaims("Transport fairness receipt", transport, [
-  "declaredSnapshotEventIds",
-  "snapshotMetadataMatchesPayload",
-  "publicContextFingerprint",
-  "latestRoundSelectedActorIds",
-  "actual CONSULTATION_EVENTS_JSON payload",
+  "declaredSnapshotEventIds?: readonly string[]",
+  "snapshotMetadataMatchesPayload?: boolean",
+  "publicContextFingerprint?: string",
+  "latestRoundSelectedActorIds?: readonly string[]",
+  "snapshotEventIds: [...promptSelection.actualPublicEventIds]",
+  "declaredSnapshotEventIds: [...promptSelection.declaredSnapshotEventIds]",
+  "snapshotMetadataMatchesPayload: promptSelection.snapshotMetadataMatchesPayload",
 ]);
 
 requireClaims("Provider Memory Fairness model", fairness, [
@@ -127,7 +129,7 @@ requireClaims("Provider Memory Fairness browser guard", guard, [
   "data-memory-fairness-actor-represented",
   "data-memory-fairness-payload-consistent",
   "data-memory-fairness-metadata-mismatch-seats",
-  "data-chatchat-provider-memory-fairness-metadata-parity",
+  "chatchatProviderMemoryFairnessMetadataParity",
   "chatchatProviderMemoryFairnessShowcase",
 ]);
 
