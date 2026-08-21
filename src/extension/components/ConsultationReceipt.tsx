@@ -12,6 +12,12 @@ import {
   deriveConsultationReceipt,
 } from "../../consultation/receipt.js";
 import { safeConsultationReceiptMarkdown } from "../../consultation/receipt-share.js";
+import {
+  deriveResponseObligationSummary,
+  responseObligationsSvgBadge,
+  safeResponseObligationsMarkdown,
+} from "../../consultation/response-obligation-summary.js";
+import { ResponseObligations } from "./ResponseObligations.js";
 import "./consultation-receipt.css";
 
 interface ConsultationReceiptProps {
@@ -35,12 +41,16 @@ export function ConsultationReceiptCard({
     () => deriveConsultationReceipt(report, events, verifications),
     [report, events, verifications],
   );
+  const responseObligations = useMemo(
+    () => deriveResponseObligationSummary(report, events),
+    [report, events],
+  );
   const [copied, setCopied] = useState(false);
   const zh = locale === "zh-CN";
   const modeLabel = zh ? receipt.modeLabelZhCN : receipt.modeLabelEn;
 
   async function copyMarkdown() {
-    const markdown = safeConsultationReceiptMarkdown(receipt, locale, executionIntegrity);
+    const markdown = `${safeConsultationReceiptMarkdown(receipt, locale, executionIntegrity)}${safeResponseObligationsMarkdown(responseObligations, locale)}`;
     const ok = await copyText(markdown);
     if (!ok) return;
     setCopied(true);
@@ -49,9 +59,10 @@ export function ConsultationReceiptCard({
 
   function exportSvg() {
     const baseSvg = consultationReceiptSvg(receipt, locale);
+    const withResponses = responseObligationsSvgBadge(baseSvg, responseObligations, locale);
     const svg = executionIntegrity
-      ? consultationReceiptSvgWithIntegrity(baseSvg, executionIntegrity, locale)
-      : baseSvg;
+      ? consultationReceiptSvgWithIntegrity(withResponses, executionIntegrity, locale)
+      : withResponses;
     const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -120,6 +131,8 @@ export function ConsultationReceiptCard({
             <strong>{stopReasonLabel(receipt.stopReason, zh)}</strong>
           </div>
         ) : null}
+
+        <ResponseObligations summary={responseObligations} locale={locale} />
 
         {receipt.keyTurn ? (
           <div className="receipt-turn">

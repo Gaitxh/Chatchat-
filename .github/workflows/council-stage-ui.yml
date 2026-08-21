@@ -96,8 +96,42 @@ jobs:
           grep -q 'data-chatchat-audit-vault="open"' artifacts/chatchat-council-audit-open-en.html
           grep -q 'data-provider-memory-coverage="audited"' artifacts/chatchat-council-audit-open-en.html
 
+      - name: Capture bilingual response-obligation receipts
+        run: |
+          for LANG in en zh; do
+            if [ "$LANG" = "zh" ]; then HTML_LANG="zh-CN"; else HTML_LANG="en"; fi
+            node scripts/capture-chromium-proof.mjs \
+              --chrome "$CHROME_BIN" \
+              --url "http://127.0.0.1:4186/app/app.html?showcase=consultation&lang=$LANG&receipt-proof=focus" \
+              --width 1200 --height 1100 --wait-ms 26000 \
+              --ready-selector "html[lang=\"$HTML_LANG\"][data-chatchat-room-showcase=\"complete\"][data-chatchat-live-deliberation-showcase=\"complete\"][data-chatchat-history-persistence-showcase=\"complete\"][data-chatchat-final-position-floor-showcase=\"complete\"][data-chatchat-response-obligations-showcase=\"complete\"][data-chatchat-response-obligation-layout-ready=\"complete\"][data-chatchat-stage-hierarchy=\"council-first\"]" \
+              --focus-selector '[data-response-obligations="present"]' \
+              --screenshot "artifacts/chatchat-response-obligations-$LANG.png" \
+              --dom "artifacts/chatchat-response-obligations-$LANG.html"
+          done
+
+      - name: Validate answered and pending response receipts
+        run: |
+          for LANG in en zh; do
+            DOM="artifacts/chatchat-response-obligations-$LANG.html"
+            grep -q 'data-chatchat-response-obligations-showcase="complete"' "$DOM"
+            grep -q 'data-chatchat-response-obligation-layout-ready="complete"' "$DOM"
+            grep -q 'data-chatchat-room-showcase="complete"' "$DOM"
+            grep -q 'data-chatchat-history-persistence-showcase="complete"' "$DOM"
+            grep -q 'data-chatchat-final-position-floor-showcase="complete"' "$DOM"
+            grep -Eq 'data-response-obligations-answered="[1-9][0-9]*"' "$DOM"
+            grep -Eq 'data-response-obligations-pending="[1-9][0-9]*"' "$DOM"
+            grep -q 'data-response-obligations-report-match="true"' "$DOM"
+            grep -q 'data-response-obligation-status="answered"' "$DOM"
+            grep -q 'data-response-obligation-status="pending"' "$DOM"
+            grep -q 'data-request-event-id=' "$DOM"
+            grep -q 'data-response-event-id=' "$DOM"
+          done
+          grep -Fq 'Response duty ≠ agreement duty' artifacts/chatchat-response-obligations-en.html
+          grep -Fq '回应义务 ≠ 同意义务' artifacts/chatchat-response-obligations-zh.html
+
       - name: Reject blank screenshots
-        run: node scripts/check-png-content.mjs artifacts/chatchat-council-*.png
+        run: node scripts/check-png-content.mjs artifacts/chatchat-council-*.png artifacts/chatchat-response-obligations-*.png
 
       - name: Save preview log
         if: always()

@@ -86,26 +86,19 @@ function NextMovePortal() {
   useEffect(() => {
     const root = document.getElementById("next-move-root");
     if (!root || !completion) return;
-    const sourceObservation = document.getElementById("source-observation-root");
-    const evidence = document.getElementById("evidence-root");
-    const history = document.getElementById("consultation-history-root");
-    const setup = document.querySelector(".consultation-app .setup-card");
-    const app = sourceObservation?.parentElement
-      ?? evidence?.parentElement
-      ?? history?.parentElement
-      ?? setup?.parentElement
-      ?? document.querySelector(".consultation-app");
-    if (!app) return;
+    const app = document.querySelector(".consultation-app");
+    if (!(app instanceof HTMLElement)) return;
+    const setup = app.querySelector(".setup-card");
+    const receipt = app.querySelector("#consultation-receipt-root");
 
-    if (sourceObservation?.parentElement === app) {
-      app.insertBefore(root, sourceObservation.nextSibling);
-    } else if (evidence?.parentElement === app) {
-      app.insertBefore(root, evidence.nextSibling);
-    } else if (history?.parentElement === app) {
-      app.insertBefore(root, history);
+    // Council Stage invariant: audit roots may influence evidence content, but
+    // their parent container must never become the parent of a primary result.
+    // Keep Next Move on the actual consultation app regardless of portal order.
+    if (receipt?.parentElement === app) {
+      app.insertBefore(root, receipt);
     } else if (setup?.parentElement === app) {
       app.insertBefore(root, setup);
-    } else {
+    } else if (root.parentElement !== app) {
       app.append(root);
     }
   }, [completion, verifications]);
