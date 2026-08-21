@@ -12,7 +12,6 @@ import {
 import "./public-deck-integrity-portal.css";
 
 type MeetingPhase = CouncilPhase;
-
 type AuditState = "waiting" | "exact" | "mismatch";
 
 interface ObservedRoundAudit {
@@ -22,6 +21,7 @@ interface ObservedRoundAudit {
 }
 
 const MAX_VISIBLE_ROUNDS = 6;
+const SYNTHETIC_SHOWCASE = new URLSearchParams(location.search).get("showcase") === "consultation";
 
 function PublicDeckIntegrityPortal() {
   const [rounds, setRounds] = useState<Record<string, ObservedRoundAudit>>({});
@@ -78,17 +78,26 @@ function PublicDeckIntegrityPortal() {
     <section
       className={`public-deck-integrity state-${overallState}`}
       data-public-deck-integrity={overallState}
+      data-public-deck-proof-mode={SYNTHETIC_SHOWCASE ? "synthetic-showcase" : "live-provider-tabs"}
       aria-live="polite"
     >
       <header>
         <div>
-          <span>{zh ? "公共议政板一致性" : "PUBLIC BLACKBOARD DECK INTEGRITY"}</span>
-          <strong>{zh ? "平等席位真的拿到同一副公开牌吗？" : "Did equal seats actually receive the same public deck?"}</strong>
-          <p>{zh
-            ? "这里比较真实发送给 Provider 标签页的 CONSULTATION_EVENTS_JSON 原始序列化内容，不只比较事件 ID，也不读取模型隐藏思维。"
-            : "This compares the exact serialized CONSULTATION_EVENTS_JSON actually sent to Provider tabs — not only event IDs, and never hidden model reasoning."}</p>
+          <span>{SYNTHETIC_SHOWCASE
+            ? (zh ? "合成公共牌夹具" : "SYNTHETIC PUBLIC-DECK FIXTURE")
+            : (zh ? "公共议政板一致性" : "PUBLIC BLACKBOARD DECK INTEGRITY")}</span>
+          <strong>{SYNTHETIC_SHOWCASE
+            ? (zh ? "Demo 只证明审计机制，不证明真实 AI 出席" : "Demo proves the audit path, not live AI attendance")
+            : (zh ? "平等席位真的拿到同一副公开牌吗？" : "Did equal seats actually receive the same public deck?")}</strong>
+          <p>{SYNTHETIC_SHOWCASE
+            ? (zh
+                ? "这里比较的是 CI / Demo 夹具生成的 CONSULTATION_EVENTS_JSON，用来验证同牌检查和 repair 连续性 UI。它不能证明 ChatGPT、Claude、Gemini 或其他真实 Provider 收到过这些内容。"
+                : "This compares CONSULTATION_EVENTS_JSON produced by CI / demo fixtures to exercise exact-deck and repair-continuity checks. It is not evidence that ChatGPT, Claude, Gemini, or any other live Provider received these contents.")
+            : (zh
+                ? "这里比较真实发送给 Provider 标签页的 CONSULTATION_EVENTS_JSON 原始序列化内容，不只比较事件 ID，也不读取模型隐藏思维。"
+                : "This compares the exact serialized CONSULTATION_EVENTS_JSON actually sent to Provider tabs — not only event IDs, and never hidden model reasoning.")}</p>
         </div>
-        <b>{overallBadge(overallState, zh)}</b>
+        <b>{SYNTHETIC_SHOWCASE ? "DEMO · SYNTHETIC" : overallBadge(overallState, zh)}</b>
       </header>
 
       <div className="public-deck-rounds">
