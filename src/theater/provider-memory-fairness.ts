@@ -17,6 +17,7 @@ export interface ProviderMemoryFairnessTurn {
   actorName: string;
   phase: CouncilPhase;
   round: number;
+  selectorObserved: boolean;
   actualPromptObserved: boolean;
   publicContextFingerprint?: string;
   selectorLatestRoundActorIds: string[];
@@ -65,7 +66,7 @@ export interface ProviderMemoryFairnessModel {
  * This model never judges answer quality or semantic importance. It asks four
  * mechanical questions only:
  * 1) did the hard cap still represent every actor from the previous public round;
- * 2) did equal peers receive byte-equivalent normalized public event payloads;
+ * 2) did equal peers receive equivalent normalized public event payloads;
  * 3) did selector actor coverage agree with what the actual Prompt contained;
  * 4) did a repair attempt preserve exactly the same public deck as attempt one.
  */
@@ -98,9 +99,7 @@ export function deriveProviderMemoryFairness(
       : null;
     const repairContextConsistent = repairs.length && first
       ? repairs.every((repair) => samePromptDeck(first, repair))
-      : repairs.length
-        ? null
-        : null;
+      : null;
 
     return {
       key: `${sessionId}|${audit.actorId}|${audit.phase}|${audit.round}`,
@@ -108,6 +107,7 @@ export function deriveProviderMemoryFairness(
       actorName: names.get(audit.actorId) ?? audit.providerName ?? audit.actorId,
       phase: audit.phase,
       round: audit.round,
+      selectorObserved,
       actualPromptObserved: Boolean(first),
       ...(first?.publicContextFingerprint ? { publicContextFingerprint: first.publicContextFingerprint } : {}),
       selectorLatestRoundActorIds: selectorActors,
@@ -153,11 +153,7 @@ export function deriveProviderMemoryFairness(
   const selectorActorMismatchTurns = turns.filter((turn) => turn.selectorActorCoverageMatchesActual === false).length;
   const representationLimitedRounds = rounds.filter((round) => !round.latestRoundRepresentationComplete).length;
   const actualPromptTurns = turns.filter((turn) => turn.actualPromptObserved).length;
-  const allLegacy = turns.length > 0 && turns.every((turn) =>
-    !turn.actualPromptObserved
-    && turn.selectorLatestRoundActorIds.length === 0
-    && turn.selectorSelectedActorIds.length === 0,
-  );
+  const allLegacy = turns.length > 0 && turns.every((turn) => !turn.actualPromptObserved && !turn.selectorObserved);
 
   const state: ProviderMemoryFairnessState = publicPayloadMismatchRounds > 0
     ? "public_payload_mismatch"
@@ -233,7 +229,9 @@ function latestSessionId(
 }
 
 function sameSet(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && [...a].sort().every((value, index) => value === [...b].sort()[index]);
+  const left = [...a].sort();
+  const right = [...b].sort();
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 function union(values: readonly string[][]): string[] {
