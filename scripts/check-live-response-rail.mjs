@@ -59,6 +59,8 @@ for (const text of [
   'data-live-response-state="responding"',
   'data-live-response-state="queued"',
   "const QUEUED_FALLBACK_MS = 900",
+  'floor.querySelector(".live-phase-chip.phase-debate")',
+  'liveResponsePhase: "debate"',
   'mode: "response"',
   "liveResponseRequestEvent",
   "liveResponseTargetActor",
@@ -74,6 +76,7 @@ for (const text of [
   "Capture bilingual live response rail",
   'live-proof=response',
   'data-chatchat-live-proof-frame="response"',
+  'data-live-response-phase="debate"',
   'data-live-response-rail="canonical-peer-exchange"',
   'data-live-response-state="(responding|queued)"',
   "Validate live response rail provenance",
@@ -84,7 +87,7 @@ if (workflow.includes('chatchat-live-response-rail-$LANG') && workflow.includes(
 
 console.log("✓ Live Response Rail is a compact projection of canonical Peer Exchange state");
 console.log("✓ Rail stays above AI seats while the detailed Peer Exchange queue remains intact");
-console.log("✓ Chromium freezes a real responding/queued debate route, not the later final snapshot");
+console.log("✓ Chromium freezes a real responding/queued route during open debate, not the later final snapshot");
 console.log("✓ No majority, persuasion, prose-similarity or duplicate closure logic can drive the rail");
 
 function requireText(haystack, needle, label) {
