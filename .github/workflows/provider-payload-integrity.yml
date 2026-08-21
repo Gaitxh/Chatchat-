@@ -1,0 +1,92 @@
+name: Provider Payload Integrity UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: chatchat-provider-payload-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  payload-proof:
+    name: Provider payload parity · repair deck invariance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install and build production extension
+        run: |
+          npm ci
+          npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Locate Chromium browser
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_BIN"
+          echo "CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
+
+      - name: Start production preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4180 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-provider-payload-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4180/manifest.json >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4180/manifest.json >/dev/null
+
+      - name: Capture bilingual repair deck proof from same Chromium session DOM
+        run: |
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url 'http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=zh&payload-proof=repair' \
+            --width 1440 --height 1800 --wait-ms 24000 \
+            --ready-selector 'html[data-chatchat-provider-payload-repair-showcase="complete"]' \
+            --focus-selector '[data-provider-payload-integrity="verified"]' \
+            --screenshot artifacts/chatchat-provider-payload-repair-zh.png \
+            --dom artifacts/chatchat-provider-payload-repair-zh.html
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url 'http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=en&payload-proof=repair' \
+            --width 1440 --height 1800 --wait-ms 24000 \
+            --ready-selector 'html[data-chatchat-provider-payload-repair-showcase="complete"]' \
+            --focus-selector '[data-provider-payload-integrity="verified"]' \
+            --screenshot artifacts/chatchat-provider-payload-repair-en.png \
+            --dom artifacts/chatchat-provider-payload-repair-en.html
+
+      - name: Reject blank payload-integrity screenshots
+        run: |
+          node scripts/check-png-content.mjs \
+            artifacts/chatchat-provider-payload-repair-zh.png \
+            artifacts/chatchat-provider-payload-repair-en.png
+
+      - name: Validate public payload and repair deck semantics
+        run: node scripts/validate-provider-payload-evidence.mjs artifacts
+
+      - name: Save preview log
+        if: always()
+        run: cp /tmp/chatchat-provider-payload-preview.log artifacts/preview.log 2>/dev/null || true
+
+      - name: Upload Provider payload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-provider-payload-integrity
+          path: artifacts/**
+          if-no-files-found: warn
+          retention-days: 14
