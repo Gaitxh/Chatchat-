@@ -131,22 +131,19 @@ function ConsultationReceiptPortal() {
   useEffect(() => {
     const root = document.getElementById("consultation-receipt-root");
     if (!root || !completion) return;
-    const nextMove = document.getElementById("next-move-root");
-    const history = document.getElementById("consultation-history-root");
-    const setup = document.querySelector(".consultation-app .setup-card");
-    const app = nextMove?.parentElement
-      ?? history?.parentElement
-      ?? setup?.parentElement
-      ?? document.querySelector(".consultation-app");
-    if (!app) return;
+    const app = document.querySelector(".consultation-app");
+    if (!(app instanceof HTMLElement)) return;
+    const nextMove = app.querySelector("#next-move-root");
+    const setup = app.querySelector(".setup-card");
 
+    // Council Stage invariant: the receipt is a primary meeting result. Never
+    // derive its parent from History/Evidence/Audit roots that may live inside
+    // the disclosure-gated Audit Vault.
     if (nextMove?.parentElement === app) {
       app.insertBefore(root, nextMove.nextSibling);
-    } else if (history?.parentElement === app) {
-      app.insertBefore(root, history);
     } else if (setup?.parentElement === app) {
       app.insertBefore(root, setup);
-    } else {
+    } else if (root.parentElement !== app) {
       app.append(root);
     }
   }, [completion, verifications, executionIntegrity]);
