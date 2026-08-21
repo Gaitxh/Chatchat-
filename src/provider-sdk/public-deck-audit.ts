@@ -82,6 +82,13 @@ export function parseProviderPublicDeck(prompt: string): ProviderPublicDeckObser
   };
 }
 
+export function providerPublicDeckObservationFor(
+  value: Pick<ProviderPublicDeckObservation, "sessionId" | "actorId" | "phase" | "round" | "repairAttempt">,
+): ProviderPublicDeckObservation | null {
+  const found = observations.get(observationKey(value));
+  return found ? { ...found } : null;
+}
+
 /**
  * Audit one public meeting deck across equal Provider seats and any parser repair.
  * Peer parity and repair continuity are deliberately separate properties.
