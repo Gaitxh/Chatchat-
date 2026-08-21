@@ -114,7 +114,8 @@ for (const proof of [
 }
 
 for (const proof of [
-  'params.get("live-proof") !== "persuasion"',
+  'proofMode !== "persuasion" && proofMode !== "response"',
+  'mode: "persuasion"',
   'data-chatchat-live-proof-showcase',
   'data-chatchat-live-proof-frame',
   'data-persuasion-strength="strong"',
