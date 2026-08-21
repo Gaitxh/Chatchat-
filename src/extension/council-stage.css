@@ -248,10 +248,11 @@ html[data-surface="web-app"] .council-audit-drawer[open] > summary { border-bott
 
 html[data-surface="web-app"] .council-audit-content {
   padding: 22px;
-  display: grid;
   gap: 18px;
   background: rgba(246, 248, 246, .72);
 }
+html[data-surface="web-app"] .council-audit-drawer:not([open]) > .council-audit-content { display: none; }
+html[data-surface="web-app"] .council-audit-drawer[open] > .council-audit-content { display: grid; }
 
 html[data-surface="web-app"] .council-audit-content > div:empty { display: none; }
 html[data-surface="web-app"] .council-audit-content .execution-provenance,
