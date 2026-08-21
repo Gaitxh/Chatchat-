@@ -7,6 +7,7 @@ const modePrompt = fs.readFileSync("src/provider-sdk/consultation-mode-prompt.ts
 const agent = fs.readFileSync("src/provider-sdk/consultation-agent.ts", "utf8");
 const executionAudit = fs.readFileSync("src/provider-sdk/execution-audit.ts", "utf8");
 const attendance = fs.readFileSync("src/theater/provider-attendance.ts", "utf8");
+const fairnessTest = fs.readFileSync("tests/context-selection-seat-fairness.test.ts", "utf8");
 
 for (const claim of [
   "OpenMeetingIssueProvenance",
@@ -26,12 +27,27 @@ for (const claim of [
   "pinnedIssueSourceEventIds",
   "providerVisibleConsultationContext",
   "Pinned events gain memory priority only — never authority",
+  "const byActor = new Map",
+  "stableRotation",
+  "const actorCycle = rotate",
+  "Each actor",
+  "publication position receives preference",
 ]) {
   assert(selector.includes(claim), `Conflict-aware context selector is missing: ${claim}`);
 }
 assert(!selector.includes("embedding"), "Provider context selection must not use embeddings or semantic similarity.");
 assert(!selector.includes("consensusRatio"), "Provider context memory priority must not depend on stance majority.");
 assert(!selector.includes("confidence >"), "Provider context memory priority must not reward higher model confidence.");
+assert(!/filter\(\(event\) => event\.round === latestRound\)[\s\S]{0,80}slice\(-maxEvents\)/.test(selector), "Overflowing newest-round memory must not regress to publication-tail slice(-maxEvents).");
+
+for (const claim of [
+  "12 slots across 3 equally active seats must allocate 4/4/4",
+  "Selected latest-round event set must be invariant to actor block publication order",
+  "differ by at most one slot",
+  "A seat with one public event must keep that event",
+]) {
+  assert(fairnessTest.includes(claim), `Latest-round seat fairness regression test is missing: ${claim}`);
+}
 
 for (const claim of [
   "selectProviderContextEvents(context.publicEvents)",
@@ -78,7 +94,7 @@ for (const claim of [
   assert(attendance.includes(claim), `Attendance audit model drops context-selection provenance: ${claim}`);
 }
 
-console.log("✓ unresolved conflict memory, exact visible provenance, response opportunities and latest-round protection are mechanically enforced");
+console.log("✓ unresolved conflict memory, exact provenance and seat-balanced overflowing latest-round protection are mechanically enforced");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`Context selection check failed: ${message}`);
