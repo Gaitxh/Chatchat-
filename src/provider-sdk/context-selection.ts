@@ -177,7 +177,7 @@ function selectLatestRoundFairly(
       || a.localeCompare(b),
   );
 
-  const quota = new Map(fairActorOrder.map((actorId) => [actorId, 0] as const));
+  const quota = new Map<string, number>(fairActorOrder.map((actorId) => [actorId, 0]));
   let slots = maxEvents;
   // One seat before seconds. If actor count itself exceeds the hard cap, the
   // omitted actor ids remain explicit so Memory Integrity can report that the
