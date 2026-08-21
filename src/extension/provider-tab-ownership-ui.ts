@@ -75,21 +75,24 @@ function decorate() {
     if (!badge) {
       badge = document.createElement("span");
       badge.dataset[camelDataName(OWNERSHIP_BADGE)] = "true";
-      badge.className = `provider-tab-ownership-badge ownership-${ownership}`;
       titleLine.append(badge);
     }
 
-    badge.className = `provider-tab-ownership-badge ownership-${ownership}`;
-    badge.textContent = ownership === "managed"
+    const className = `provider-tab-ownership-badge ownership-${ownership}`;
+    const label = ownership === "managed"
       ? (zh ? "托管标签页" : "Managed tab")
       : (zh ? "你的标签页" : "Your tab");
-    badge.title = ownership === "managed"
+    const title = ownership === "managed"
       ? (zh
         ? "这是 ChatChat 创建的干净 AI 标签页；ChatChat 只会在受限自动连接/恢复流程中导航它。"
         : "This clean AI tab was created by ChatChat; bounded automatic connection/recovery may navigate it.")
       : (zh
         ? "这是你的标签页；ChatChat 不会在后台自动导航或恢复它。"
         : "This is your tab; ChatChat will not automatically navigate or resume it in the background.");
+
+    if (badge.className !== className) badge.className = className;
+    if (badge.textContent !== label) badge.textContent = label;
+    if (badge.title !== title) badge.title = title;
   }
 }
 
