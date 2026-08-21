@@ -1,14 +1,78 @@
 /* Full Room keeps automatic AI-team plumbing out of the primary novice flow. */
 html[data-surface="web-app"]:not([data-chatchat-team-edit="open"]) .participants-card > .connect-all-button,
 html[data-surface="web-app"]:not([data-chatchat-team-edit="open"]) .participants-card > .participant-actions,
-html[data-surface="web-app"]:not([data-chatchat-team-edit="open"]) .participants-card > .url-opener,
 html[data-surface="web-app"]:not([data-chatchat-team-edit="open"]) .participants-card > .discovered-section,
 html[data-surface="web-app"]:not([data-chatchat-team-edit="open"]) .quick-open,
 html[data-surface="web-app"]:not([data-chatchat-team-edit="open"]) .participant-row-actions button:nth-child(n + 2) {
   display: none !important;
 }
 
-/* web-app.css intentionally keeps these controls out of the novice Full Room with
+/*
+ * Inviting an AI is a product action, not repair plumbing. web-app.css still
+ * carries the older defensive hide for .url-opener; this later stylesheet only
+ * lifts the URL entry that team-settings.ts has explicitly promoted to Invite AI.
+ */
+html[data-surface="web-app"] .participants-card > .url-opener[data-chatchat-invite-ai="true"] {
+  display: block !important;
+  margin: 12px 0 2px;
+  padding: 12px;
+  border: 1px solid rgba(45, 42, 37, .1);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255, 248, 232, .96), rgba(246, 248, 255, .96));
+  box-shadow: 0 10px 24px rgba(51, 47, 40, .06);
+}
+
+html[data-surface="web-app"] .participants-card > .url-opener[data-chatchat-invite-ai="true"] > label {
+  display: block;
+  margin-bottom: 8px;
+  color: #37332d;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .02em;
+}
+
+html[data-surface="web-app"] .participants-card > .url-opener[data-chatchat-invite-ai="true"] > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+
+html[data-surface="web-app"] .participants-card > .url-opener[data-chatchat-invite-ai="true"] input {
+  min-width: 0;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid rgba(45, 42, 37, .14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .9);
+  color: #39352f;
+  font: inherit;
+  font-size: 9px;
+  outline: none;
+}
+
+html[data-surface="web-app"] .participants-card > .url-opener[data-chatchat-invite-ai="true"] input:focus {
+  border-color: rgba(79, 100, 177, .45);
+  box-shadow: 0 0 0 3px rgba(79, 100, 177, .09);
+}
+
+html[data-surface="web-app"] .participants-card > .url-opener[data-chatchat-invite-ai="true"] button {
+  min-width: 72px;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 10px;
+  background: #34312c;
+  color: #fffdf8;
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+html[data-surface="web-app"] .participants-card > .url-opener[data-chatchat-invite-ai="true"] button:disabled {
+  cursor: default;
+  opacity: .42;
+}
+
+/* web-app.css intentionally keeps the remaining controls out of the novice Full Room with
  * its own !important rules. Team edit is the one explicit, user-controlled escape
  * hatch, so it must deliberately override those older product defaults. */
 html[data-surface="web-app"][data-chatchat-team-edit="open"] .participants-card > .connect-all-button {
@@ -119,5 +183,9 @@ html[data-surface="web-app"] .team-settings-hint {
   html[data-surface="web-app"] .team-settings-disclosure > summary > span {
     display: grid;
     gap: 2px;
+  }
+
+  html[data-surface="web-app"] .participants-card > .url-opener[data-chatchat-invite-ai="true"] > div {
+    grid-template-columns: 1fr;
   }
 }
