@@ -27,14 +27,22 @@ for (const claim of [
   "pinnedIssueSourceEventIds",
   "providerVisibleConsultationContext",
   "Pinned events gain memory priority only — never authority",
+  "balancedRoundIds",
   "const byActor = new Map",
   "stableRotation",
   "const actorCycle = rotate",
-  "Each actor",
   "publication position receives preference",
 ]) {
-  assert(selector.includes(claim), `Conflict-aware context selector is missing: ${claim}`);
+  assert(selector.includes(claim), `Conflict-aware context selector is missing semantic structure: ${claim}`);
 }
+assert(
+  /function latestRoundIds[\s\S]*?return balancedRoundIds\(latest, maxEvents,/.test(selector),
+  "Overflowing newest-round selection must delegate to the deterministic actor-balanced allocator.",
+);
+assert(
+  /function balancedRoundIds[\s\S]*?byActor[\s\S]*?actorCycle[\s\S]*?selected\.add/.test(selector),
+  "Actor-balanced allocator must group by actor, rotate deterministically and allocate selected event ids.",
+);
 assert(!selector.includes("embedding"), "Provider context selection must not use embeddings or semantic similarity.");
 assert(!selector.includes("consensusRatio"), "Provider context memory priority must not depend on stance majority.");
 assert(!selector.includes("confidence >"), "Provider context memory priority must not reward higher model confidence.");
@@ -94,7 +102,7 @@ for (const claim of [
   assert(attendance.includes(claim), `Attendance audit model drops context-selection provenance: ${claim}`);
 }
 
-console.log("✓ unresolved conflict memory, exact provenance and seat-balanced overflowing latest-round protection are mechanically enforced");
+console.log("✓ unresolved conflict memory, exact provenance and deterministic actor-balanced newest-round protection are mechanically enforced");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`Context selection check failed: ${message}`);
