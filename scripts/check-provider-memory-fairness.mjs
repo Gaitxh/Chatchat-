@@ -29,8 +29,9 @@ requireClaims("Seat-balanced latest-round selector", selector, [
 ]);
 
 requireClaims("Protocol payload fingerprint", fingerprint, [
-  'algorithm: "fnv1a32"',
+  'algorithm: "fnv1a64"',
   "fingerprintProtocolJsonText",
+  "64-bit width reduces accidental collision risk",
   "not a security hash",
 ]);
 
@@ -145,7 +146,7 @@ requireClaims("CI Provider Memory Fairness proof", workflow, [
   "validate-provider-memory-fairness-evidence.mjs",
 ]);
 
-console.log("✓ Provider memory fairness requires seat-balanced representation, actual payload equality, repair-deck parity, frozen replay and dedicated Chromium proof");
+console.log("✓ Provider memory fairness requires seat-balanced representation, 64-bit actual-payload equality, repair-deck parity, frozen replay and dedicated Chromium proof");
 
 function read(path) {
   return fs.readFileSync(path, "utf8");
