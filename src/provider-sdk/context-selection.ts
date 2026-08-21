@@ -44,7 +44,9 @@ export interface ProviderVisibleConsultationContext {
  * protected before ordinary same-round recency.
  *
  * This selector never scores prose, stance popularity, provider identity or
- * confidence. Pinned/protected events gain memory coverage only — never authority.
+ * confidence. Pinned events gain memory priority only — never authority.
+ * Latest-round protection likewise changes memory coverage only and never
+ * creates truth status, vote weight, speaking priority, or model privilege.
  */
 export function selectProviderContextEvents(
   publicEvents: readonly CouncilEvent[],
