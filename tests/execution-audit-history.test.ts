@@ -8,6 +8,7 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Assertion failed: ${message}`);
 }
 
+const FINGERPRINT = "fnv1a64:1234567890abcdef:400";
 const transports: ProviderTransportAuditRecord[] = [
   {
     sessionId: "session-a",
@@ -23,7 +24,7 @@ const transports: ProviderTransportAuditRecord[] = [
     pinnedIssueSourceEventIds: ["e1"],
     latestRoundEventIds: ["e2"],
     latestRoundSelectedActorIds: ["gpt", "claude"],
-    publicContextFingerprint: "fnv1a32:12345678:400",
+    publicContextFingerprint: FINGERPRINT,
     repairAttempt: false,
     tabId: 7,
     promptChars: 4100,
@@ -92,7 +93,7 @@ assert(archive.transports[0]?.pinnedOpenIssueEventIds?.join(",") === "e1", "rece
 assert(archive.transports[0]?.pinnedIssueSourceEventIds?.join(",") === "e1", "receipt must freeze exact canonical pin-reason source ids");
 assert(archive.transports[0]?.latestRoundEventIds?.join(",") === "e2", "receipt must freeze newest-round protected ids");
 assert(archive.transports[0]?.latestRoundSelectedActorIds?.join(",") === "gpt,claude", "receipt must freeze actual Prompt latest-round actor representation");
-assert(archive.transports[0]?.publicContextFingerprint === "fnv1a32:12345678:400", "receipt must freeze the actual normalized public-payload fingerprint");
+assert(archive.transports[0]?.publicContextFingerprint === FINGERPRINT, "receipt must freeze the actual normalized public-payload fingerprint");
 assert(archive.execution[0]?.contextSelectionObserved === true, "receipt must preserve modern selector-audit provenance");
 assert(archive.execution[0]?.latestRoundActorIds?.join(",") === "gpt,claude,gemini", "receipt must freeze all actors who spoke in the previous public round");
 assert(archive.execution[0]?.latestRoundSelectedActorIds?.join(",") === "gpt,claude", "receipt must freeze selector actor representation");
@@ -119,7 +120,7 @@ assert(archive.transports[0]?.pinnedOpenIssueEventIds?.join(",") === "e1", "froz
 assert(archive.transports[0]?.pinnedIssueSourceEventIds?.join(",") === "e1", "frozen receipt must own pin-reason source ids");
 assert(archive.transports[0]?.latestRoundEventIds?.join(",") === "e2", "frozen receipt must own latest-round ids");
 assert(archive.transports[0]?.latestRoundSelectedActorIds?.join(",") === "gpt,claude", "frozen transport receipt must own actual represented-actor ids");
-assert(archive.transports[0]?.publicContextFingerprint === "fnv1a32:12345678:400", "frozen transport fingerprint must remain immutable");
+assert(archive.transports[0]?.publicContextFingerprint === FINGERPRINT, "frozen transport fingerprint must remain immutable");
 assert(archive.execution[0]?.pinnedOpenIssueEventIds?.join(",") === "e1", "frozen execution audit must own pinned-event ids");
 assert(archive.execution[0]?.pinnedIssueSourceEventIds?.join(",") === "e1", "frozen execution audit must own pin-source ids");
 assert(archive.execution[0]?.latestRoundEventIds?.join(",") === "e2", "frozen execution audit must own latest-round ids");
