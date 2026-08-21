@@ -14,11 +14,14 @@ export interface ProviderTransportAuditRecord {
   mode: ProviderExecutionMode;
   observedAt: string;
   snapshotEventIds: readonly string[];
-  /** True only when category metadata was parsed from the actual RUN_SPEECH prompt. */
+  /** True only when metadata was parsed from the actual RUN_SPEECH prompt. */
   promptMemoryObserved?: true;
   pinnedOpenIssueEventIds?: readonly string[];
   pinnedIssueSourceEventIds?: readonly string[];
   latestRoundEventIds?: readonly string[];
+  latestRoundSelectedActorIds?: readonly string[];
+  /** Hash + normalized character count of exact CONSULTATION_EVENTS_JSON. */
+  publicContextFingerprint?: string;
   repairAttempt: boolean;
   tabId: number;
   promptChars: number;
@@ -47,6 +50,10 @@ export function recordProviderTransportAudit(record: ProviderTransportAuditRecor
         pinnedOpenIssueEventIds: [...promptSelection.pinnedOpenIssueEventIds],
         pinnedIssueSourceEventIds: [...promptSelection.pinnedIssueSourceEventIds],
         latestRoundEventIds: [...promptSelection.latestRoundEventIds],
+        latestRoundSelectedActorIds: [...promptSelection.latestRoundSelectedActorIds],
+        ...(promptSelection.publicContextFingerprint
+          ? { publicContextFingerprint: promptSelection.publicContextFingerprint }
+          : {}),
       }
     : record;
   const copy = cloneProviderTransportAudit(enriched);
@@ -77,6 +84,9 @@ export function cloneProviderTransportAudit(record: ProviderTransportAuditRecord
       : {}),
     ...(record.latestRoundEventIds !== undefined
       ? { latestRoundEventIds: [...record.latestRoundEventIds] }
+      : {}),
+    ...(record.latestRoundSelectedActorIds !== undefined
+      ? { latestRoundSelectedActorIds: [...record.latestRoundSelectedActorIds] }
       : {}),
   };
 }
