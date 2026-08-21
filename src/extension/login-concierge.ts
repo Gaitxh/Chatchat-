@@ -1,4 +1,5 @@
-import { classifyLoginState } from "./login-state.js";
+import { participantRowMap } from "./participant-row-identity.js";
+import { inspectProviderPage } from "./provider-page-inspection.js";
 
 declare const chrome: any;
 
@@ -15,12 +16,7 @@ interface ParticipantRecord {
   tabId: number;
   providerName: string;
   origin: string;
-}
-
-interface PageSignals {
-  passwordInputs: number;
-  loginControls: number;
-  composerCandidates: number;
+  hostname: string;
 }
 
 install();
@@ -60,14 +56,15 @@ async function refresh() {
     const participants = Array.isArray(stored[PARTICIPANTS_KEY])
       ? stored[PARTICIPANTS_KEY] as ParticipantRecord[]
       : [];
-    const rows = [...document.querySelectorAll<HTMLElement>(".participant-row")];
+    const rowsBySeat = participantRowMap(participants);
 
-    await Promise.all(rows.map(async (row, index) => {
-      const participant = participants[index];
-      if (!participant) {
-        clearLoginState(row);
-        return;
-      }
+    for (const row of document.querySelectorAll<HTMLElement>(".participant-row")) {
+      if (!row.dataset.seatId || !rowsBySeat.has(row.dataset.seatId)) clearLoginState(row);
+    }
+
+    await Promise.all(participants.map(async (participant) => {
+      const row = rowsBySeat.get(participant.seatId);
+      if (!row) return;
       if (!row.classList.contains("connection-failed")) {
         clearLoginState(row);
         return;
@@ -78,7 +75,7 @@ async function refresh() {
       else clearLoginState(row);
     }));
 
-    if (rows.some((row) => row.classList.contains("connection-needs-login"))) {
+    if ([...rowsBySeat.values()].some((row) => row.classList.contains("connection-needs-login"))) {
       document.documentElement.dataset.chatchatLoginPending = "true";
     } else {
       delete document.documentElement.dataset.chatchatLoginPending;
@@ -91,7 +88,7 @@ async function refresh() {
 }
 
 async function participantNeedsLogin(participant: ParticipantRecord): Promise<boolean> {
-  let tab: { url?: string; title?: string };
+  let tab: { url?: string };
   try {
     tab = await chrome.tabs.get(participant.tabId);
   } catch {
@@ -105,61 +102,16 @@ async function participantNeedsLogin(participant: ParticipantRecord): Promise<bo
     return cached.state === "needs_login";
   }
 
-  const signals = await inspectPage(participant, currentUrl);
-  const state = classifyLoginState({
+  const inspection = await inspectProviderPage({
+    tabId: participant.tabId,
     expectedOrigin: participant.origin,
-    currentUrl,
-    title: String(tab?.title ?? ""),
-    ...signals,
   });
-  inspectionCache.set(participant.seatId, { url: currentUrl, state, at: Date.now() });
-  return state === "needs_login";
-}
-
-async function inspectPage(participant: ParticipantRecord, currentUrl: string): Promise<PageSignals> {
-  try {
-    const expected = new URL(participant.origin);
-    const current = new URL(currentUrl);
-    if (expected.origin !== current.origin) {
-      return { passwordInputs: 0, loginControls: 0, composerCandidates: 0 };
-    }
-  } catch {
-    return { passwordInputs: 0, loginControls: 0, composerCandidates: 0 };
-  }
-
-  try {
-    const result = await chrome.scripting.executeScript({
-      target: { tabId: participant.tabId },
-      func: () => {
-        const visible = (element: Element) => {
-          if (!(element instanceof HTMLElement)) return false;
-          const rect = element.getBoundingClientRect();
-          const style = getComputedStyle(element);
-          return rect.width > 2 && rect.height > 2 && style.display !== "none" && style.visibility !== "hidden";
-        };
-        const label = (element: Element) => [
-          element.getAttribute("aria-label"),
-          element.getAttribute("title"),
-          element.textContent,
-        ].filter(Boolean).join(" ").slice(0, 500);
-        const passwordInputs = [...document.querySelectorAll('input[type="password"]')].filter(visible).length;
-        const loginControls = [...document.querySelectorAll("button,a,[role='button']")]
-          .filter(visible)
-          .filter((element) => /log\s*in|sign\s*in|continue\s+with|登录|登入|登陆/i.test(label(element))).length;
-        const composerCandidates = [...document.querySelectorAll("textarea,[contenteditable='true'],input")]
-          .filter(visible)
-          .filter((element) => {
-            if (!(element instanceof HTMLInputElement)) return true;
-            return !["password", "email", "search", "tel", "url", "hidden", "file"].includes(element.type);
-          }).length;
-        return { passwordInputs, loginControls, composerCandidates };
-      },
-    });
-    const value = result?.[0]?.result as PageSignals | undefined;
-    return value ?? { passwordInputs: 0, loginControls: 0, composerCandidates: 0 };
-  } catch {
-    return { passwordInputs: 0, loginControls: 0, composerCandidates: 0 };
-  }
+  inspectionCache.set(participant.seatId, {
+    url: inspection.currentUrl,
+    state: inspection.loginState,
+    at: Date.now(),
+  });
+  return inspection.loginState === "needs_login";
 }
 
 function decorateLoginState(row: HTMLElement, providerName: string) {

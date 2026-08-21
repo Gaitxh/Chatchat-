@@ -1,0 +1,109 @@
+name: Provider Self-Healing UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: chatchat-provider-self-healing-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  self-healing:
+    name: Provider self-healing · one bounded clean-start recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install and build production extension
+        run: |
+          npm ci
+          npm run check
+          npm test
+          npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Locate Chromium browser
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_BIN"
+          echo "CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
+
+      - name: Start production preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4184 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-self-healing-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4184/manifest.json >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4184/manifest.json >/dev/null
+
+      - name: Capture bounded self-healing journeys
+        run: |
+          for LANG in en zh; do
+            for JOURNEY in static resume exhausted owned; do
+              node scripts/capture-chromium-proof.mjs \
+                --chrome "$CHROME_BIN" \
+                --url "http://127.0.0.1:4184/app/app.html?showcase=provider-self-healing&journey=$JOURNEY&lang=$LANG" \
+                --width 1000 --height 1100 --wait-ms 18000 \
+                --ready-selector 'html[data-chatchat-provider-self-healing-showcase="complete"]' \
+                --focus-selector '[data-seat-id="extension:anthropic-claude:801"]' \
+                --screenshot "artifacts/chatchat-self-healing-$JOURNEY-$LANG.png" \
+                --dom "artifacts/chatchat-self-healing-$JOURNEY-$LANG.html"
+            done
+          done
+
+      - name: Validate recovery semantics from ready DOM
+        run: |
+          for LANG in en zh; do
+            grep -q 'data-chatchat-provider-self-healing-static="complete"' "artifacts/chatchat-self-healing-static-$LANG.html"
+            grep -q 'data-chatchat-self-healing-navigation-count="1"' "artifacts/chatchat-self-healing-static-$LANG.html"
+            grep -q 'connection-self-healing' "artifacts/chatchat-self-healing-static-$LANG.html"
+            grep -q 'provider-self-healing-note' "artifacts/chatchat-self-healing-static-$LANG.html"
+
+            grep -q 'data-chatchat-provider-self-healing-resume="complete"' "artifacts/chatchat-self-healing-resume-$LANG.html"
+            grep -q 'data-chatchat-self-healing-navigation-count="1"' "artifacts/chatchat-self-healing-resume-$LANG.html"
+            grep -q 'participant-row connection-ready is-ready' "artifacts/chatchat-self-healing-resume-$LANG.html"
+            ! grep -q 'provider-self-healing-note' "artifacts/chatchat-self-healing-resume-$LANG.html"
+
+            grep -q 'data-chatchat-provider-self-healing-exhausted="complete"' "artifacts/chatchat-self-healing-exhausted-$LANG.html"
+            grep -q 'data-chatchat-self-healing-navigation-count="1"' "artifacts/chatchat-self-healing-exhausted-$LANG.html"
+            grep -q 'participant-row connection-failed' "artifacts/chatchat-self-healing-exhausted-$LANG.html"
+            ! grep -q 'provider-self-healing-note' "artifacts/chatchat-self-healing-exhausted-$LANG.html"
+
+            grep -q 'data-chatchat-provider-self-healing-owned-tab-safe="complete"' "artifacts/chatchat-self-healing-owned-$LANG.html"
+            grep -q 'data-chatchat-self-healing-navigation-count="0"' "artifacts/chatchat-self-healing-owned-$LANG.html"
+            grep -q 'participant-row connection-failed' "artifacts/chatchat-self-healing-owned-$LANG.html"
+            ! grep -q 'connection-self-healing' "artifacts/chatchat-self-healing-owned-$LANG.html"
+          done
+
+      - name: Reject blank screenshots
+        run: |
+          node scripts/check-png-content.mjs artifacts/chatchat-self-healing-*.png
+
+      - name: Save preview log
+        if: always()
+        run: cp /tmp/chatchat-self-healing-preview.log artifacts/preview.log 2>/dev/null || true
+
+      - name: Upload self-healing browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-provider-self-healing-ui
+          path: artifacts/**
+          if-no-files-found: warn
+          retention-days: 14
