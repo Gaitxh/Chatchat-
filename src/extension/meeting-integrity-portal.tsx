@@ -65,8 +65,9 @@ function MeetingIntegrityPortal() {
   useEffect(() => {
     if (!view) return;
     const root = document.getElementById("meeting-integrity-root");
+    if (!root || root.closest("#council-audit-drawer")) return;
     const outcome = document.querySelector(".outcome-card");
-    if (!root || !outcome?.parentElement) return;
+    if (!outcome?.parentElement) return;
     outcome.insertAdjacentElement("afterend", root);
   }, [view]);
 
