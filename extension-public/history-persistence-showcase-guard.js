@@ -67,10 +67,6 @@
       );
       if (!historicalTurn) throw new Error("Historical execution receipt did not replay a peer-visible published turn.");
 
-      // Provider Memory is a second deterministic consumer of the exact same
-      // frozen execution receipt. History is not considered fully replayed until
-      // this independent view has reloaded the same session from IndexedDB and
-      // reconstructed non-empty Prompt memory evidence.
       const memoryView = await waitForElement(() => {
         const candidate = document.querySelector('[data-provider-memory-view="archive"]');
         return candidate?.getAttribute("data-provider-memory-view-session") === sessionId ? candidate : null;
@@ -86,11 +82,6 @@
         throw new Error("Historical Provider Memory Coverage did not preserve every modern Prompt receipt.");
       }
 
-      // Procedural Fairness is a third deterministic view over the same frozen
-      // raw receipt. For the modern showcase it must preserve actual public
-      // payload fingerprints, actor representation and repair parity across a
-      // reload. A live-ledger residue would keep `view=live` and cannot satisfy
-      // this archive gate.
       const fairness = await waitForElement(() => {
         const candidate = memoryView.querySelector('[data-provider-memory-fairness][data-provider-memory-fairness-view="archive"]');
         return candidate?.getAttribute("data-provider-memory-fairness-session") === sessionId ? candidate : null;
@@ -104,6 +95,7 @@
         throw new Error("Historical Provider Memory Fairness lost actual Prompt coverage.");
       }
       if (Number(fairness.getAttribute("data-memory-fairness-payload-mismatch-rounds") ?? "-1") !== 0
+        || Number(fairness.getAttribute("data-memory-fairness-metadata-mismatch-turns") ?? "-1") !== 0
         || Number(fairness.getAttribute("data-memory-fairness-repair-mismatch-turns") ?? "-1") !== 0
         || Number(fairness.getAttribute("data-memory-fairness-selector-actor-mismatch-turns") ?? "-1") !== 0) {
         throw new Error("Historical Provider Memory Fairness reconstructed a procedural mismatch that was absent at close.");
