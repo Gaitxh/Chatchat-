@@ -2,21 +2,30 @@ type Locale = "en" | "zh-CN";
 
 const ROOT_ID = "team-settings-root";
 const OPEN_DATASET_VALUE = "open";
+const INVITE_DATASET_VALUE = "true";
 
 const COPY = {
   en: {
     kicker: "AI TEAM",
     title: "Change AI team",
-    hint: "ChatChat manages this automatically. Open this only when you want to add, remove, or repair an AI participant.",
+    hint: "ChatChat manages this automatically. Open this only when you want to remove or repair an AI participant.",
     closed: "Automatic by default",
     open: "Team controls open",
+    inviteLabel: "+ Invite AI",
+    invitePlaceholder: "Paste any AI website URL",
+    inviteAction: "Invite",
+    inviteTitle: "Invite an AI by URL. ChatChat will open it, let you sign in if needed, learn the page automatically, and prepare its seat.",
   },
   "zh-CN": {
     kicker: "AI 团队",
     title: "调整 AI 团队",
-    hint: "ChatChat 默认会自动管理这里。只有想添加、移除或修复某位 AI 参与者时，才需要打开这些控制。",
+    hint: "ChatChat 默认会自动管理这里。只有想移除或修复某位 AI 参与者时，才需要打开这些控制。",
     closed: "默认自动管理",
     open: "团队控制已展开",
+    inviteLabel: "＋ 邀请 AI",
+    invitePlaceholder: "粘贴任意 AI 网站 URL",
+    inviteAction: "邀请入席",
+    inviteTitle: "通过 URL 邀请一位 AI。ChatChat 会打开网站；需要时你正常登录，之后它会自动识别页面并准备席位。",
   },
 } as const;
 
@@ -51,6 +60,7 @@ function install(): void {
     if (details.getAttribute("aria-label") !== copy.title) {
       details.setAttribute("aria-label", copy.title);
     }
+    syncInviteEntry(copy);
   };
 
   const syncOpenState = () => {
@@ -71,6 +81,7 @@ function install(): void {
     }
     const shouldHide = document.documentElement.dataset.chatchatOnboarding === "zero-config";
     if (root.hidden !== shouldHide) root.hidden = shouldHide;
+    syncInviteEntry(COPY[currentLocale()]);
   };
 
   details.addEventListener("toggle", syncOpenState);
@@ -92,6 +103,22 @@ function install(): void {
 
   syncOpenState();
   mount();
+}
+
+function syncInviteEntry(copy: (typeof COPY)[Locale]): void {
+  const invite = document.querySelector<HTMLElement>(".consultation-app .participants-card > .url-opener");
+  if (!invite) return;
+  invite.dataset.chatchatInviteAi = INVITE_DATASET_VALUE;
+  invite.setAttribute("aria-label", copy.inviteTitle);
+  invite.setAttribute("title", copy.inviteTitle);
+
+  const label = invite.querySelector<HTMLLabelElement>("label");
+  const input = invite.querySelector<HTMLInputElement>("input");
+  const button = invite.querySelector<HTMLButtonElement>("button");
+  if (label) setText(label, copy.inviteLabel);
+  if (input && input.placeholder !== copy.invitePlaceholder) input.placeholder = copy.invitePlaceholder;
+  if (input && input.getAttribute("aria-label") !== copy.inviteTitle) input.setAttribute("aria-label", copy.inviteTitle);
+  if (button) setText(button, copy.inviteAction);
 }
 
 function ensureRoot(): HTMLElement {
