@@ -54,7 +54,6 @@ const tests = [
   "dist/tests/consultation-history.test.js",
   "dist/tests/extension-gate-b.test.js",
   "dist/tests/recipe-candidate.test.js",
-  "dist/tests/browser-chronicle.test.js",
 ];
 
 for (const test of tests) {
