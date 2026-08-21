@@ -1,3 +1,5 @@
+export {};
+
 declare const chrome: any;
 
 const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
