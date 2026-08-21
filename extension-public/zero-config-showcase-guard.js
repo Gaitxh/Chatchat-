@@ -130,21 +130,29 @@
 
   async function verifyTeamControls() {
     const disclosure = document.querySelector(".team-settings-disclosure");
-    if (!(disclosure instanceof HTMLDetailsElement)) return false;
+    const invite = document.querySelector('.participants-card > .url-opener[data-chatchat-invite-ai="true"]');
+    if (!(disclosure instanceof HTMLDetailsElement) || !(invite instanceof HTMLElement)) return false;
 
-    const managementSelectors = [
+    // Inviting a new thinker is now a normal round-table action. It must become
+    // available as soon as the starter room has assembled, while actual repair /
+    // team-management plumbing remains behind the explicit disclosure.
+    const advancedSelectors = [
       ".participants-card > .participant-actions",
-      ".participants-card > .url-opener",
       ".participant-row-actions button:nth-child(2)",
     ];
-    const hiddenByDefault = managementSelectors.every(isVisuallyAbsent);
-    if (!hiddenByDefault || disclosure.open || document.documentElement.dataset.chatchatTeamEdit) return false;
+    const inviteVisibleByDefault = !isVisuallyAbsentElement(invite);
+    const advancedHiddenByDefault = advancedSelectors.every(isVisuallyAbsent);
+    if (!inviteVisibleByDefault || !advancedHiddenByDefault || disclosure.open || document.documentElement.dataset.chatchatTeamEdit) {
+      return false;
+    }
+    document.documentElement.dataset.chatchatInviteAiAfterAssembly = "visible";
     document.documentElement.dataset.chatchatTeamControlsDefault = "hidden";
 
     disclosure.open = true;
     await delay(100);
-    const visibleOnDemand = managementSelectors.every(isVisuallyPresent);
-    if (!visibleOnDemand || document.documentElement.dataset.chatchatTeamEdit !== "open") {
+    const advancedVisibleOnDemand = advancedSelectors.every(isVisuallyPresent);
+    const inviteStillVisible = !isVisuallyAbsentElement(invite);
+    if (!advancedVisibleOnDemand || !inviteStillVisible || document.documentElement.dataset.chatchatTeamEdit !== "open") {
       disclosure.open = false;
       return false;
     }
@@ -152,9 +160,10 @@
 
     disclosure.open = false;
     await delay(100);
-    const hiddenAgain = managementSelectors.every(isVisuallyAbsent)
+    const advancedHiddenAgain = advancedSelectors.every(isVisuallyAbsent)
       && !document.documentElement.dataset.chatchatTeamEdit;
-    if (!hiddenAgain) return false;
+    const inviteRestored = !isVisuallyAbsentElement(invite);
+    if (!advancedHiddenAgain || !inviteRestored) return false;
     document.documentElement.dataset.chatchatTeamControlsRestore = "complete";
     return true;
   }
