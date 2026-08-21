@@ -69,12 +69,14 @@
   function freezeResponseFloor(rail) {
     const floor = rail.closest(".live-participant-floor");
     if (!(floor instanceof HTMLElement)) return false;
+    if (!floor.querySelector(".live-phase-chip.phase-debate")) return false;
     const state = rail.dataset.liveResponseState ?? "";
     if (state !== "responding" && state !== "queued") return false;
     return freezeFloor({
       mode: "response",
       floor,
       frameDataset: {
+        liveResponsePhase: "debate",
         liveResponseState: state,
         liveResponseRequestEvent: rail.dataset.liveResponseRequestEvent ?? "",
         liveResponseTargetActor: rail.dataset.liveResponseTargetActor ?? "",
@@ -173,7 +175,7 @@
         right: 28px;
         padding: 8px 11px;
         border-radius: 999px;
-        background: rgba(171, 103, 199, .12);
+        background: rgba(171, 103, 199,.12);
         color: #d7ade8;
         font: 700 11px/1 ui-sans-serif, system-ui, sans-serif;
       }
