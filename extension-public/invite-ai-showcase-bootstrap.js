@@ -22,9 +22,11 @@
   ]);
   let nextTabId = 801;
   let createdCount = 0;
+  let autoSetupCount = 0;
 
   document.documentElement.lang = locale;
   document.documentElement.dataset.chatchatInviteAiCreatedCount = "0";
+  document.documentElement.dataset.chatchatInviteAiAutoSetupCount = "0";
 
   const existingParticipant = {
     seatId: existingSeatId,
@@ -175,10 +177,14 @@
           };
         }
         if (payload?.type === "AUTO_SETUP") {
+          const profileId = String(payload.profileId ?? new URL(tab.url).origin);
+          autoSetupCount += 1;
+          document.documentElement.dataset.chatchatInviteAiAutoSetupCount = String(autoSetupCount);
+          document.documentElement.dataset.chatchatInviteAiAutoSetupProfile = profileId;
           return {
             ok: true,
             result: {
-              recipe: recipe(String(payload.profileId ?? new URL(tab.url).origin)),
+              recipe: recipe(profileId),
               responseText: "CHATCHAT_READY",
               elapsedMs: 180,
               diagnostics: { mode: "invite-ai-automatic" },
