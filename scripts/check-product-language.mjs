@@ -45,6 +45,7 @@ const sidePanelHtml = fs.readFileSync("extension/sidepanel.html", "utf8");
 const appHtml = fs.readFileSync("app/app.html", "utf8");
 const loginConcierge = fs.readFileSync("src/extension/login-concierge.ts", "utf8");
 const loginState = fs.readFileSync("src/extension/login-state.ts", "utf8");
+const providerPageInspection = fs.readFileSync("src/extension/provider-page-inspection.ts", "utf8");
 const gateBProofUi = fs.readFileSync("src/extension/gate-b-proof-ui.ts", "utf8");
 const gateBObserver = fs.readFileSync("src/extension/gate-b-observer.ts", "utf8");
 const proofPack = fs.readFileSync("src/validation/proof-pack.ts", "utf8");
@@ -122,7 +123,7 @@ for (const surface of [appHtml, sidePanelHtml]) {
 }
 
 for (const required of [
-  "classifyLoginState",
+  "inspectProviderPage",
   "connection-needs-login",
   "No retry needed",
   "不用回来点重试",
@@ -142,6 +143,18 @@ for (const required of [
 ]) {
   if (!loginState.includes(required)) {
     throw new Error(`Login-state classifier contract is missing: ${required}`);
+  }
+}
+
+for (const required of [
+  "classifyLoginState",
+  "chrome.scripting.executeScript",
+  "passwordInputs",
+  "loginControls",
+  "composerCandidates",
+]) {
+  if (!providerPageInspection.includes(required)) {
+    throw new Error(`Shared Provider-page inspection contract is missing: ${required}`);
   }
 }
 
@@ -192,6 +205,7 @@ console.log("✓ ChatChat Web Room defaults to zero-config automatic setup");
 console.log("✓ ChatChat novice onboarding hides internal setup jargon");
 console.log("✓ ChatChat toolbar opens the Full Room directly");
 console.log("✓ ChatChat treats provider login as an automatic-resume state, not configuration failure");
+console.log("✓ ChatChat Provider page-shape inspection is shared across automatic login/recovery UX");
 console.log("✓ ChatChat Real Provider Proof observes the current Browser Consultation and rejects synthetic live evidence");
 
 function extractVisibleCopy(sourceText) {

@@ -7,6 +7,9 @@ import {
 const MAX_EVIDENCE_BYTES = 256 * 1024;
 const EVIDENCE_TIMEOUT_MS = 8_000;
 const REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308]);
+const CLAIM_PROVIDER_SELF_HEALING = "CLAIM_PROVIDER_SELF_HEALING";
+const SELF_HEALING_CLAIMS_KEY = "chatchat.provider-self-healing.claims.v1";
+let recoveryClaimQueue = Promise.resolve();
 
 const configurePrimaryAction = async () => {
   try {
@@ -29,6 +32,16 @@ chrome.action.onClicked.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === CLAIM_PROVIDER_SELF_HEALING) {
+    claimProviderSelfHealing(message)
+      .then((claimed) => sendResponse({ ok: true, claimed }))
+      .catch((error) => sendResponse({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    return true;
+  }
+
   if (message?.type !== "VERIFY_EVIDENCE_SOURCE") return undefined;
   verifyEvidenceSource(String(message.url ?? ""))
     .then((result) => sendResponse({ ok: true, result }))
@@ -38,6 +51,32 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }));
   return true;
 });
+
+async function claimProviderSelfHealing(message) {
+  const seatId = String(message?.seatId ?? "").trim();
+  const tabId = Number(message?.tabId);
+  if (!seatId || !Number.isInteger(tabId)) return false;
+  const claimKey = `${seatId}:${tabId}`;
+
+  const task = recoveryClaimQueue.then(async () => {
+    const store = chrome.storage.session ?? chrome.storage.local;
+    const stored = await store.get(SELF_HEALING_CLAIMS_KEY);
+    const current = stored?.[SELF_HEALING_CLAIMS_KEY];
+    const claims = current && typeof current === "object" ? { ...current } : {};
+    if (claims[claimKey]) return false;
+    claims[claimKey] = {
+      seatId,
+      tabId,
+      claimedAt: new Date().toISOString(),
+    };
+    // Persist the claim before navigation. MV3 service-worker suspension must not
+    // turn one bounded recovery into an accidental navigation loop.
+    await store.set({ [SELF_HEALING_CLAIMS_KEY]: claims });
+    return true;
+  });
+  recoveryClaimQueue = task.then(() => undefined, () => undefined);
+  return task;
+}
 
 async function openFullRoom() {
   const appUrl = chrome.runtime.getURL("app/app.html");
