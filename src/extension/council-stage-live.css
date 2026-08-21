@@ -1,0 +1,28 @@
+html[data-surface="web-app"] .live-room-card {
+  background:
+    radial-gradient(circle at 92% 0%, rgba(255, 184, 74, .15), transparent 25%),
+    linear-gradient(150deg, #1b2029 0%, #252c37 68%, #303744 100%);
+  border-color: rgba(255,255,255,.07);
+  color: #fff;
+  box-shadow: 0 22px 56px rgba(28, 34, 44, .16);
+}
+
+html[data-surface="web-app"] .live-room-card .live-seat {
+  border-color: rgba(255,255,255,.08);
+  background: rgba(255,255,255,.055);
+}
+
+html[data-surface="web-app"] .live-room-card .live-seat.is-speaking {
+  border-color: rgba(117, 164, 238, .48);
+  background: rgba(89, 130, 197, .13);
+}
+
+html[data-surface="web-app"] .live-room-card .live-seat.is-revised {
+  border-color: rgba(207, 148, 229, .42);
+  background: rgba(151, 92, 176, .11);
+}
+
+html[data-surface="web-app"] .live-room-card .room-event-banner {
+  border-color: rgba(255,255,255,.08);
+  background: rgba(255,255,255,.06);
+}
