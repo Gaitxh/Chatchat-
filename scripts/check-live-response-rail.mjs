@@ -58,7 +58,7 @@ for (const text of [
   'proofMode === "response" ? captureResponse() : capturePersuasion()',
   'data-live-response-state="responding"',
   'data-live-response-state="queued"',
-  "const QUEUED_FALLBACK_MS = 900",
+  "document.querySelector(RESPONDING_SELECTOR) ?? document.querySelector(QUEUED_SELECTOR)",
   'floor.querySelector(".live-phase-chip.phase-debate")',
   'liveResponsePhase: "debate"',
   'mode: "response"',
@@ -68,6 +68,9 @@ for (const text of [
   "点名答辩正在发生",
 ]) requireText(liveFrame, text, "real debate response-frame proof");
 requireText(liveFrame, 'mode: "persuasion"', "existing persuasion frame remains intact");
+for (const forbidden of ["QUEUED_FALLBACK_MS", "queuedFallbackTimer", "allowQueued"]) {
+  if (liveFrame.includes(forbidden)) fail(`Response frame must freeze the first real queued/responding debate state without artificial timing: ${forbidden}`);
+}
 if (liveFrame.includes('liveResponseState: "responding"') || liveFrame.includes('liveResponseState: "queued"')) {
   fail("Response proof must copy the real rail state rather than hardcoding a proof state.");
 }
@@ -87,7 +90,7 @@ if (workflow.includes('chatchat-live-response-rail-$LANG') && workflow.includes(
 
 console.log("✓ Live Response Rail is a compact projection of canonical Peer Exchange state");
 console.log("✓ Rail stays above AI seats while the detailed Peer Exchange queue remains intact");
-console.log("✓ Chromium freezes a real responding/queued route during open debate, not the later final snapshot");
+console.log("✓ Chromium freezes the first real queued/responding route during open debate, not the later final snapshot");
 console.log("✓ No majority, persuasion, prose-similarity or duplicate closure logic can drive the rail");
 
 function requireText(haystack, needle, label) {
