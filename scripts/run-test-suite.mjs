@@ -25,6 +25,7 @@ const tests = [
   "dist/tests/context-selection.test.js",
   "dist/tests/context-selection-fairness.test.js",
   "dist/tests/pinned-issue-prompt.test.js",
+  "dist/tests/protocol-fingerprint.test.js",
   "dist/tests/prompt-memory-audit.test.js",
   "dist/tests/provider-memory-coverage-v2.test.js",
   "dist/tests/provider-memory-fairness.test.js",
