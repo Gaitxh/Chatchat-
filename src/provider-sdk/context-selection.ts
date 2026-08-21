@@ -161,7 +161,7 @@ function selectPinnedIssueMemory(
     }
     const actorIds = [...byActor.keys()].sort((a, b) => a.localeCompare(b));
     const actorCycle = rotate(actorIds, stableRotation(`${sessionId}|pin|${cohortKey}`, actorIds.length));
-    const cursor = new Map(actorIds.map((actorId) => [actorId, 0] as const));
+    const cursor = new Map<string, number>(actorIds.map((actorId) => [actorId, 0]));
 
     while (pinned.size < maxPinnedIssueEvents) {
       let addedThisPass = false;
