@@ -17,87 +17,112 @@ const waitMs = positiveInteger(args.waitMs ?? "26000", "--wait-ms");
 // a smaller ceiling so a wedged Page.navigate / Runtime.evaluate / screenshot
 // cannot consume the entire GitHub Actions job without an actionable failure.
 const cdpCallTimeoutMs = Math.min(8000, Math.max(2500, Math.floor(waitMs / 2)));
-const port = await freeDebugPort();
-const profile = await fs.mkdtemp(path.join(os.tmpdir(), "chatchat-chromium-proof-"));
+// Chromium's DevTools runtime occasionally wedges one Runtime.evaluate on a
+// healthy ready page in GitHub-hosted runners. Preserve the exact same product
+// selectors and assertions, but allow one full fresh-browser retry. A second
+// evaluate timeout still fails the proof.
+const MAX_CAPTURE_ATTEMPTS = 2;
 
-let browser;
-let stderrChunks = [];
-try {
-  browser = spawn(chrome, [
-    "--headless=new",
-    "--no-sandbox",
-    "--disable-gpu",
-    "--hide-scrollbars",
-    "--run-all-compositor-stages-before-draw",
-    `--remote-debugging-port=${port}`,
-    `--user-data-dir=${profile}`,
-    `--window-size=${width},${height}`,
-    "about:blank",
-  ], { stdio: ["ignore", "pipe", "pipe"] });
-
-  browser.stderr?.on("data", (chunk) => {
-    stderrChunks.push(String(chunk));
-    if (stderrChunks.length > 80) stderrChunks = stderrChunks.slice(-80);
-  });
-  browser.stdout?.resume();
-
-  const target = await waitForPageTarget(
-    port,
-    waitMs,
-    () => browser?.exitCode ?? null,
-    () => stderrTail(stderrChunks),
-  );
-  const cdp = connectCdp(target.webSocketDebuggerUrl, cdpCallTimeoutMs);
+let lastError = null;
+for (let attempt = 1; attempt <= MAX_CAPTURE_ATTEMPTS; attempt += 1) {
   try {
-    await cdp.call("Page.enable");
-    await cdp.call("Runtime.enable");
-    await cdp.call("Emulation.setDeviceMetricsOverride", {
-      width,
-      height,
-      deviceScaleFactor: 1,
-      mobile: false,
-    });
-    await cdp.call("Page.navigate", { url });
-    await waitForReady(cdp, readySelector, waitMs);
-    if (focusSelector) {
-      await focusElement(cdp, focusSelector);
-    } else {
-      await evaluate(cdp, `(() => {
-        window.scrollTo(0, 0);
-        if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
-        return { x: window.scrollX, y: window.scrollY };
-      })()`);
-    }
-    await waitForPaint(cdp);
-
-    const dom = await evaluate(cdp, "document.documentElement.outerHTML");
-    if (typeof dom !== "string" || !dom.includes(readySelectorHint(readySelector))) {
-      throw new Error(`Ready DOM was not captured after selector ${readySelector}.`);
-    }
-    if (focusSelector && !dom.includes(readySelectorHint(focusSelector))) {
-      throw new Error(`Focused DOM did not contain selector ${focusSelector}.`);
-    }
-    await fs.mkdir(path.dirname(domPath), { recursive: true });
-    await fs.writeFile(domPath, `<!doctype html>\n${dom}\n`, "utf8");
-
-    const shot = await cdp.call("Page.captureScreenshot", {
-      format: "png",
-      fromSurface: true,
-      captureBeyondViewport: false,
-    });
-    if (!shot?.data) throw new Error("Chromium did not return screenshot bytes.");
-    await fs.mkdir(path.dirname(screenshotPath), { recursive: true });
-    await fs.writeFile(screenshotPath, Buffer.from(shot.data, "base64"));
-  } finally {
-    cdp.close();
+    await captureProofAttempt(attempt);
+    lastError = null;
+    break;
+  } catch (error) {
+    lastError = error;
+    if (attempt >= MAX_CAPTURE_ATTEMPTS || !isRetryableTransientCdpError(error)) throw error;
+    console.warn(
+      `Transient Chromium DevTools evaluate timeout on capture attempt ${attempt}; retrying once with a fresh Chromium profile and debug port. Product selectors and assertions are unchanged.`,
+    );
+    await sleep(160);
   }
-} catch (error) {
-  const tail = stderrTail(stderrChunks);
-  console.error(`Chromium proof capture failed: ${message(error)}${tail ? `\nChromium stderr tail:\n${tail}` : ""}`);
-  throw error;
-} finally {
-  if (browser && !browser.killed) browser.kill("SIGTERM");
-  await fs.rm(profile, { recursive: true, force: true }).catch(() => {});
+}
+if (lastError) throw lastError;
+
+async function captureProofAttempt(attempt) {
+  const port = await freeDebugPort();
+  const profile = await fs.mkdtemp(path.join(os.tmpdir(), `chatchat-chromium-proof-${attempt}-`));
+  let browser;
+  let stderrChunks = [];
+
+  try {
+    browser = spawn(chrome, [
+      "--headless=new",
+      "--no-sandbox",
+      "--disable-gpu",
+      "--hide-scrollbars",
+      "--run-all-compositor-stages-before-draw",
+      `--remote-debugging-port=${port}`,
+      `--user-data-dir=${profile}`,
+      `--window-size=${width},${height}`,
+      "about:blank",
+    ], { stdio: ["ignore", "pipe", "pipe"] });
+
+    browser.stderr?.on("data", (chunk) => {
+      stderrChunks.push(String(chunk));
+      if (stderrChunks.length > 80) stderrChunks = stderrChunks.slice(-80);
+    });
+    browser.stdout?.resume();
+
+    const target = await waitForPageTarget(
+      port,
+      waitMs,
+      () => browser?.exitCode ?? null,
+      () => stderrTail(stderrChunks),
+    );
+    const cdp = connectCdp(target.webSocketDebuggerUrl, cdpCallTimeoutMs);
+    try {
+      await cdp.call("Page.enable");
+      await cdp.call("Runtime.enable");
+      await cdp.call("Emulation.setDeviceMetricsOverride", {
+        width,
+        height,
+        deviceScaleFactor: 1,
+        mobile: false,
+      });
+      await cdp.call("Page.navigate", { url });
+      await waitForReady(cdp, readySelector, waitMs);
+      if (focusSelector) {
+        await focusElement(cdp, focusSelector);
+      } else {
+        await evaluate(cdp, `(() => {
+          window.scrollTo(0, 0);
+          if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+          return { x: window.scrollX, y: window.scrollY };
+        })()`);
+      }
+      await waitForPaint(cdp);
+
+      const dom = await evaluate(cdp, "document.documentElement.outerHTML");
+      if (typeof dom !== "string" || !dom.includes(readySelectorHint(readySelector))) {
+        throw new Error(`Ready DOM was not captured after selector ${readySelector}.`);
+      }
+      if (focusSelector && !dom.includes(readySelectorHint(focusSelector))) {
+        throw new Error(`Focused DOM did not contain selector ${focusSelector}.`);
+      }
+      await fs.mkdir(path.dirname(domPath), { recursive: true });
+      await fs.writeFile(domPath, `<!doctype html>\n${dom}\n`, "utf8");
+
+      const shot = await cdp.call("Page.captureScreenshot", {
+        format: "png",
+        fromSurface: true,
+        captureBeyondViewport: false,
+      });
+      if (!shot?.data) throw new Error("Chromium did not return screenshot bytes.");
+      await fs.mkdir(path.dirname(screenshotPath), { recursive: true });
+      await fs.writeFile(screenshotPath, Buffer.from(shot.data, "base64"));
+    } finally {
+      cdp.close();
+    }
+  } catch (error) {
+    const tail = stderrTail(stderrChunks);
+    console.error(`Chromium proof capture attempt ${attempt} failed: ${message(error)}${tail ? `\nChromium stderr tail:\n${tail}` : ""}`);
+    throw error;
+  } finally {
+    if (browser && !browser.killed) browser.kill("SIGTERM");
+    await fs.rm(profile, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 async function waitForReady(cdp, selector, timeoutMs) {
@@ -272,6 +297,10 @@ function withDeadline(promise, timeoutMs, errorMessage) {
       (error) => { clearTimeout(timer); reject(error); },
     );
   });
+}
+
+function isRetryableTransientCdpError(error) {
+  return /CDP Runtime\.evaluate timed out after \d+ ms\./.test(message(error));
 }
 
 function stderrTail(chunks) {
