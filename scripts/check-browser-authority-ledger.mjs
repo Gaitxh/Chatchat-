@@ -1,6 +1,19 @@
 import { readFile } from "node:fs/promises";
 
-const [ledger, store, runtime, portal, app, hierarchy, test, runner, workflow, showcaseGuard] = await Promise.all([
+const [
+  ledger,
+  store,
+  runtime,
+  portal,
+  app,
+  hierarchy,
+  test,
+  runner,
+  workflow,
+  showcaseGuard,
+  loginWorkflow,
+  loginBootstrap,
+] = await Promise.all([
   readFile("src/extension/browser-authority-ledger.ts", "utf8"),
   readFile("src/extension/browser-authority-store.ts", "utf8"),
   readFile("src/extension/browser-authority-runtime.ts", "utf8"),
@@ -11,6 +24,8 @@ const [ledger, store, runtime, portal, app, hierarchy, test, runner, workflow, s
   readFile("scripts/run-test-suite.mjs", "utf8"),
   readFile(".github/workflows/browser-authority-ui.yml", "utf8"),
   readFile("extension-public/browser-authority-showcase-guard.js", "utf8"),
+  readFile(".github/workflows/login-concierge-ui.yml", "utf8"),
+  readFile("extension-public/login-concierge-showcase-bootstrap.js", "utf8"),
 ]);
 
 for (const text of [
@@ -20,9 +35,12 @@ for (const text of [
   "appendBoundedBrowserAuthorityReceipt",
   'ownership: "managed"',
   "mayDispatchProviderRetryUnderBrowserAuthority",
+  "shouldTrackAutomaticResumeIntent",
+  "browserAuthorityReasonForRetry",
   'if (reason === "manual") return true;',
+  'connectionState === "ready" || connectionState === "connecting"',
   'return providerTabOwnership(participant) === "managed";',
-]) requireText(ledger, text, "bounded managed-only Browser Authority model");
+]) requireText(ledger, text, "bounded managed-only Browser Authority model / actionable resume intent");
 
 for (const forbiddenField of [
   "url:",
@@ -48,10 +66,18 @@ for (const text of [
 for (const text of [
   "CONNECTION_RETRY_REQUESTED_EVENT",
   "{ capture: true }",
+  "CONNECTIONS_KEY",
   "mayDispatchProviderRetryUnderBrowserAuthority(participant, reason)",
+  "shouldTrackAutomaticResumeIntent(participant, reason, connectionState)",
+  "pendingAutomaticResumeBySeat.set",
+  "recordConsumedAutomaticResumes",
+  'connection.state !== "connecting"',
+  "connectionChanged(previous[seatId], connection)",
+  'recordAutomaticResume(participant, "session_hydration")',
+  "await recordAutomaticResume(participant, pending.reason)",
+  'action: "automatic_connection_resume"',
   "event.stopImmediatePropagation()",
   "chatchatAuthorityBlockedAutomaticRetries",
-  'action: "automatic_connection_resume"',
   'action: "managed_tab_created"',
   '"fresh_session_navigation"',
   '"self_heal_navigation"',
@@ -61,7 +87,29 @@ for (const text of [
   "collectSelfHealingSeatsFromMutations",
   "for (const mutation of mutations)",
   "mutation.addedNodes",
-]) requireText(runtime, text, "Browser Authority runtime firewall / bounded action observation");
+]) requireText(runtime, text, "Browser Authority runtime firewall / consumed action observation");
+
+const retryHandler = runtime.match(
+  /function onConnectionRetryRequested\(event: Event\) \{([\s\S]*?)\n\}\n\nasync function recordConsumedAutomaticResumes/,
+)?.[1] ?? "";
+requireText(retryHandler, "pendingAutomaticResumeBySeat.set", "retry handler creates only a short-lived intent");
+for (const forbidden of ["recordBrowserAuthorityAction(", 'action: "automatic_connection_resume"', "recordAutomaticResume("]) {
+  if (retryHandler.includes(forbidden)) {
+    fail(`Automatic retry capture must not write a receipt before the Panel consumes the action: ${forbidden}`);
+  }
+}
+
+const consumedBlock = runtime.match(
+  /async function recordConsumedAutomaticResumes\(([\s\S]*?)\n\}\n\nasync function recordAutomaticResume/,
+)?.[1] ?? "";
+for (const text of [
+  'connection.state !== "connecting"',
+  "connectionChanged(previous[seatId], connection)",
+  "pendingAutomaticResumeBySeat.get(seatId)",
+  "initialHydrationExpiryBySeat.get(seatId)",
+  'recordAutomaticResume(participant, "session_hydration")',
+]) requireText(consumedBlock, text, "consumed automatic resume receipt lifecycle");
+
 if (runtime.includes("document.querySelectorAll<HTMLElement>(SELF_HEALING_ROW_SELECTOR)")) {
   fail("Browser Authority must not rescan the whole document on every mutation.");
 }
@@ -109,7 +157,11 @@ for (const text of [
   '!mayDispatchProviderRetryUnderBrowserAuthority(userOwnedSeat, "provider-tab-loaded")',
   '!mayDispatchProviderRetryUnderBrowserAuthority(legacySeat, "provider-tab-loaded")',
   'mayDispatchProviderRetryUnderBrowserAuthority(userOwnedSeat, "manual")',
-]) requireText(test, text, "adversarial Browser Authority privacy / retry tests");
+  'shouldTrackAutomaticResumeIntent(managedSeat, "provider-tab-loaded", "failed")',
+  '!shouldTrackAutomaticResumeIntent(managedSeat, "provider-tab-loaded", "ready")',
+  '!shouldTrackAutomaticResumeIntent(managedSeat, "recovery", "connecting")',
+  'browserAuthorityReasonForRetry("manual") === null',
+]) requireText(test, text, "adversarial Browser Authority privacy / consumed retry tests");
 
 for (const text of [
   'params.get("authority-proof") !== "protected"',
@@ -117,6 +169,28 @@ for (const text of [
   'data-browser-authority-summary="ready"',
   'chatchatBrowserAuthorityProtectedProof = "complete"',
 ]) requireText(showcaseGuard, text, "actual user-owned automatic retry block proof");
+
+for (const text of [
+  "storageListeners = new Set()",
+  "oldValue",
+  "newValue",
+  "storageListeners.add(listener)",
+]) requireText(loginBootstrap, text, "Login Concierge storage lifecycle parity with real Chrome");
+
+const normalizedLoginWorkflow = loginWorkflow.replaceAll('\\"', '"');
+for (const text of [
+  "recordConsumedAutomaticResumes",
+  "session_hydration",
+  'data-browser-authority-ledger="ready"',
+  'data-browser-authority-receipts="2"',
+  'data-browser-authority-auto-actions="2"',
+  "Automatic connection resume",
+  "Session restore",
+  "Provider page loaded",
+  "自动恢复连接",
+  "会话恢复",
+  "Provider 页面已加载",
+]) requireText(normalizedLoginWorkflow, text, "Login Concierge consumed Browser Authority cross-proof");
 
 requireText(runner, '"dist/tests/browser-authority-ledger.test.js"', "Browser Authority deterministic test registration");
 
@@ -132,6 +206,8 @@ for (const text of [
 
 console.log("✓ Browser Authority receipts are bounded, session-local, allowlisted and managed-only");
 console.log("✓ Automatic Provider retry fails closed before Panel listeners; explicit manual retry remains allowed");
+console.log("✓ Automatic resume receipt is emitted only after a real connecting lifecycle consumes the authorized intent");
+console.log("✓ Managed session hydration and provider-page login resume are both receipt-complete without inventing no-op actions");
 console.log("✓ Compact boundary summary stays public while detailed authority receipts remain in Audit Vault");
 console.log("✓ Chromium proof must dispatch and block a real user-owned background retry before claiming Protected");
 console.log("✓ Browser Authority observers stay passive under unrelated high-frequency Full Room mutations");
