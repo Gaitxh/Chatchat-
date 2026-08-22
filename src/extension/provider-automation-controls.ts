@@ -85,16 +85,18 @@ async function refresh() {
     }
     button.dataset.automationProtection = protectedState ? "protected" : "managed";
     button.classList.toggle("is-protected", protectedState);
-    button.textContent = protectedState
+    const nextText = protectedState
       ? (zh ? "允许自动化" : "Allow automation")
       : (zh ? "收回自动化" : "Protect");
-    button.title = protectedState
+    const nextTitle = protectedState
       ? (zh
           ? "仅对这个 ChatChat 创建的标签页重新开放受限自动准备、登录恢复与一次性自愈。"
           : "Restore bounded automatic preparation, login resume, and one-shot self-healing for this ChatChat-created tab only.")
       : (zh
           ? "不关闭标签页、不删除席位；立即停止后台恢复、新会议自动导航和自愈导航。"
           : "Keep the tab and seat, but immediately stop background resume, fresh-session navigation, and self-heal navigation.");
+    if (button.textContent !== nextText) button.textContent = nextText;
+    if (button.title !== nextTitle) button.title = nextTitle;
     button.onclick = () => void toggleProtection(participant.seatId!, participant.providerName!, !protectedState, button);
   }
 }
