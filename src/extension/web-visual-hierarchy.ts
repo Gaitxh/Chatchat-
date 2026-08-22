@@ -4,6 +4,7 @@ declare const chrome: any;
 
 const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
 const AUDIT_ROOT_IDS = [
+  "browser-authority-root",
   "execution-provenance-root",
   "provider-memory-root",
   "meeting-integrity-root",

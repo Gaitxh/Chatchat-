@@ -25,6 +25,7 @@
   <script src="/zero-config-showcase-bootstrap.js"></script>
   <script src="/zero-config-showcase-guard.js"></script>
   <script src="/consultation-showcase-bootstrap.js"></script>
+  <script src="/browser-authority-showcase-guard.js"></script>
   <script src="/live-meeting-frame-showcase.js"></script>
   <script src="/investigation-trail-showcase.js"></script>
   <script src="/consultation-evidence-showcase.js"></script>
@@ -48,6 +49,7 @@
   <div id="spectator-mode-root"></div>
   <div id="web-onboarding-root"></div>
   <div id="extension-root"></div>
+  <div id="browser-authority-summary-root"></div>
   <div id="council-verdict-root"></div>
   <div id="final-position-floor-root"></div>
   <div id="proposal-mode-root"></div>
@@ -67,6 +69,7 @@
       <span class="chatchat-audit-action" data-audit-action>Open audit</span>
     </summary>
     <div class="chatchat-audit-vault-body">
+      <div id="browser-authority-root"></div>
       <div id="execution-provenance-root"></div>
       <div id="provider-memory-root"></div>
       <div id="meeting-integrity-root"></div>
@@ -84,6 +87,8 @@
   <script type="module" src="/src/extension/consultation-history-observer.ts"></script>
   <script type="module" src="/src/extension/investigation-trail-observer.ts"></script>
   <script type="module" src="/src/extension/history-request-bridge.ts"></script>
+  <script type="module" src="/src/extension/browser-authority-runtime.ts"></script>
+  <script type="module" src="/src/extension/browser-authority-portal.tsx"></script>
   <script type="module" src="/src/extension/web-room-onboarding.tsx"></script>
   <script type="module" src="/src/extension/login-concierge.ts"></script>
   <script type="module" src="/src/extension/provider-self-healing.ts"></script>
