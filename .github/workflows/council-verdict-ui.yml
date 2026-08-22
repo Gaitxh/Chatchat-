@@ -1,0 +1,110 @@
+name: Council Verdict UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: chatchat-council-verdict-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verdict:
+    name: Council Verdict · unresolved truth stays visible
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install and build production extension
+        run: |
+          npm ci
+          npm run check
+          npm test
+          npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Locate Chromium browser
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_BIN"
+          echo "CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
+
+      - name: Start production preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4187 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-council-verdict-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4187/manifest.json >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4187/manifest.json >/dev/null
+
+      - name: Capture bilingual first-layer live Council readout
+        run: |
+          for LANG in en zh; do
+            if [ "$LANG" = "zh" ]; then HTML_LANG="zh-CN"; else HTML_LANG="en"; fi
+            node scripts/capture-chromium-proof.mjs \
+              --chrome "$CHROME_BIN" \
+              --url "http://127.0.0.1:4187/app/app.html?showcase=consultation&lang=$LANG&verdict-proof=focus" \
+              --width 1440 --height 1500 --wait-ms 26000 \
+              --ready-selector "html[lang=\"$HTML_LANG\"][data-chatchat-room-showcase=\"complete\"][data-chatchat-response-obligations-showcase=\"complete\"][data-chatchat-verdict-stage=\"ready\"][data-chatchat-verdict-proof-history-mode=\"live-held\"] [data-council-verdict=\"ready\"][data-council-verdict-archive=\"false\"]" \
+              --focus-selector '[data-council-verdict="ready"][data-council-verdict-archive="false"]' \
+              --screenshot "artifacts/chatchat-council-verdict-$LANG.png" \
+              --dom "artifacts/chatchat-council-verdict-$LANG.html"
+          done
+
+      - name: Validate epistemic hierarchy from live ready DOM
+        run: |
+          for LANG in en zh; do
+            DOM="artifacts/chatchat-council-verdict-$LANG.html"
+            grep -q 'data-chatchat-verdict-stage="ready"' "$DOM"
+            grep -q 'data-chatchat-verdict-proof-history-mode="live-held"' "$DOM"
+            grep -q 'data-council-verdict="ready"' "$DOM"
+            grep -q 'data-council-verdict-archive="false"' "$DOM"
+            grep -q 'data-council-verdict-attention="pending-response"' "$DOM"
+            grep -Eq 'data-council-verdict-minority-count="[1-9][0-9]*"' "$DOM"
+            grep -Eq 'data-council-verdict-response-pending="[1-9][0-9]*"' "$DOM"
+            grep -Eq 'data-council-verdict-response-total="[1-9][0-9]*"' "$DOM"
+            grep -q 'data-council-verdict-response-report-match="true"' "$DOM"
+            grep -q 'data-council-verdict-unanswered-ids=' "$DOM"
+            grep -q 'data-council-verdict-revision-id=' "$DOM"
+            grep -q 'id="council-verdict-root" data-chatchat-visual-layer="stage"' "$DOM"
+            grep -q 'data-chatchat-audit-vault="closed"' "$DOM"
+          done
+          grep -Fq 'Read the meeting before the metrics.' artifacts/chatchat-council-verdict-en.html
+          grep -Fq 'not correctness' artifacts/chatchat-council-verdict-en.html
+          grep -Fq 'Majority is not authority' artifacts/chatchat-council-verdict-en.html
+          grep -Fq 'Unanswered is not a win condition' artifacts/chatchat-council-verdict-en.html
+          grep -Fq '先看这场会真正留下了什么。' artifacts/chatchat-council-verdict-zh.html
+          grep -Fq '不是正确率' artifacts/chatchat-council-verdict-zh.html
+          grep -Fq '多数不是权威' artifacts/chatchat-council-verdict-zh.html
+          grep -Fq '未答质询不是胜负判定' artifacts/chatchat-council-verdict-zh.html
+
+      - name: Reject blank screenshots
+        run: node scripts/check-png-content.mjs artifacts/chatchat-council-verdict-*.png
+
+      - name: Save preview log
+        if: always()
+        run: cp /tmp/chatchat-council-verdict-preview.log artifacts/preview.log 2>/dev/null || true
+
+      - name: Upload Council Verdict browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-council-verdict-ui
+          path: artifacts/**
+          if-no-files-found: warn
+          retention-days: 14
