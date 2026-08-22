@@ -7,7 +7,9 @@ export type BrowserAuthorityActionKind =
   | "managed_tab_created"
   | "automatic_connection_resume"
   | "fresh_session_navigation"
-  | "self_heal_navigation";
+  | "self_heal_navigation"
+  | "automation_protected"
+  | "automation_restored";
 
 export type BrowserAuthorityTrigger = "automatic" | "explicit_user";
 
@@ -19,7 +21,9 @@ export type BrowserAuthorityReason =
   | "provider_tab_loaded"
   | "recovery"
   | "fresh_consultation"
-  | "page_mapping_drift";
+  | "page_mapping_drift"
+  | "user_protection"
+  | "user_restored_automation";
 
 export interface BrowserAuthorityReceipt {
   readonly seatId: string;
@@ -28,7 +32,7 @@ export interface BrowserAuthorityReceipt {
   readonly trigger: BrowserAuthorityTrigger;
   readonly reason: BrowserAuthorityReason;
   readonly occurredAt: string;
-  /** Automatic browser authority is valid only for ChatChat-created clean tabs. */
+  /** The receipt belongs to a tab with immutable ChatChat-created provenance. */
   readonly ownership: "managed";
 }
 
@@ -36,10 +40,12 @@ export interface BrowserAuthorityParticipant {
   readonly seatId: string;
   readonly providerName: string;
   readonly createdByChatChat?: boolean;
+  readonly automationProtected?: boolean;
 }
 
 export interface BrowserAuthoritySummary {
   readonly managedSeats: number;
+  /** Includes immutable user-owned tabs and ChatChat-created tabs whose authority the user revoked. */
   readonly protectedSeats: number;
   readonly automaticActions: number;
   readonly explicitActions: number;
@@ -71,7 +77,7 @@ export function sanitizeBrowserAuthorityReceipt(
   if (!isAction(value.action)) throw new Error("Unknown browser authority action.");
   if (!isTrigger(value.trigger)) throw new Error("Unknown browser authority trigger.");
   if (!isReason(value.reason)) throw new Error("Unknown browser authority reason.");
-  if (value.ownership !== "managed") throw new Error("Automatic browser authority receipts must be managed-only.");
+  if (value.ownership !== "managed") throw new Error("Browser authority receipts require ChatChat-created provenance.");
   if (typeof value.seatId !== "string" || !value.seatId.trim()) throw new Error("Browser authority seat id is required.");
   if (typeof value.providerName !== "string" || !value.providerName.trim()) throw new Error("Browser authority provider name is required.");
   if (typeof value.occurredAt !== "string" || !Number.isFinite(Date.parse(value.occurredAt))) {
@@ -103,7 +109,7 @@ export function deriveBrowserAuthoritySummary(
   receipts: readonly BrowserAuthorityReceipt[],
 ): BrowserAuthoritySummary {
   const managed = participants.filter((participant) => providerTabOwnership(participant) === "managed");
-  const protectedSeats = participants.filter((participant) => providerTabOwnership(participant) === "user-owned");
+  const protectedSeats = participants.filter((participant) => providerTabOwnership(participant) !== "managed");
   const sanitized = receipts.flatMap((receipt) => {
     try {
       return [sanitizeBrowserAuthorityReceipt(receipt)];
@@ -127,7 +133,9 @@ function isAction(value: unknown): value is BrowserAuthorityActionKind {
   return value === "managed_tab_created"
     || value === "automatic_connection_resume"
     || value === "fresh_session_navigation"
-    || value === "self_heal_navigation";
+    || value === "self_heal_navigation"
+    || value === "automation_protected"
+    || value === "automation_restored";
 }
 
 function isTrigger(value: unknown): value is BrowserAuthorityTrigger {
@@ -142,5 +150,7 @@ function isReason(value: unknown): value is BrowserAuthorityReason {
     || value === "provider_tab_loaded"
     || value === "recovery"
     || value === "fresh_consultation"
-    || value === "page_mapping_drift";
+    || value === "page_mapping_drift"
+    || value === "user_protection"
+    || value === "user_restored_automation";
 }
