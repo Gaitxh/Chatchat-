@@ -1,3 +1,5 @@
+import { providerTabOwnership } from "./provider-tab-boundary.js";
+
 export {};
 
 declare const chrome: any;
@@ -129,20 +131,21 @@ async function decorateProviderOwnership() {
     return;
   }
   const participants = Array.isArray(stored?.[PARTICIPANTS_KEY])
-    ? (stored[PARTICIPANTS_KEY] as Array<{ seatId?: string; createdByChatChat?: boolean }>)
+    ? (stored[PARTICIPANTS_KEY] as Array<{ seatId?: string; createdByChatChat?: boolean; automationProtected?: boolean }>)
     : [];
-  const ownership = new Map(
+  const bySeat = new Map(
     participants
       .filter((participant) => typeof participant?.seatId === "string")
-      .map((participant) => [participant.seatId!, participant.createdByChatChat === true]),
+      .map((participant) => [participant.seatId!, participant] as const),
   );
   const zh = document.documentElement.lang.toLocaleLowerCase().startsWith("zh");
 
   for (const row of document.querySelectorAll<HTMLElement>(".participant-row[data-seat-id]")) {
     const seatId = row.dataset.seatId;
-    if (!seatId || !ownership.has(seatId)) continue;
-    const managed = ownership.get(seatId) === true;
-    row.dataset.tabOwnership = managed ? "managed" : "user-owned";
+    const participant = seatId ? bySeat.get(seatId) : undefined;
+    if (!seatId || !participant) continue;
+    const ownership = providerTabOwnership({ ...participant, seatId });
+    row.dataset.tabOwnership = ownership;
     const titleLine = row.querySelector<HTMLElement>(".participant-title-line");
     if (!titleLine) continue;
     let chip = titleLine.querySelector<HTMLElement>(".automation-boundary-chip");
@@ -151,13 +154,25 @@ async function decorateProviderOwnership() {
       chip.className = "automation-boundary-chip";
       titleLine.append(chip);
     }
-    chip.classList.toggle("is-managed", managed);
-    chip.classList.toggle("is-user-owned", !managed);
-    setText(chip, managed ? (zh ? "托管席位" : "Managed") : (zh ? "你的标签页" : "Your tab"));
-    const title = managed
-      ? (zh ? "ChatChat 创建的干净标签页：允许自动准备与一次性恢复。" : "ChatChat-created clean tab: automatic preparation and bounded recovery are allowed.")
-      : (zh ? "用户自己的标签页：ChatChat 不会在后台自动导航或重置。" : "Your existing tab: ChatChat will not navigate or reset it in the background.");
-    if (chip.title !== title) chip.title = title;
+    chip.classList.toggle("is-managed", ownership === "managed");
+    chip.classList.toggle("is-protected", ownership === "protected");
+    chip.classList.toggle("is-user-owned", ownership === "user-owned");
+    const copy = ownership === "managed"
+      ? {
+          text: zh ? "托管席位" : "Managed",
+          title: zh ? "ChatChat 创建的干净标签页：允许受限自动准备与一次性恢复。" : "ChatChat-created clean tab: bounded automatic preparation and one-shot recovery are allowed.",
+        }
+      : ownership === "protected"
+        ? {
+            text: zh ? "已保护" : "Protected",
+            title: zh ? "这个标签页由 ChatChat 创建，但你已收回自动化权限；仅明确手动操作可继续。" : "ChatChat created this tab, but you revoked automatic authority. Only explicit manual actions may continue.",
+          }
+        : {
+            text: zh ? "你的标签页" : "Your tab",
+            title: zh ? "用户自己的标签页：ChatChat 不会在后台自动导航或恢复连接。" : "Your existing tab: ChatChat will not navigate or resume it in the background.",
+          };
+    setText(chip, copy.text);
+    if (chip.title !== copy.title) chip.title = copy.title;
   }
 }
 
