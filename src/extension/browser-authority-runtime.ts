@@ -9,7 +9,10 @@ import {
   type BrowserAuthorityTrigger,
 } from "./browser-authority-ledger.js";
 import { recordBrowserAuthorityAction } from "./browser-authority-store.js";
-import { providerTabOwnership } from "./provider-tab-boundary.js";
+import {
+  providerTabOwnership,
+  replaceRuntimeProtectedProviderSeats,
+} from "./provider-tab-boundary.js";
 
 declare const chrome: any;
 
@@ -20,6 +23,7 @@ interface ParticipantRecord extends BrowserAuthorityParticipant {
   tabId: number;
   providerId?: string;
   createdByChatChat?: boolean;
+  automationProtected?: boolean;
 }
 
 interface CreationIntent {
@@ -96,8 +100,9 @@ function onConnectionRetryRequested(event: Event) {
   if (!seatId || reason === "manual") return;
   const participant = participantBySeat.get(seatId);
 
-  // A missing ownership record cannot acquire background authority during an
-  // asynchronous hydration race. It may be retried later or by explicit user action.
+  // A missing, user-owned, or user-protected ownership record cannot acquire
+  // background authority during an asynchronous hydration race. It may be
+  // retried later or by explicit user action.
   if (!participant || !mayDispatchProviderRetryUnderBrowserAuthority(participant, reason)) {
     event.stopImmediatePropagation();
     blockedAutomaticRetryCount += 1;
@@ -139,7 +144,8 @@ async function recordNewManagedSeats(
   const newManaged = next.filter((participant) => {
     if (providerTabOwnership(participant) !== "managed") return false;
     const old = previousBySeat.get(participant.seatId);
-    return !old || providerTabOwnership(old) !== "managed";
+    // Authority restoration on an existing ChatChat-created tab is not a new tab.
+    return !old || old.createdByChatChat !== true;
   });
   if (!newManaged.length) return;
 
@@ -197,6 +203,11 @@ function updateParticipantMaps(participants: readonly ParticipantRecord[]) {
     participantBySeat.set(participant.seatId, participant);
     participantByTab.set(participant.tabId, participant);
   }
+  replaceRuntimeProtectedProviderSeats(
+    participants
+      .filter((participant) => participant.createdByChatChat === true && participant.automationProtected === true)
+      .map((participant) => participant.seatId),
+  );
   announceAuthorityUpdated();
 }
 
