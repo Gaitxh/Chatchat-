@@ -3,8 +3,6 @@ import {
   type ProviderTabOwnershipMetadata,
 } from "./provider-tab-boundary.js";
 
-declare const chrome: any;
-
 const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
 let mutationQueue = Promise.resolve();
 
@@ -34,7 +32,9 @@ export function setProviderAutomationProtected(
   if (!normalizedSeatId) return Promise.resolve({ changed: false, protected: true, reason: "missing" });
 
   const task = mutationQueue.then(async () => {
-    const store = chrome.storage.session ?? chrome.storage.local;
+    const chromeApi = (globalThis as typeof globalThis & { chrome?: any }).chrome;
+    const store = chromeApi?.storage?.session ?? chromeApi?.storage?.local;
+    if (!store?.get || !store?.set) throw new Error("Browser session storage is unavailable.");
     const stored = await store.get(PARTICIPANTS_KEY);
     const participants = Array.isArray(stored?.[PARTICIPANTS_KEY])
       ? stored[PARTICIPANTS_KEY] as ProtectableProviderParticipant[]
