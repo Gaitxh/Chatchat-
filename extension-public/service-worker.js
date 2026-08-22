@@ -9,6 +9,7 @@ const EVIDENCE_TIMEOUT_MS = 8_000;
 const REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308]);
 const CLAIM_PROVIDER_SELF_HEALING = "CLAIM_PROVIDER_SELF_HEALING";
 const SELF_HEALING_CLAIMS_KEY = "chatchat.provider-self-healing.claims.v1";
+const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
 let recoveryClaimQueue = Promise.resolve();
 
 const configurePrimaryAction = async () => {
@@ -60,6 +61,11 @@ async function claimProviderSelfHealing(message) {
 
   const task = recoveryClaimQueue.then(async () => {
     const store = chrome.storage.session ?? chrome.storage.local;
+    // Re-read current authority at the final navigation claim boundary. A user
+    // may click Protect after page inspection began but before MV3 receives this
+    // claim; stale front-end state must never win that race.
+    if (!(await hasCurrentManagedAuthority(store, seatId, tabId))) return false;
+
     const stored = await store.get(SELF_HEALING_CLAIMS_KEY);
     const current = stored?.[SELF_HEALING_CLAIMS_KEY];
     const claims = current && typeof current === "object" ? { ...current } : {};
@@ -76,6 +82,20 @@ async function claimProviderSelfHealing(message) {
   });
   recoveryClaimQueue = task.then(() => undefined, () => undefined);
   return task;
+}
+
+async function hasCurrentManagedAuthority(store, seatId, tabId) {
+  const stored = await store.get(PARTICIPANTS_KEY);
+  const participants = stored?.[PARTICIPANTS_KEY];
+  if (!Array.isArray(participants)) return false;
+  const participant = participants.find((candidate) => (
+    candidate
+      && typeof candidate === "object"
+      && candidate.seatId === seatId
+      && candidate.tabId === tabId
+  ));
+  return participant?.createdByChatChat === true
+    && participant?.automationProtected !== true;
 }
 
 async function openFullRoom() {
