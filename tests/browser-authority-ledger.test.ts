@@ -51,23 +51,29 @@ assert(bounded[0]!.occurredAt.endsWith("02.000Z") && bounded[2]!.occurredAt.ends
 
 const participants = [
   { seatId: managed.seatId, providerName: "ChatGPT", createdByChatChat: true },
-  { seatId: "extension:anthropic-claude:202", providerName: "Claude", createdByChatChat: false },
-  { seatId: "legacy:gemini:303", providerName: "Gemini" },
+  { seatId: "extension:anthropic-claude:202", providerName: "Claude", createdByChatChat: true, automationProtected: true },
+  { seatId: "user:gemini:303", providerName: "Gemini", createdByChatChat: false },
+  { seatId: "legacy:deepseek:404", providerName: "DeepSeek" },
 ];
 const summary = deriveBrowserAuthoritySummary(participants, [
   managed,
   { ...managed, action: "managed_tab_created", trigger: "explicit_user", reason: "invite_ai" },
+  { ...managed, action: "automation_protected", trigger: "explicit_user", reason: "user_protection" },
 ]);
-assert(summary.managedSeats === 1, "only explicit createdByChatChat=true seats are managed");
-assert(summary.protectedSeats === 2, "user-owned and missing legacy metadata must both fail closed as protected");
-assert(summary.automaticActions === 1 && summary.explicitActions === 1, "automatic authority and explicit user actions must remain distinguishable");
-assert(summary.protectedProviders.join(",") === "Claude,Gemini", "protected Provider names should stay visible without granting authority");
+assert(summary.managedSeats === 1, "only an unprotected explicit ChatChat-created seat is managed");
+assert(summary.protectedSeats === 3, "user-protected, user-owned, and missing legacy metadata must all deny background automation");
+assert(summary.automaticActions === 1 && summary.explicitActions === 2, "authority changes must stay distinguishable from automatic browser actions");
+assert(summary.protectedProviders.join(",") === "Claude,Gemini,DeepSeek", "all non-managed Provider names should stay visible in the protected summary");
 
 const managedSeat = participants[0]!;
-const userOwnedSeat = participants[1]!;
-const legacySeat = participants[2]!;
+const protectedManagedSeat = participants[1]!;
+const userOwnedSeat = participants[2]!;
+const legacySeat = participants[3]!;
 assert(mayDispatchProviderRetryUnderBrowserAuthority(managedSeat, "provider-tab-loaded"), "managed seat may automatically resume after its Provider page loads");
 assert(mayDispatchProviderRetryUnderBrowserAuthority(managedSeat, "recovery"), "managed seat may run bounded recovery retry");
+assert(!mayDispatchProviderRetryUnderBrowserAuthority(protectedManagedSeat, "provider-tab-loaded"), "user-protected ChatChat-created tab must reject background login/page-load resume");
+assert(!mayDispatchProviderRetryUnderBrowserAuthority(protectedManagedSeat, "recovery"), "user-protected ChatChat-created tab must reject automatic recovery retry");
+assert(mayDispatchProviderRetryUnderBrowserAuthority(protectedManagedSeat, "manual"), "explicit user retry remains allowed after automation revocation");
 assert(!mayDispatchProviderRetryUnderBrowserAuthority(userOwnedSeat, "provider-tab-loaded"), "user-owned tab must reject background login/page-load resume");
 assert(!mayDispatchProviderRetryUnderBrowserAuthority(userOwnedSeat, "recovery"), "user-owned tab must reject automatic recovery retry");
 assert(!mayDispatchProviderRetryUnderBrowserAuthority(legacySeat, "provider-tab-loaded"), "legacy missing ownership metadata must fail closed for automatic resume");
@@ -81,5 +87,5 @@ try {
 }
 assert(rejected, "a user-owned automatic-action receipt must fail closed instead of legitimizing the action");
 
-console.log("✓ Browser Authority receipts are bounded, allowlisted, and managed-only");
-console.log("✓ User-owned and legacy Provider tabs remain explicitly protected from automatic retry while manual user action stays allowed");
+console.log("✓ Browser Authority receipts are bounded, allowlisted, and ChatChat-created-provenance only");
+console.log("✓ Managed automation is explicitly revocable while manual user action remains allowed");
