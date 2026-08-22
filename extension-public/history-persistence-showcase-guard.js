@@ -7,6 +7,7 @@
   const ARCHIVES = "archives";
   const EXECUTION_DB_NAME = "chatchat-provider-execution-history-v1";
   const EXECUTION_STORE = "receipts";
+  const HOLD_LIVE_VERDICT = params.get("verdict-proof") === "focus";
   // This script runs in <head>, before body roots exist. Full Room declares its
   // product identity on <html data-surface="web-app">, which is already parsed
   // here and therefore cannot be confused with the compact Side Panel.
@@ -43,6 +44,20 @@
       }
 
       document.documentElement.dataset.chatchatExecutionHistoryPersistenceShowcase = "complete";
+
+      // The dedicated Council Verdict proof owns the immediate post-meeting view.
+      // It still proves durable archive + execution receipt persistence above, but
+      // must not let the independent History proof click into archive replay after
+      // the live Verdict selector has become ready. Normal history proof journeys
+      // do not carry verdict-proof=focus and therefore continue through full replay.
+      if (HOLD_LIVE_VERDICT) {
+        document.documentElement.dataset.chatchatExecutionHistoryReplayShowcase = "not-applicable";
+        document.documentElement.dataset.chatchatProviderMemoryHistoryReplayShowcase = "not-applicable";
+        document.documentElement.dataset.chatchatProviderPayloadHistoryReplayShowcase = "not-applicable";
+        document.documentElement.dataset.chatchatHistoryPersistenceShowcase = "complete";
+        document.documentElement.dataset.chatchatVerdictProofHistoryMode = "live-held";
+        return;
+      }
 
       // Side Panel intentionally has no Consultation History UI. It still has to
       // prove exact-session archive + execution receipt durability. Full Room

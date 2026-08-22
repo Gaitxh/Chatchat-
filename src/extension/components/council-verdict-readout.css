@@ -1,0 +1,257 @@
+.council-verdict-readout {
+  margin: 18px 0;
+  padding: clamp(22px, 3vw, 34px);
+  border: 1px solid rgba(35, 34, 31, .09);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 92% 0%, rgba(226, 169, 82, .17), transparent 28%),
+    linear-gradient(145deg, #fffdf8, #f5f0e6 72%, #f0e8d9);
+  color: #24231f;
+  box-shadow: 0 22px 60px rgba(46, 40, 32, .09);
+}
+
+.council-verdict-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+}
+
+.council-verdict-heading > div > span,
+.council-verdict-hero > span,
+.council-verdict-fact > span {
+  display: block;
+  color: #8a8174;
+  font-size: 10px;
+  font-weight: 820;
+  letter-spacing: .105em;
+}
+
+.council-verdict-heading h2 {
+  max-width: 760px;
+  margin: 7px 0 7px;
+  font-size: clamp(26px, 3vw, 42px);
+  line-height: 1.03;
+  letter-spacing: -.04em;
+}
+
+.council-verdict-heading p {
+  max-width: 760px;
+  margin: 0;
+  color: #6d675d;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.council-verdict-state {
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: #2a2d28;
+  color: #fff;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.attention-pending-response .council-verdict-state {
+  background: #8e5a2d;
+}
+
+.attention-minority-survives .council-verdict-state {
+  background: #685547;
+}
+
+.council-verdict-hero {
+  margin-top: 24px;
+  padding: 22px 0 20px;
+  border-top: 1px solid rgba(41, 38, 33, .1);
+  border-bottom: 1px solid rgba(41, 38, 33, .1);
+}
+
+.council-verdict-hero strong {
+  display: block;
+  margin-top: 6px;
+  font-size: clamp(34px, 4.4vw, 68px);
+  line-height: .98;
+  letter-spacing: -.05em;
+  overflow-wrap: anywhere;
+}
+
+.council-verdict-hero small {
+  display: block;
+  margin-top: 10px;
+  color: #777064;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.council-verdict-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.council-verdict-fact {
+  min-width: 0;
+  padding: 14px 15px;
+  border: 1px solid rgba(45, 41, 35, .08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .62);
+}
+
+.council-verdict-fact strong {
+  display: block;
+  margin-top: 5px;
+  color: #2d2a25;
+  font-size: clamp(19px, 2vw, 28px);
+  line-height: 1.05;
+  letter-spacing: -.035em;
+  overflow-wrap: anywhere;
+}
+
+.council-verdict-fact small {
+  display: block;
+  margin-top: 6px;
+  color: #756d62;
+  font-size: 9px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.council-verdict-fact.is-pending {
+  border-color: #e6c8a3;
+  background: #fff5e7;
+}
+
+.council-verdict-fact.is-minority {
+  background: #f5eee7;
+}
+
+.council-verdict-fact.is-revision {
+  background: #f0edf6;
+}
+
+.council-verdict-alert {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid #e7c59e;
+  border-radius: 16px;
+  background: #fff3e3;
+  color: #694621;
+}
+
+.council-verdict-alert b {
+  display: block;
+  font-size: 12px;
+}
+
+.council-verdict-alert span {
+  display: block;
+  margin-top: 4px;
+  color: #86684a;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.council-verdict-alert code {
+  max-width: 360px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .65);
+  color: #7b5631;
+  font-size: 8px;
+  overflow-wrap: anywhere;
+}
+
+.council-verdict-integrity-warning {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 1px solid #e1b7b2;
+  border-radius: 14px;
+  background: #fff0ef;
+  color: #8d433d;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.council-verdict-integrity-warning.is-legacy {
+  border-color: #d8d1c4;
+  background: #f6f2eb;
+  color: #746c61;
+}
+
+.council-verdict-readout footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 15px;
+  padding-top: 13px;
+  border-top: 1px solid rgba(41, 38, 33, .09);
+  color: #857c70;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+html[data-surface="web-app"] #council-verdict-root {
+  grid-column: 1 / -1;
+}
+
+/* A full-width completed readout must never slide underneath the sticky seat rail. */
+html[data-surface="web-app"][data-chatchat-verdict-stage="ready"] .participants-card {
+  position: static;
+  top: auto;
+}
+
+/*
+ * The Verdict Stage owns the first-layer result hierarchy in the Web Room.
+ * Keep the existing outcome card as the full seat-by-seat record, but do not
+ * repeat its majority/confidence hero after the clearer epistemic readout exists.
+ */
+html[data-surface="web-app"][data-chatchat-verdict-stage="ready"] .outcome-card > .eyebrow,
+html[data-surface="web-app"][data-chatchat-verdict-stage="ready"] .outcome-card > .outcome-hero,
+html[data-surface="web-app"][data-chatchat-verdict-stage="ready"] .outcome-card > .no-chair-note,
+html[data-surface="web-app"][data-chatchat-verdict-stage="ready"] .outcome-card > .changed-summary {
+  display: none !important;
+}
+
+html[data-surface="web-app"][data-chatchat-verdict-stage="ready"] .outcome-card {
+  padding-top: 18px;
+}
+
+@media (max-width: 959px) {
+  .council-verdict-readout {
+    padding: 20px;
+    border-radius: 22px;
+  }
+
+  .council-verdict-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .council-verdict-alert,
+  .council-verdict-heading {
+    grid-template-columns: 1fr;
+  }
+
+  .council-verdict-state {
+    justify-self: start;
+  }
+
+  .council-verdict-readout footer {
+    display: grid;
+  }
+}
+
+@media (max-width: 560px) {
+  .council-verdict-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .council-verdict-hero strong {
+    font-size: 34px;
+  }
+}

@@ -19,6 +19,7 @@ const tests = [
   "dist/tests/direct-response-receipts.test.js",
   "dist/tests/direct-rebuttal-orchestrator.test.js",
   "dist/tests/response-obligation-summary.test.js",
+  "dist/tests/council-verdict-readout.test.js",
   "dist/tests/reply-provenance.test.js",
   "dist/tests/peer-exchange.test.js",
   "dist/tests/live-agenda.test.js",

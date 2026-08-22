@@ -17,6 +17,7 @@ const AUDIT_ROOT_IDS = [
 const PUBLIC_STAGE_ROOT_IDS = [
   "extension-root",
   "consultation-theater-root",
+  "council-verdict-root",
   "final-position-floor-root",
   "consultation-receipt-root",
 ] as const;
