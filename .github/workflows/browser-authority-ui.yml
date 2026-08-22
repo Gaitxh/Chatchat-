@@ -1,0 +1,135 @@
+name: Browser Authority UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: chatchat-browser-authority-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  authority:
+    name: Browser Authority · protected tabs / managed receipts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install and build production extension
+        run: |
+          npm ci
+          npm run check
+          npm test
+          npm run build:extension
+
+      - name: Install CJK screenshot fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+
+      - name: Locate Chromium browser
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_BIN"
+          echo "CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
+
+      - name: Start production preview
+        run: |
+          mkdir -p artifacts
+          nohup python3 -m http.server 4188 --bind 127.0.0.1 --directory dist-extension > /tmp/chatchat-browser-authority-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4188/manifest.json >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4188/manifest.json >/dev/null
+
+      - name: Prove user-owned tabs fail closed
+        run: |
+          for LANG in en zh; do
+            node scripts/capture-chromium-proof.mjs \
+              --chrome "$CHROME_BIN" \
+              --url "http://127.0.0.1:4188/app/app.html?showcase=consultation&lang=$LANG&authority-proof=protected" \
+              --width 1200 --height 900 --wait-ms 22000 \
+              --ready-selector 'html[data-chatchat-browser-authority-protected-proof="complete"] [data-browser-authority-summary="ready"][data-browser-authority-managed="0"][data-browser-authority-protected="3"][data-browser-authority-auto-actions="0"][data-browser-authority-explicit-actions="0"][data-browser-authority-blocked="1"]' \
+              --focus-selector '[data-browser-authority-summary="ready"]' \
+              --screenshot "artifacts/chatchat-browser-authority-protected-$LANG.png" \
+              --dom "artifacts/chatchat-browser-authority-protected-$LANG.html"
+          done
+
+      - name: Validate protected boundary from ready DOM
+        run: |
+          for LANG in en zh; do
+            DOM="artifacts/chatchat-browser-authority-protected-$LANG.html"
+            grep -q 'data-chatchat-browser-authority-protected-proof="complete"' "$DOM"
+            grep -q 'data-chatchat-authority-blocked-automatic-retries="1"' "$DOM"
+            grep -q 'data-browser-authority-managed="0"' "$DOM"
+            grep -q 'data-browser-authority-protected="3"' "$DOM"
+            grep -q 'data-browser-authority-auto-actions="0"' "$DOM"
+            grep -q 'data-browser-authority-explicit-actions="0"' "$DOM"
+            grep -q 'data-browser-authority-blocked="1"' "$DOM"
+          done
+          grep -Fq 'Browser boundary' artifacts/chatchat-browser-authority-protected-en.html
+          grep -Fq 'Your own tabs are never background-navigated or auto-resumed.' artifacts/chatchat-browser-authority-protected-en.html
+          grep -Fq 'Browser boundary' artifacts/chatchat-browser-authority-protected-en.html
+          grep -Fq '浏览器边界' artifacts/chatchat-browser-authority-protected-zh.html
+          grep -Fq '你的标签页不会在后台自动导航或恢复连接。' artifacts/chatchat-browser-authority-protected-zh.html
+
+      - name: Prove Invite AI creates a local managed authority receipt
+        run: |
+          for LANG in en zh; do
+            node scripts/capture-chromium-proof.mjs \
+              --chrome "$CHROME_BIN" \
+              --url "http://127.0.0.1:4188/app/app.html?showcase=invite-ai&target=custom&lang=$LANG&audit=open" \
+              --width 1200 --height 1300 --wait-ms 22000 \
+              --ready-selector 'html[data-chatchat-invite-ai-showcase="complete"] [data-browser-authority-summary="ready"][data-browser-authority-managed="2"][data-browser-authority-protected="0"][data-browser-authority-explicit-actions="1"]' \
+              --focus-selector '[data-browser-authority-ledger="ready"][data-browser-authority-receipts="1"]' \
+              --screenshot "artifacts/chatchat-browser-authority-managed-$LANG.png" \
+              --dom "artifacts/chatchat-browser-authority-managed-$LANG.html"
+          done
+
+      - name: Validate managed receipt from ready DOM
+        run: |
+          for LANG in en zh; do
+            DOM="artifacts/chatchat-browser-authority-managed-$LANG.html"
+            grep -q 'data-chatchat-invite-ai-showcase="complete"' "$DOM"
+            grep -q 'data-chatchat-audit-vault="open"' "$DOM"
+            grep -q 'data-browser-authority-managed="2"' "$DOM"
+            grep -q 'data-browser-authority-protected="0"' "$DOM"
+            grep -q 'data-browser-authority-explicit-actions="1"' "$DOM"
+            grep -q 'data-browser-authority-ledger="ready"' "$DOM"
+            grep -q 'data-browser-authority-receipts="1"' "$DOM"
+          done
+          grep -Fq 'What ChatChat touched' artifacts/chatchat-browser-authority-managed-en.html
+          grep -Fq 'never page URLs, conversations, prompts, responses, accounts, cookies, or tokens.' artifacts/chatchat-browser-authority-managed-en.html
+          grep -Fq 'Created clean managed tab' artifacts/chatchat-browser-authority-managed-en.html
+          grep -Fq 'Invite AI' artifacts/chatchat-browser-authority-managed-en.html
+          grep -Fq '>USER<' artifacts/chatchat-browser-authority-managed-en.html
+          grep -Fq 'ChatChat 动过什么' artifacts/chatchat-browser-authority-managed-zh.html
+          grep -Fq '创建干净托管标签页' artifacts/chatchat-browser-authority-managed-zh.html
+          grep -Fq '邀请 AI' artifacts/chatchat-browser-authority-managed-zh.html
+          grep -Fq '>用户触发<' artifacts/chatchat-browser-authority-managed-zh.html
+
+      - name: Reject blank screenshots
+        run: node scripts/check-png-content.mjs artifacts/chatchat-browser-authority-*.png
+
+      - name: Save preview log
+        if: always()
+        run: cp /tmp/chatchat-browser-authority-preview.log artifacts/preview.log 2>/dev/null || true
+
+      - name: Upload Browser Authority browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-browser-authority-ui
+          path: artifacts/**
+          if-no-files-found: warn
+          retention-days: 14
