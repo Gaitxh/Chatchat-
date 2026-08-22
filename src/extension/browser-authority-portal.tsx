@@ -27,8 +27,8 @@ function BrowserAuthorityPortal() {
 
   useEffect(() => {
     const refresh = () => void readState().then(({ participants: nextParticipants, receipts: nextReceipts }) => {
-      setParticipants(nextParticipants);
-      setReceipts(nextReceipts);
+      setParticipants((current) => participantsEqual(current, nextParticipants) ? current : nextParticipants);
+      setReceipts((current) => receiptsEqual(current, nextReceipts) ? current : nextReceipts);
       setBlockedAttempts(Number(document.documentElement.dataset.chatchatAuthorityBlockedAutomaticRetries ?? "0") || 0);
     });
     refresh();
@@ -37,7 +37,10 @@ function BrowserAuthorityPortal() {
     };
     chrome.storage?.onChanged?.addListener?.(onStorage);
     window.addEventListener(AUTHORITY_UPDATED_EVENT, refresh);
-    const language = new MutationObserver(() => setLocale(normalizeLocale(document.documentElement.lang)));
+    const language = new MutationObserver(() => {
+      const next = normalizeLocale(document.documentElement.lang);
+      setLocale((current) => current === next ? current : next);
+    });
     language.observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
     return () => {
       chrome.storage?.onChanged?.removeListener?.(onStorage);
@@ -49,18 +52,23 @@ function BrowserAuthorityPortal() {
   useEffect(() => {
     const summaryRoot = document.getElementById("browser-authority-summary-root");
     if (!(summaryRoot instanceof HTMLElement)) return;
-    const place = () => {
+    const place = (): boolean => {
       const participantsCard = document.querySelector(".consultation-app .participants-card");
-      if (!(participantsCard instanceof HTMLElement)) return;
+      if (!(participantsCard instanceof HTMLElement)) return false;
       const description = participantsCard.querySelector(".section-description");
       if (summaryRoot.parentElement !== participantsCard) {
         if (description) description.insertAdjacentElement("afterend", summaryRoot);
         else participantsCard.prepend(summaryRoot);
       }
-      summaryRoot.dataset.chatchatVisualLayer = "stage";
+      if (summaryRoot.dataset.chatchatVisualLayer !== "stage") {
+        summaryRoot.dataset.chatchatVisualLayer = "stage";
+      }
+      return true;
     };
-    place();
-    const observer = new MutationObserver(place);
+    if (place()) return;
+    const observer = new MutationObserver(() => {
+      if (place()) observer.disconnect();
+    });
     observer.observe(document.documentElement, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, []);
@@ -227,6 +235,38 @@ function participantArray(value: unknown): BrowserAuthorityParticipant[] {
       && typeof participant.seatId === "string"
       && typeof participant.providerName === "string",
   ));
+}
+
+function participantsEqual(
+  left: readonly BrowserAuthorityParticipant[],
+  right: readonly BrowserAuthorityParticipant[],
+): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((participant, index) => {
+    const candidate = right[index];
+    return candidate
+      && participant.seatId === candidate.seatId
+      && participant.providerName === candidate.providerName
+      && participant.createdByChatChat === candidate.createdByChatChat;
+  });
+}
+
+function receiptsEqual(
+  left: readonly BrowserAuthorityReceipt[],
+  right: readonly BrowserAuthorityReceipt[],
+): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((receipt, index) => {
+    const candidate = right[index];
+    return candidate
+      && receipt.seatId === candidate.seatId
+      && receipt.providerName === candidate.providerName
+      && receipt.action === candidate.action
+      && receipt.trigger === candidate.trigger
+      && receipt.reason === candidate.reason
+      && receipt.occurredAt === candidate.occurredAt
+      && receipt.ownership === candidate.ownership;
+  });
 }
 
 function actionIcon(action: BrowserAuthorityReceipt["action"]): string {

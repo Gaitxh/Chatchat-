@@ -128,8 +128,25 @@ for (const text of [
   "captureBeyondViewport: false",
   "const cdpCallTimeoutMs = Math.min(8000",
   "const MAX_CAPTURE_ATTEMPTS = 2",
-  "/CDP Runtime\\.evaluate timed out after \\d+ ms\\./",
 ]) requireText(captureProof, text, "shared bounded Chromium proof contract");
+
+const chromiumRetryPolicy = captureProof.match(
+  /function isRetryableTransientCdpError\(error\) \{([\s\S]*?)\n\}/,
+)?.[1] ?? "";
+for (const allowed of ["Runtime\\.evaluate", "Page\\.captureScreenshot"]) {
+  requireText(chromiumRetryPolicy, allowed, `shared bounded Chromium ${allowed} retry class`);
+}
+for (const forbidden of ["Page\\.navigate", "Page\\.enable", "Runtime\\.enable", "Emulation\\.setDeviceMetricsOverride"]) {
+  if (chromiumRetryPolicy.includes(forbidden)) {
+    fail(`Response receipt proof must not broaden shared fresh-browser retry policy to ${forbidden}.`);
+  }
+}
+requireText(
+  captureProof,
+  "attempt >= MAX_CAPTURE_ATTEMPTS || !isRetryableTransientCdpError(error)",
+  "second Chromium attempt remains fatal",
+);
+
 for (const forbidden of ["clipSelector", "cropPng", "decodePng", "PNG_SIGNATURE", 'from "node:zlib"']) {
   if (captureProof.includes(forbidden)) fail(`Response receipts must not expand the shared screenshot infrastructure: ${forbidden}`);
 }
@@ -151,7 +168,7 @@ console.log("✓ ChatChat final receipt consumes the canonical named-response le
 console.log("✓ Sealed round-one targeting cannot become final public response debt");
 console.log("✓ Primary Next Move / Consultation Receipt portals cannot follow audit roots into the Audit Vault");
 console.log("✓ Answered/pending obligations remain exact-provenance facts, never forced agreement or a truth score");
-console.log("✓ Proof waits for bounded geometric stability, then delegates viewport focus to the unchanged Chromium helper");
+console.log("✓ Proof waits for bounded geometric stability, then delegates viewport focus to the shared evidence-bounded Chromium helper");
 
 function requireText(haystack, needle, label) {
   if (!haystack.includes(needle)) fail(`Missing ${label}: ${needle}`);

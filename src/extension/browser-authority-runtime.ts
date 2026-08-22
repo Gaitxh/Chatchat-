@@ -15,6 +15,7 @@ declare const chrome: any;
 
 const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
 const RECENT_NAVIGATION_WINDOW_MS = 2_500;
+const SELF_HEALING_ROW_SELECTOR = ".participant-row.connection-self-healing[data-seat-id]";
 
 interface ParticipantRecord extends BrowserAuthorityParticipant {
   tabId: number;
@@ -71,7 +72,7 @@ function installSynchronousGuards() {
   });
 
   document.addEventListener("click", captureCreationIntent, true);
-  new MutationObserver(collectSelfHealingSeats).observe(document.documentElement, {
+  new MutationObserver(collectSelfHealingSeatsFromMutations).observe(document.documentElement, {
     childList: true,
     subtree: true,
     attributes: true,
@@ -165,9 +166,30 @@ async function recordNewManagedSeats(
   announceAuthorityUpdated();
 }
 
-function collectSelfHealingSeats() {
-  for (const row of document.querySelectorAll<HTMLElement>(".participant-row.connection-self-healing[data-seat-id]")) {
-    if (row.dataset.seatId) selfHealingSeats.add(row.dataset.seatId);
+/**
+ * The Full Room mutates heavily while a meeting and audit views render. Inspect
+ * only MutationObserver targets/new subtrees instead of rescanning the entire
+ * document for every class change. This keeps the authority ledger passive on
+ * unrelated high-frequency UI updates such as Provider Memory proof rendering.
+ */
+function collectSelfHealingSeatsFromMutations(mutations: MutationRecord[]) {
+  for (const mutation of mutations) {
+    if (mutation.type === "attributes") {
+      collectSelfHealingSeatFromNode(mutation.target);
+      continue;
+    }
+    for (const node of mutation.addedNodes) collectSelfHealingSeatFromNode(node);
+  }
+}
+
+function collectSelfHealingSeatFromNode(node: Node) {
+  if (!(node instanceof Element)) return;
+  const row = node.matches(SELF_HEALING_ROW_SELECTOR)
+    ? node as HTMLElement
+    : node.closest<HTMLElement>(SELF_HEALING_ROW_SELECTOR);
+  if (row?.dataset.seatId) selfHealingSeats.add(row.dataset.seatId);
+  for (const nested of node.querySelectorAll<HTMLElement>(SELF_HEALING_ROW_SELECTOR)) {
+    if (nested.dataset.seatId) selfHealingSeats.add(nested.dataset.seatId);
   }
 }
 

@@ -126,7 +126,7 @@ jobs:
           node scripts/capture-chromium-proof.mjs \
             --chrome "$CHROME_BIN" \
             --url 'http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=zh&memory-proof=coverage' \
-            --width 1440 --height 2200 --wait-ms 26000 \
+            --width 1440 --height 1600 --wait-ms 26000 \
             --ready-selector 'html[data-chatchat-provider-memory-showcase="complete"]' \
             --focus-selector '[data-provider-memory-coverage="audited"]' \
             --screenshot artifacts/chatchat-provider-memory-zh.png \
@@ -134,7 +134,7 @@ jobs:
           node scripts/capture-chromium-proof.mjs \
             --chrome "$CHROME_BIN" \
             --url 'http://127.0.0.1:4180/app/app.html?showcase=consultation&lang=en&memory-proof=coverage' \
-            --width 1440 --height 2200 --wait-ms 26000 \
+            --width 1440 --height 1600 --wait-ms 26000 \
             --ready-selector 'html[data-chatchat-provider-memory-showcase="complete"]' \
             --focus-selector '[data-provider-memory-coverage="audited"]' \
             --screenshot artifacts/chatchat-provider-memory-en.png \
