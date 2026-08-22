@@ -113,8 +113,8 @@ function AuthoritySummary({
       <div className="browser-authority-summary__copy">
         <strong>{zh ? "浏览器边界" : "Browser boundary"}</strong>
         <span>{zh
-          ? "自动操作只属于 ChatChat 创建的干净标签页；你的标签页不会在后台自动导航或恢复连接。"
-          : "Automatic actions are limited to clean tabs ChatChat created. Your own tabs are never background-navigated or auto-resumed."}</span>
+          ? "自动操作只属于未被保护的 ChatChat 干净标签页。你的标签页，以及你主动保护的托管席位，都不会在后台自动导航或恢复连接。"
+          : "Automatic actions are limited to unprotected clean tabs ChatChat created. Your own tabs — and any managed seat you protect — are never background-navigated or auto-resumed."}</span>
       </div>
       <div className="browser-authority-summary__facts">
         <b>{summary.managedSeats}<small>{zh ? "托管" : "managed"}</small></b>
@@ -168,7 +168,7 @@ function AuthorityLedger({
         <div className="browser-authority-protected-list">
           <span>🛡</span>
           <div>
-            <strong>{zh ? "这些是你的标签页" : "These are your tabs"}</strong>
+            <strong>{zh ? "这些席位已禁止后台自动化" : "These seats are protected from background automation"}</strong>
             <small>{summary.protectedProviders.join(" · ")}</small>
           </div>
           <b>{zh ? "不自动导航 / 不自动恢复" : "NO AUTO NAV / RESUME"}</b>
@@ -233,6 +233,8 @@ function actionIcon(action: BrowserAuthorityReceipt["action"]): string {
   if (action === "managed_tab_created") return "+";
   if (action === "automatic_connection_resume") return "↻";
   if (action === "self_heal_navigation") return "⌁";
+  if (action === "automation_protected") return "🛡";
+  if (action === "automation_restored") return "↺";
   return "→";
 }
 
@@ -240,6 +242,8 @@ function actionLabel(action: BrowserAuthorityReceipt["action"], zh: boolean): st
   if (action === "managed_tab_created") return zh ? "创建干净托管标签页" : "Created clean managed tab";
   if (action === "automatic_connection_resume") return zh ? "自动恢复连接" : "Automatic connection resume";
   if (action === "self_heal_navigation") return zh ? "一次性自愈导航" : "One-shot self-heal navigation";
+  if (action === "automation_protected") return zh ? "用户收回自动化权限" : "User revoked automation";
+  if (action === "automation_restored") return zh ? "用户恢复受限自动化" : "User restored bounded automation";
   return zh ? "新会议干净会话导航" : "Fresh-session navigation";
 }
 
@@ -253,6 +257,8 @@ function reasonLabel(reason: BrowserAuthorityReceipt["reason"], zh: boolean): st
     recovery: ["Bounded recovery", "受限恢复"],
     fresh_consultation: ["Fresh consultation", "新协商"],
     page_mapping_drift: ["Page mapping drift", "页面映射漂移"],
+    user_protection: ["User protection", "用户保护"],
+    user_restored_automation: ["User restored automation", "用户恢复自动化"],
   };
   const label = labels[reason];
   return zh ? label[1] : label[0];
