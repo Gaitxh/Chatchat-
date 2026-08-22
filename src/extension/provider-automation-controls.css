@@ -1,0 +1,33 @@
+.automation-protection-toggle {
+  border: 1px solid #d9c79e !important;
+  background: #fff5df !important;
+  color: #6d5127 !important;
+  font-weight: 800 !important;
+}
+
+.automation-protection-toggle:hover:not(:disabled) {
+  border-color: #c9ad72 !important;
+  background: #ffefca !important;
+}
+
+.automation-protection-toggle.is-protected {
+  border-color: #cad4e4 !important;
+  background: #eef2f8 !important;
+  color: #455a78 !important;
+}
+
+.automation-protection-toggle:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+.automation-boundary-chip.is-protected {
+  border-color: rgba(83, 104, 139, .2);
+  background: #e9eef6;
+  color: #4a5f7f;
+}
+
+html[data-surface="web-app"] .participant-row[data-tab-ownership="protected"] {
+  border-color: rgba(76, 96, 132, .18);
+  background: linear-gradient(145deg, #fbfbfc, #f4f6fa);
+}
