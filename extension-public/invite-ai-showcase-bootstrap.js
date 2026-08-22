@@ -20,6 +20,7 @@
       status: "complete",
     }],
   ]);
+  const navigationCounts = new Map();
   let nextTabId = 801;
   let createdCount = 0;
   let autoSetupCount = 0;
@@ -27,6 +28,7 @@
   document.documentElement.lang = locale;
   document.documentElement.dataset.chatchatInviteAiCreatedCount = "0";
   document.documentElement.dataset.chatchatInviteAiAutoSetupCount = "0";
+  document.documentElement.dataset.chatchatInviteAiNavigationCounts = "{}";
 
   const existingParticipant = {
     seatId: existingSeatId,
@@ -53,7 +55,7 @@
       [existingSeatId]: {
         state: "ready",
         automatic: true,
-        verifiedAt: "2026-08-21T00:00:00.000Z",
+        verifiedAt: "2026-08-21T00:00:01.000Z",
         detail: "Automatic page connection and consultation protocol both passed.",
       },
     },
@@ -111,6 +113,12 @@
     })}</CHATCHAT_COUNCIL_JSON>`;
   }
 
+  function publishNavigationCounts() {
+    document.documentElement.dataset.chatchatInviteAiNavigationCounts = JSON.stringify(
+      Object.fromEntries([...navigationCounts.entries()].map(([tabId, count]) => [String(tabId), count])),
+    );
+  }
+
   window.chrome = {
     storage: {
       local: area(memoryLocal, "local"),
@@ -160,6 +168,15 @@
         const tab = tabs.get(tabId);
         if (!tab) throw new Error(`Unknown Invite AI showcase tab ${tabId}`);
         Object.assign(tab, changes);
+        if (changes?.url) {
+          navigationCounts.set(tabId, (navigationCounts.get(tabId) ?? 0) + 1);
+          publishNavigationCounts();
+          queueMicrotask(() => {
+            for (const listener of tabUpdatedListeners) {
+              listener(tabId, { status: "complete", url: changes.url }, { ...tab });
+            }
+          });
+        }
         return { ...tab };
       },
       async remove(tabId) { tabs.delete(tabId); },
@@ -211,7 +228,16 @@
     runtime: {
       getURL(path) { return new URL(path, location.href).toString(); },
       async sendMessage(message) {
-        if (message?.type === "CLAIM_PROVIDER_SELF_HEALING") return { ok: true, claimed: false };
+        if (message?.type === "CLAIM_PROVIDER_SELF_HEALING") {
+          const participants = memorySession[PARTICIPANTS_KEY] ?? [];
+          const participant = participants.find((candidate) => (
+            candidate?.seatId === message.seatId && candidate?.tabId === message.tabId
+          ));
+          const claimed = participant?.createdByChatChat === true
+            && participant?.automationProtected !== true;
+          document.documentElement.dataset.chatchatInviteAiLastSelfHealClaim = claimed ? "claimed" : "denied";
+          return { ok: true, claimed };
+        }
         return { ok: false, error: "No runtime tool call is expected in the Invite AI showcase." };
       },
     },
