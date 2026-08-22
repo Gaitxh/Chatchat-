@@ -1,6 +1,7 @@
 import { recordBrowserAuthorityAction } from "./browser-authority-store.js";
 import { providerTabOwnership } from "./provider-tab-boundary.js";
 import { setProviderAutomationProtected } from "./provider-automation-protection.js";
+import "./provider-automation-controls.css";
 
 declare const chrome: any;
 
@@ -77,6 +78,9 @@ async function refresh() {
     if (!existing) {
       button.type = "button";
       button.className = "automation-protection-toggle";
+      // This intentionally becomes the first row action. Full Room hides the
+      // later Open/Remove plumbing by default, so Protect remains a first-class
+      // user boundary while management tools stay Advanced.
       actions.prepend(button);
     }
     button.dataset.automationProtection = protectedState ? "protected" : "managed";
