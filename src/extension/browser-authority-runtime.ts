@@ -3,7 +3,9 @@ import {
   type ConnectionRetryRequestedDetail,
 } from "./connection-retry-wire.js";
 import {
+  browserAuthorityReasonForRetry,
   mayDispatchProviderRetryUnderBrowserAuthority,
+  shouldTrackAutomaticResumeIntent,
   type BrowserAuthorityParticipant,
   type BrowserAuthorityReason,
   type BrowserAuthorityTrigger,
@@ -14,7 +16,10 @@ import { providerTabOwnership } from "./provider-tab-boundary.js";
 declare const chrome: any;
 
 const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
+const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
 const RECENT_NAVIGATION_WINDOW_MS = 2_500;
+const AUTOMATIC_RESUME_INTENT_TTL_MS = 8_000;
+const INITIAL_HYDRATION_INTENT_TTL_MS = 12_000;
 const SELF_HEALING_ROW_SELECTOR = ".participant-row.connection-self-healing[data-seat-id]";
 
 interface ParticipantRecord extends BrowserAuthorityParticipant {
@@ -23,22 +28,39 @@ interface ParticipantRecord extends BrowserAuthorityParticipant {
   createdByChatChat?: boolean;
 }
 
+interface ConnectionRecord {
+  state?: "idle" | "connecting" | "ready" | "failed";
+  detail?: string;
+  verifiedAt?: string;
+  automatic?: boolean;
+}
+
 interface CreationIntent {
   trigger: BrowserAuthorityTrigger;
   reason: BrowserAuthorityReason;
   expiresAt: number;
 }
 
+interface AutomaticResumeIntent {
+  reason: "provider_tab_loaded" | "recovery";
+  expiresAt: number;
+}
+
 const participantBySeat = new Map<string, ParticipantRecord>();
 const participantByTab = new Map<number, ParticipantRecord>();
+const connectionStateBySeat = new Map<string, ConnectionRecord["state"]>();
 const selfHealingSeats = new Set<string>();
 const recentNavigation = new Map<string, number>();
+const pendingAutomaticResumeBySeat = new Map<string, AutomaticResumeIntent>();
+const initialHydrationExpiryBySeat = new Map<string, number>();
 let creationIntent: CreationIntent | null = null;
 let blockedAutomaticRetryCount = 0;
+let participantHydration: Promise<void> = Promise.resolve();
 
 if (document.documentElement.dataset.surface === "web-app") {
   installSynchronousGuards();
-  void hydrateParticipants();
+  participantHydration = hydrateParticipants();
+  void participantHydration;
 }
 
 function installSynchronousGuards() {
@@ -49,12 +71,21 @@ function installSynchronousGuards() {
   );
 
   chrome.storage?.onChanged?.addListener?.((changes: Record<string, { oldValue?: unknown; newValue?: unknown }>) => {
-    const change = changes?.[PARTICIPANTS_KEY];
-    if (!change) return;
-    const previous = participantArray(change.oldValue);
-    const next = participantArray(change.newValue);
-    updateParticipantMaps(next);
-    void recordNewManagedSeats(previous, next);
+    const participantChange = changes?.[PARTICIPANTS_KEY];
+    if (participantChange) {
+      const previous = participantArray(participantChange.oldValue);
+      const next = participantArray(participantChange.newValue);
+      updateParticipantMaps(next);
+      void recordNewManagedSeats(previous, next);
+    }
+
+    const connectionChange = changes?.[CONNECTIONS_KEY];
+    if (connectionChange) {
+      const previous = connectionRecord(connectionChange.oldValue);
+      const next = connectionRecord(connectionChange.newValue);
+      updateConnectionStateMap(next);
+      void recordConsumedAutomaticResumes(previous, next);
+    }
   });
 
   chrome.tabs?.onUpdated?.addListener?.((tabId: number, changeInfo: { url?: string }) => {
@@ -83,8 +114,18 @@ function installSynchronousGuards() {
 async function hydrateParticipants() {
   try {
     const store = chrome.storage.session ?? chrome.storage.local;
-    const stored = await store.get(PARTICIPANTS_KEY);
-    updateParticipantMaps(participantArray(stored?.[PARTICIPANTS_KEY]));
+    const stored = await store.get([PARTICIPANTS_KEY, CONNECTIONS_KEY]);
+    const participants = participantArray(stored?.[PARTICIPANTS_KEY]);
+    const connections = connectionRecord(stored?.[CONNECTIONS_KEY]);
+    updateParticipantMaps(participants);
+    updateConnectionStateMap(connections);
+
+    const expiresAt = Date.now() + INITIAL_HYDRATION_INTENT_TTL_MS;
+    for (const participant of participants) {
+      if (providerTabOwnership(participant) !== "managed") continue;
+      if (connections[participant.seatId]?.state === "ready") continue;
+      initialHydrationExpiryBySeat.set(participant.seatId, expiresAt);
+    }
   } catch {
     // Unknown ownership must fail closed in the synchronous retry guard.
   }
@@ -103,17 +144,64 @@ function onConnectionRetryRequested(event: Event) {
     event.stopImmediatePropagation();
     blockedAutomaticRetryCount += 1;
     document.documentElement.dataset.chatchatAuthorityBlockedAutomaticRetries = String(blockedAutomaticRetryCount);
-    window.dispatchEvent(new CustomEvent("chatchat:browser-authority-updated"));
+    announceAuthorityUpdated();
     return;
   }
 
-  void recordBrowserAuthorityAction({
+  const connectionState = connectionStateBySeat.get(seatId);
+  if (!shouldTrackAutomaticResumeIntent(participant, reason, connectionState)) return;
+  const receiptReason = browserAuthorityReasonForRetry(reason);
+  if (!receiptReason) return;
+  pendingAutomaticResumeBySeat.set(seatId, {
+    reason: receiptReason,
+    expiresAt: Date.now() + AUTOMATIC_RESUME_INTENT_TTL_MS,
+  });
+}
+
+async function recordConsumedAutomaticResumes(
+  previous: Readonly<Record<string, ConnectionRecord>>,
+  next: Readonly<Record<string, ConnectionRecord>>,
+) {
+  await participantHydration;
+  const now = Date.now();
+
+  for (const [seatId, connection] of Object.entries(next)) {
+    if (connection.state !== "connecting") continue;
+    if (!connectionChanged(previous[seatId], connection)) continue;
+    const participant = participantBySeat.get(seatId);
+    if (!participant || providerTabOwnership(participant) !== "managed") continue;
+
+    const pending = pendingAutomaticResumeBySeat.get(seatId);
+    if (pending && pending.expiresAt >= now) {
+      pendingAutomaticResumeBySeat.delete(seatId);
+      initialHydrationExpiryBySeat.delete(seatId);
+      await recordAutomaticResume(participant, pending.reason);
+      continue;
+    }
+    if (pending) pendingAutomaticResumeBySeat.delete(seatId);
+
+    const hydrationExpiry = initialHydrationExpiryBySeat.get(seatId);
+    if (hydrationExpiry && hydrationExpiry >= now) {
+      initialHydrationExpiryBySeat.delete(seatId);
+      await recordAutomaticResume(participant, "session_hydration");
+      continue;
+    }
+    if (hydrationExpiry) initialHydrationExpiryBySeat.delete(seatId);
+  }
+}
+
+async function recordAutomaticResume(
+  participant: ParticipantRecord,
+  reason: "session_hydration" | "provider_tab_loaded" | "recovery",
+) {
+  await recordBrowserAuthorityAction({
     seatId: participant.seatId,
     providerName: participant.providerName,
     action: "automatic_connection_resume",
     trigger: "automatic",
-    reason: reason === "provider-tab-loaded" ? "provider_tab_loaded" : "recovery",
-  }).then(announceAuthorityUpdated, () => undefined);
+    reason,
+  });
+  announceAuthorityUpdated();
 }
 
 function captureCreationIntent(event: Event) {
@@ -155,6 +243,7 @@ async function recordNewManagedSeats(
   if (!receiptContext) return;
 
   for (const participant of newManaged) {
+    initialHydrationExpiryBySeat.delete(participant.seatId);
     await recordBrowserAuthorityAction({
       seatId: participant.seatId,
       providerName: participant.providerName,
@@ -215,11 +304,33 @@ async function recordNavigation(
 function updateParticipantMaps(participants: readonly ParticipantRecord[]) {
   participantBySeat.clear();
   participantByTab.clear();
+  const validSeats = new Set<string>();
   for (const participant of participants) {
     participantBySeat.set(participant.seatId, participant);
     participantByTab.set(participant.tabId, participant);
+    validSeats.add(participant.seatId);
+  }
+  for (const seatId of pendingAutomaticResumeBySeat.keys()) {
+    if (!validSeats.has(seatId)) pendingAutomaticResumeBySeat.delete(seatId);
+  }
+  for (const seatId of initialHydrationExpiryBySeat.keys()) {
+    if (!validSeats.has(seatId)) initialHydrationExpiryBySeat.delete(seatId);
   }
   announceAuthorityUpdated();
+}
+
+function updateConnectionStateMap(connections: Readonly<Record<string, ConnectionRecord>>) {
+  connectionStateBySeat.clear();
+  for (const [seatId, connection] of Object.entries(connections)) {
+    connectionStateBySeat.set(seatId, connection.state);
+  }
+}
+
+function connectionChanged(previous: ConnectionRecord | undefined, next: ConnectionRecord): boolean {
+  return previous?.state !== next.state
+    || previous?.detail !== next.detail
+    || previous?.verifiedAt !== next.verifiedAt
+    || previous?.automatic !== next.automatic;
 }
 
 function participantArray(value: unknown): ParticipantRecord[] {
@@ -231,6 +342,12 @@ function participantArray(value: unknown): ParticipantRecord[] {
       && typeof participant.providerName === "string"
       && Number.isInteger(participant.tabId),
   ));
+}
+
+function connectionRecord(value: unknown): Record<string, ConnectionRecord> {
+  return value && typeof value === "object"
+    ? value as Record<string, ConnectionRecord>
+    : {};
 }
 
 function announceAuthorityUpdated() {

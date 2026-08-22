@@ -38,6 +38,7 @@
       },
     },
   };
+  const storageListeners = new Set();
   const onUpdatedListeners = new Set();
   const tab = {
     id: 501,
@@ -48,7 +49,7 @@
   };
   let loginComplete = false;
 
-  function area(memory) {
+  function area(memory, areaName) {
     return {
       async get(keys) {
         if (keys == null) return { ...memory };
@@ -59,9 +60,27 @@
             : Object.keys(keys);
         return Object.fromEntries(list.map((key) => [key, memory[key]]));
       },
-      async set(values) { Object.assign(memory, values); },
+      async set(values) {
+        const changes = {};
+        for (const [key, value] of Object.entries(values)) {
+          const oldValue = memory[key];
+          memory[key] = value;
+          if (oldValue !== value) changes[key] = { oldValue, newValue: value };
+        }
+        if (Object.keys(changes).length) {
+          for (const listener of storageListeners) listener(changes, areaName);
+        }
+      },
       async remove(keys) {
-        for (const key of Array.isArray(keys) ? keys : [keys]) delete memory[key];
+        const changes = {};
+        for (const key of Array.isArray(keys) ? keys : [keys]) {
+          if (!(key in memory)) continue;
+          changes[key] = { oldValue: memory[key], newValue: undefined };
+          delete memory[key];
+        }
+        if (Object.keys(changes).length) {
+          for (const listener of storageListeners) listener(changes, areaName);
+        }
       },
     };
   }
@@ -86,8 +105,12 @@
 
   window.chrome = {
     storage: {
-      local: area(memoryLocal),
-      session: area(memorySession),
+      local: area(memoryLocal, "local"),
+      session: area(memorySession, "session"),
+      onChanged: {
+        addListener(listener) { storageListeners.add(listener); },
+        removeListener(listener) { storageListeners.delete(listener); },
+      },
     },
     permissions: {
       async contains() { return true; },

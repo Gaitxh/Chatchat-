@@ -49,6 +49,7 @@ export interface BrowserAuthoritySummary {
 }
 
 export type BrowserAuthorityRetryReason = "provider-tab-loaded" | "manual" | "recovery" | undefined;
+export type BrowserAuthorityConnectionState = "idle" | "connecting" | "ready" | "failed" | undefined;
 
 /** Manual retry is an explicit user action. Every background/recovery retry is managed-only. */
 export function mayDispatchProviderRetryUnderBrowserAuthority(
@@ -57,6 +58,28 @@ export function mayDispatchProviderRetryUnderBrowserAuthority(
 ): boolean {
   if (reason === "manual") return true;
   return providerTabOwnership(participant) === "managed";
+}
+
+/**
+ * A permitted retry event is still only an intent. It becomes an authority
+ * receipt only if the Panel is actually able to consume it into a new
+ * `connecting` lifecycle. READY/CONNECTING seats therefore cannot manufacture
+ * resume receipts from no-op background events.
+ */
+export function shouldTrackAutomaticResumeIntent(
+  participant: BrowserAuthorityParticipant,
+  reason: BrowserAuthorityRetryReason,
+  connectionState: BrowserAuthorityConnectionState,
+): boolean {
+  if (reason === "manual" || connectionState === "ready" || connectionState === "connecting") return false;
+  return mayDispatchProviderRetryUnderBrowserAuthority(participant, reason);
+}
+
+export function browserAuthorityReasonForRetry(
+  reason: BrowserAuthorityRetryReason,
+): "provider_tab_loaded" | "recovery" | null {
+  if (reason === "manual") return null;
+  return reason === "provider-tab-loaded" ? "provider_tab_loaded" : "recovery";
 }
 
 /**

@@ -33,6 +33,8 @@ jobs:
           grep -q 'chatchat:connection-retry-requested' extension-public/auto-resume-login.js
           grep -q 'CONNECTION_RETRY_REQUESTED_EVENT' src/extension/consultation-panel.tsx
           grep -q 'requestConnectionRetry' src/extension/web-room-onboarding.tsx
+          grep -q 'recordConsumedAutomaticResumes' src/extension/browser-authority-runtime.ts
+          grep -q 'session_hydration' src/extension/browser-authority-runtime.ts
           ! grep -q 'setup-participant .verify-button' extension-public/auto-resume-login.js
           ! grep -q 'querySelector' extension-public/auto-resume-login.js
           ! grep -q 'retry.click' src/extension/web-room-onboarding.tsx
@@ -141,6 +143,12 @@ jobs:
           grep -q 'data-chatchat-login-journey-connecting="complete"' artifacts/chatchat-login-resumed-en.html
           grep -q 'data-chatchat-login-resume-showcase="complete"' artifacts/chatchat-login-resumed-en.html
           grep -q 'participant-row connection-ready is-ready' artifacts/chatchat-login-resumed-en.html
+          grep -q 'data-browser-authority-ledger="ready"' artifacts/chatchat-login-resumed-en.html
+          grep -q 'data-browser-authority-receipts="2"' artifacts/chatchat-login-resumed-en.html
+          grep -q 'data-browser-authority-auto-actions="2"' artifacts/chatchat-login-resumed-en.html
+          grep -Fq 'Automatic connection resume' artifacts/chatchat-login-resumed-en.html
+          grep -Fq 'Session restore' artifacts/chatchat-login-resumed-en.html
+          grep -Fq 'Provider page loaded' artifacts/chatchat-login-resumed-en.html
 
       - name: Prove Chinese login resumes to READY without retry click
         run: |
@@ -168,6 +176,12 @@ jobs:
           grep -q 'data-chatchat-login-journey-connecting="complete"' artifacts/chatchat-login-resumed-zh.html
           grep -q 'data-chatchat-login-resume-showcase="complete"' artifacts/chatchat-login-resumed-zh.html
           grep -q 'participant-row connection-ready is-ready' artifacts/chatchat-login-resumed-zh.html
+          grep -q 'data-browser-authority-ledger="ready"' artifacts/chatchat-login-resumed-zh.html
+          grep -q 'data-browser-authority-receipts="2"' artifacts/chatchat-login-resumed-zh.html
+          grep -q 'data-browser-authority-auto-actions="2"' artifacts/chatchat-login-resumed-zh.html
+          grep -Fq '自动恢复连接' artifacts/chatchat-login-resumed-zh.html
+          grep -Fq '会话恢复' artifacts/chatchat-login-resumed-zh.html
+          grep -Fq 'Provider 页面已加载' artifacts/chatchat-login-resumed-zh.html
 
       - name: Save preview log
         if: always()

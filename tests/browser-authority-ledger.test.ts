@@ -1,8 +1,10 @@
 import {
   appendBoundedBrowserAuthorityReceipt,
+  browserAuthorityReasonForRetry,
   deriveBrowserAuthoritySummary,
   mayDispatchProviderRetryUnderBrowserAuthority,
   sanitizeBrowserAuthorityReceipt,
+  shouldTrackAutomaticResumeIntent,
   type BrowserAuthorityReceipt,
 } from "../src/extension/browser-authority-ledger.js";
 
@@ -73,6 +75,17 @@ assert(!mayDispatchProviderRetryUnderBrowserAuthority(userOwnedSeat, "recovery")
 assert(!mayDispatchProviderRetryUnderBrowserAuthority(legacySeat, "provider-tab-loaded"), "legacy missing ownership metadata must fail closed for automatic resume");
 assert(mayDispatchProviderRetryUnderBrowserAuthority(userOwnedSeat, "manual"), "explicit user retry remains allowed on a user-owned tab");
 
+assert(shouldTrackAutomaticResumeIntent(managedSeat, "provider-tab-loaded", "failed"), "failed managed seat may create a page-load resume intent");
+assert(shouldTrackAutomaticResumeIntent(managedSeat, "recovery", "idle"), "idle managed seat may create a bounded recovery intent");
+assert(!shouldTrackAutomaticResumeIntent(managedSeat, "provider-tab-loaded", "ready"), "READY managed seat must not manufacture a no-op resume receipt");
+assert(!shouldTrackAutomaticResumeIntent(managedSeat, "recovery", "connecting"), "already-CONNECTING managed seat must not manufacture a duplicate resume receipt");
+assert(!shouldTrackAutomaticResumeIntent(userOwnedSeat, "provider-tab-loaded", "failed"), "user-owned seat cannot create an automatic resume intent");
+assert(!shouldTrackAutomaticResumeIntent(managedSeat, "manual", "failed"), "explicit manual retry is not an automatic authority receipt intent");
+assert(browserAuthorityReasonForRetry("provider-tab-loaded") === "provider_tab_loaded", "page-load retry must retain exact authority reason provenance");
+assert(browserAuthorityReasonForRetry("recovery") === "recovery", "recovery retry must retain exact authority reason provenance");
+assert(browserAuthorityReasonForRetry(undefined) === "recovery", "legacy/default background retry remains bounded recovery");
+assert(browserAuthorityReasonForRetry("manual") === null, "manual user action must never become an automatic resume receipt");
+
 let rejected = false;
 try {
   sanitizeBrowserAuthorityReceipt({ ...managed, ownership: "user-owned" as "managed" });
@@ -83,3 +96,4 @@ assert(rejected, "a user-owned automatic-action receipt must fail closed instead
 
 console.log("✓ Browser Authority receipts are bounded, allowlisted, and managed-only");
 console.log("✓ User-owned and legacy Provider tabs remain explicitly protected from automatic retry while manual user action stays allowed");
+console.log("✓ Automatic resume receipts require actionable managed intent; READY/CONNECTING no-op events cannot manufacture receipts");
