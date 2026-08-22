@@ -17,10 +17,11 @@ const waitMs = positiveInteger(args.waitMs ?? "26000", "--wait-ms");
 // a smaller ceiling so a wedged Page.navigate / Runtime.evaluate / screenshot
 // cannot consume the entire GitHub Actions job without an actionable failure.
 const cdpCallTimeoutMs = Math.min(8000, Math.max(2500, Math.floor(waitMs / 2)));
-// Chromium's DevTools runtime occasionally wedges one Runtime.evaluate on a
-// healthy ready page in GitHub-hosted runners. Preserve the exact same product
-// selectors and assertions, but allow one full fresh-browser retry. A second
-// evaluate timeout still fails the proof.
+// GitHub-hosted Chromium has repeatedly wedged one Runtime.evaluate or
+// Page.captureScreenshot call on otherwise healthy, already-proved pages.
+// Preserve the exact same product selectors and assertions, but allow only one
+// full fresh-browser retry for those two observed timeout classes. Attempt two
+// still fails hard, and no selector/DOM/semantic failure is retryable.
 const MAX_CAPTURE_ATTEMPTS = 2;
 
 let lastError = null;
@@ -33,7 +34,7 @@ for (let attempt = 1; attempt <= MAX_CAPTURE_ATTEMPTS; attempt += 1) {
     lastError = error;
     if (attempt >= MAX_CAPTURE_ATTEMPTS || !isRetryableTransientCdpError(error)) throw error;
     console.warn(
-      `Transient Chromium DevTools evaluate timeout on capture attempt ${attempt}; retrying once with a fresh Chromium profile and debug port. Product selectors and assertions are unchanged.`,
+      `Transient Chromium DevTools timeout on capture attempt ${attempt}; retrying once with a fresh Chromium profile and debug port. Product selectors and assertions are unchanged. Cause: ${message(error)}`,
     );
     await sleep(160);
   }
@@ -51,6 +52,13 @@ async function captureProofAttempt(attempt) {
       "--headless=new",
       "--no-sandbox",
       "--disable-gpu",
+      "--disable-background-networking",
+      "--disable-component-update",
+      "--disable-default-apps",
+      "--disable-sync",
+      "--metrics-recording-only",
+      "--no-first-run",
+      "--no-default-browser-check",
       "--hide-scrollbars",
       "--run-all-compositor-stages-before-draw",
       `--remote-debugging-port=${port}`,
@@ -300,7 +308,7 @@ function withDeadline(promise, timeoutMs, errorMessage) {
 }
 
 function isRetryableTransientCdpError(error) {
-  return /CDP Runtime\.evaluate timed out after \d+ ms\./.test(message(error));
+  return /CDP (?:Runtime\.evaluate|Page\.captureScreenshot) timed out after \d+ ms\./.test(message(error));
 }
 
 function stderrTail(chunks) {

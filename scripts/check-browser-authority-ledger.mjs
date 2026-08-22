@@ -58,7 +58,13 @@ for (const text of [
   ".participant-row.connection-self-healing[data-seat-id]",
   "chrome.tabs?.onUpdated",
   "chrome.storage?.onChanged",
-]) requireText(runtime, text, "Browser Authority runtime firewall / action observation");
+  "collectSelfHealingSeatsFromMutations",
+  "for (const mutation of mutations)",
+  "mutation.addedNodes",
+]) requireText(runtime, text, "Browser Authority runtime firewall / bounded action observation");
+if (runtime.includes("document.querySelectorAll<HTMLElement>(SELF_HEALING_ROW_SELECTOR)")) {
+  fail("Browser Authority must not rescan the whole document on every mutation.");
+}
 
 for (const text of [
   'data-browser-authority-summary="ready"',
@@ -68,7 +74,11 @@ for (const text of [
   "Session-local only.",
   "never page URLs, conversations, prompts, responses, accounts, cookies, or tokens.",
   "NO AUTO NAV / RESUME",
-]) requireText(portal, text, "bilingual Browser Authority user boundary");
+  "participantsEqual(current, nextParticipants)",
+  "receiptsEqual(current, nextReceipts)",
+  "if (place()) return;",
+  "if (place()) observer.disconnect();",
+]) requireText(portal, text, "bilingual passive Browser Authority user boundary");
 
 for (const root of [
   'id="browser-authority-summary-root"',
@@ -124,6 +134,7 @@ console.log("✓ Browser Authority receipts are bounded, session-local, allowlis
 console.log("✓ Automatic Provider retry fails closed before Panel listeners; explicit manual retry remains allowed");
 console.log("✓ Compact boundary summary stays public while detailed authority receipts remain in Audit Vault");
 console.log("✓ Chromium proof must dispatch and block a real user-owned background retry before claiming Protected");
+console.log("✓ Browser Authority observers stay passive under unrelated high-frequency Full Room mutations");
 
 function requireText(haystack, needle, label) {
   if (!haystack.includes(needle)) fail(`Missing ${label}: ${needle}`);
