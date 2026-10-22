@@ -8,7 +8,7 @@ import { chromium } from 'playwright-core';
 const browserPath = process.env.CHATCHAT_RENDERER_BROWSER;
 const skip = browserPath ? false : 'Set CHATCHAT_RENDERER_BROWSER to run the isolated, sandboxed browser UI checks.';
 const fixtures = {
-  version: '0.10.5', runtime: { available: true, label: '测试浏览器', message: '隔离测试环境' },
+  version: '0.10.6', runtime: { available: true, label: '测试浏览器', message: '隔离测试环境' },
   providers: [
     { id: 'alpha', name: '测试甲', url: 'https://alpha.example/', automation: 'experimental' },
     { id: 'beta', name: '测试乙', url: 'https://beta.example/', automation: 'experimental' },

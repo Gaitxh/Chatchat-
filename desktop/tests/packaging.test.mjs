@@ -24,6 +24,8 @@ test('Windows build is one-click, current-user, self-contained and equally harde
  assert.match(packaging,/assertBrowserIntegrity/);
  assert.match(packaging,/asar.extractFile/);
  assert.match(packaging,/getCurrentFuseWire/);
+ assert.match(packaging,/verifySetupPayload/);
+ assert.match(packaging,/NSIS-PAYLOAD-VERIFICATION/);
  for(const category of ['main','runtime','renderer','generated/src']){
    assert.ok(packaging.includes('packagedSourceFiles("'+category+'")'),
      'Production build must compare the full '+category+' tree');

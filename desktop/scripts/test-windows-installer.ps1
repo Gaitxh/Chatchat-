@@ -1,7 +1,7 @@
 # Only execute in disposable GitHub-hosted Windows CI. Never on a user's daily machine.
 $ErrorActionPreference = "Stop"
-if ($env:GITHUB_ACTIONS -ne "true" -or $env:RUNNER_OS -ne "Windows" -or $env:CI -ne "true") {
-  throw "Installer acceptance is restricted to an ephemeral Windows CI runner."
+if ($env:GITHUB_ACTIONS -ne "true" -or $env:RUNNER_OS -ne "Windows" -or $env:CI -ne "true" -or $env:RUNNER_ENVIRONMENT -ne "github-hosted" -or [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) {
+  throw "Installer acceptance is restricted to an ephemeral GitHub-hosted Windows CI runner."
 }
 
 $desktop = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -14,7 +14,14 @@ function Find-ChatChatUninstallEntries {
     Where-Object { $_.DisplayName -match '^ChatChat(\s|$)' })
 }
 function Invoke-Setup([string]$file) {
-  $result = Start-Process -FilePath $file -ArgumentList @('/S') -Wait -PassThru
+  # NSIS can launch the desktop application after installation. Start-Process
+  # -Wait waits on the process tree, potentially deadlocking while ChatChat is
+  # running. Wait ONLY for the installer process, with a hard CI deadline.
+  $result = Start-Process -FilePath $file -ArgumentList @('/S') -PassThru
+  if (-not $result.WaitForExit(180000)) {
+    try { Stop-Process -Id $result.Id -Force -ErrorAction SilentlyContinue } catch {}
+    throw "Silent NSIS operation exceeded the 180-second installer process deadline."
+  }
   if ($result.ExitCode -ne 0) { throw "Silent NSIS operation failed: $($result.ExitCode)" }
 }
 
@@ -35,8 +42,10 @@ $browser = Join-Path $installRoot 'resources\browser\chrome-win64\chrome.exe'
 if (-not (Test-Path $binary -PathType Leaf) -or -not (Test-Path $browser -PathType Leaf)) {
   throw "Installed desktop does not contain ChatChat.exe and bundled Chromium."
 }
-if (-not ([IO.Path]::GetFullPath($installRoot)).StartsWith([IO.Path]::GetFullPath($env:LOCALAPPDATA), [StringComparison]::OrdinalIgnoreCase)) {
-  throw "Installer did not use a per-user install root."
+$localRoot = [IO.Path]::GetFullPath($env:LOCALAPPDATA).TrimEnd([char]92) + [char]92
+$installPath = [IO.Path]::GetFullPath($installRoot).TrimEnd([char]92) + [char]92
+if (-not $installPath.StartsWith($localRoot, [StringComparison]::OrdinalIgnoreCase)) {
+  throw "Installer did not use a current-user installation directory."
 }
 
 # This disposable-runner fixture proves reinstall/uninstall does not erase user history.
@@ -47,7 +56,7 @@ Set-Content -LiteralPath $sentinel -Value 'Do not erase saved meeting data' -Enc
 
 function Stop-CiChatChat {
   Get-CimInstance Win32_Process -Filter "name = 'ChatChat.exe'" -ErrorAction SilentlyContinue |
-    Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($installRoot, [StringComparison]::OrdinalIgnoreCase) } |
+    Where-Object { $_.ExecutablePath -and [string]::Equals($_.ExecutablePath, $binary, [StringComparison]::OrdinalIgnoreCase) } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 }
 Stop-CiChatChat
@@ -69,4 +78,5 @@ Invoke-Setup $uninstall
 if ((Find-ChatChatUninstallEntries).Count -ne 0) { throw "Uninstall registry entry remains." }
 if (Test-Path $binary -PathType Leaf) { throw "Uninstall left the main executable." }
 if (-not (Test-Path $sentinel -PathType Leaf)) { throw "Uninstall erased local history." }
-Write-Output "PASS: silent per-user install/reinstall/uninstall with local data preserved."
+Write-Output "PASS: silent per-user install, SAME-VERSION reinstall and uninstall with local data preserved."
+Write-Output "Not verified by this job: a real cross-version upgrade, manual UI setup, code signing or real Provider logins."

@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertBrowserIntegrity } from "../runtime/browser-integrity.mjs";
 import { verifiedOfflineElectronZip } from "./offline-electron-dist.mjs";
+import { verifySetupPayload } from "./verify-nsis-payload.mjs";
 
 const require = createRequire(import.meta.url);
 const asar = require("@electron/asar");
@@ -104,6 +105,19 @@ for await (const part of createReadStream(installer, { highWaterMark: 1024 * 102
   sha256.update(part);
 }
 const checksum = sha256.digest("hex");
+// Examine the actual NSIS Setup.exe without running it. Decompress its
+// embedded app-64.7z and require exact byte parity for every installed file.
+const actualInstaller = await verifySetupPayload({
+  installer,
+  reviewedUnpacked: unpacked,
+  sevenZip: path.join(root, "node_modules/electron-winstaller/vendor/7z.exe"),
+  reportFile: path.join(root, "release/NSIS-PAYLOAD-VERIFICATION.json"),
+});
+if (actualInstaller.installerSha256 !== checksum) {
+  throw new Error("Actual NSIS installer digest changed during payload verification.");
+}
+console.log("Verified NSIS embedded application payload: "
+  + actualInstaller.fileCount + " exact files.");
 writeFileSync(path.join(root, "release/SHA256SUMS.txt"),
   `${checksum}  ${artifact}\n`, "utf8");
 console.log(`Verified Windows candidate: ${artifact} SHA256=${checksum}`);

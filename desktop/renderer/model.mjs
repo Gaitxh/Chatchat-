@@ -24,7 +24,7 @@ export const EVENT_KINDS = {
 
 export function emptyState() {
   return {
-    version: '0.10.5', runtime: { available: false, label: '桌面连接', message: '正在连接桌面应用…' },
+    version: '0.10.6', runtime: { available: false, label: '桌面连接', message: '正在连接桌面应用…' },
     providers: [], seats: [], meeting: null, history: [], busy: false, synthesisAvailable: false,
     synthesisPlannedRequests: 0,
   };

@@ -1,6 +1,6 @@
 {
   "name": "chatchat-desktop",
-  "version": "0.10.5",
+  "version": "0.10.6",
   "private": true,
   "description": "Local Windows multi-model deliberation desktop harness",
   "type": "module",
@@ -21,6 +21,7 @@
     "@electron/fuses": "1.8.0",
     "electron": "45.0.0",
     "electron-builder": "26.15.3",
+    "electron-winstaller": "5.4.0",
     "extract-zip": "2.0.1"
   }
 }

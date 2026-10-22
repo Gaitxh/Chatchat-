@@ -67,6 +67,7 @@ jobs:
           path: |
             desktop/release/*.exe
             desktop/release/SHA256SUMS.txt
+            desktop/release/NSIS-PAYLOAD-VERIFICATION.json
             desktop/SECURITY.zh-CN.md
             desktop/README.zh-CN.md
           if-no-files-found: error
