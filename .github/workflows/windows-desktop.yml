@@ -85,7 +85,20 @@ jobs:
           $env:CHATCHAT_SMOKE_BROWSER = Join-Path $PWD '.build-cache/browser/chrome-win64/chrome.exe'
           $env:CHATCHAT_CI_HEADLESS = '1'
           if (!(Test-Path $env:CHATCHAT_ELECTRON_EXECUTABLE -PathType Leaf)) {
-            throw 'The npm Electron development binary was unavailable on the runner.'
+            # npm's supported install-script policy may have left the
+            # development Electron executable unmaterialized. This is only
+            # the NON-GATING diagnostic, after real installer acceptance.
+            $bootstrap = Join-Path $PWD 'node_modules/electron/install.js'
+            if (!(Test-Path $bootstrap -PathType Leaf)) {
+              throw 'The pinned Electron npm package has no bootstrap script.'
+            }
+            node $bootstrap
+            if ($LASTEXITCODE) {
+              throw 'Optional pinned development Electron bootstrap failed.'
+            }
+          }
+          if (!(Test-Path $env:CHATCHAT_ELECTRON_EXECUTABLE -PathType Leaf)) {
+            throw 'The pinned development Electron executable remains unavailable.'
           }
           node scripts/smoke-restore-electron.mjs
           exit $LASTEXITCODE
