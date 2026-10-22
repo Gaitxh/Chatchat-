@@ -17,3 +17,7 @@ The initial council always preserves every real participant's final position. It
 ## Full local-history backup and integrity check (0.10.3)
 
 From the History dialog, users may manually export all validated saved meetings and non-secret seat bookmarks as a bounded, SHA-256-checksummed JSON backup. Backup creation and read-only file verification never send Provider prompts or copy managed Chromium profiles/cookies. Backup content is plain text and may include sensitive user prompts and Provider replies: keep the exported file private. Full automatic restore is **not yet available**, and a reinstall may require signing in again. A pending-seat readiness check now preserves access to optional post-meeting peer synthesis instead of mistakenly invalidating the completed conversation.
+
+## Offline Electron ZIP for Windows builds
+
+Maintainers may set CHATCHAT_ELECTRON_DIST to an absolute path to electron-v45.0.0-win32-x64.zip before running npm run package:win. The archive filename, version, architecture, and SHA-256 are checked against the pinned electron npm package checksums before packaging. Invalid archives fail closed. This is a developer build option, not an end-user setup requirement; the normal CI download path remains unchanged.

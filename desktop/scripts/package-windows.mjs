@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertBrowserIntegrity } from "../runtime/browser-integrity.mjs";
+import { verifiedOfflineElectronZip } from "./offline-electron-dist.mjs";
 
 const require = createRequire(import.meta.url);
 const asar = require("@electron/asar");
@@ -18,6 +19,17 @@ const steps = [
   [path.join(root, "node_modules/electron-builder/cli.js"), "--win", "nsis",
     "--x64", "--publish", "never"],
 ];
+if (process.env.CHATCHAT_ELECTRON_DIST) {
+  const zip = await verifiedOfflineElectronZip({
+    zipPath: path.resolve(process.env.CHATCHAT_ELECTRON_DIST),
+    version: pkg.devDependencies.electron,
+    electronPackageRoot: path.join(root, 'node_modules/electron'),
+  });
+  // The override is only enabled after validating the official pinned hash.
+  // CI builds with no override retain the normal upstream Electron download.
+  steps[2].push('--config.electronDist=' + zip);
+  console.log('Using locally verified Electron ZIP; network fetch unnecessary.');
+}
 for (let index = 0; index < steps.length; index++) {
   const result = spawnSync(process.execPath, steps[index], { cwd: root, stdio: "inherit" });
   if (result.status !== 0) process.exit(result.status || 1);
