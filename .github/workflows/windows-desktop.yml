@@ -1,0 +1,68 @@
+name: Windows standalone desktop candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install build dependencies only on CI
+        run: |
+          npm ci
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm ci --prefix desktop
+          exit $LASTEXITCODE
+      - name: Compile shared core and verify bundled browser
+        working-directory: desktop
+        run: |
+          npm run build:core
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/download-browser.mjs
+          exit $LASTEXITCODE
+      - name: Desktop tests with isolated sandboxed fixture pages
+        working-directory: desktop
+        run: |
+          $env:CHATCHAT_RENDERER_BROWSER = Join-Path $PWD '.build-cache/browser/chrome-win64/chrome.exe'
+          npm test
+          exit $LASTEXITCODE
+      - name: Build one-click per-user installer (unsigned without signing credentials)
+        working-directory: desktop
+        run: |
+          npm run package:win
+          exit $LASTEXITCODE
+      - name: Disposable Windows runner install / reinstall / uninstall acceptance
+        run: |
+          & ./desktop/scripts/test-windows-installer.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Verify packaged installer checksum
+        run: |
+          $line = Get-Content desktop/release/SHA256SUMS.txt -TotalCount 1
+          if ($line -notmatch '^([0-9a-f]{64})  (ChatChat-Setup-.+\.exe)$') { throw 'Malformed checksum file' }
+          $actual = (Get-FileHash (Join-Path desktop/release $Matches[2]) -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $Matches[1]) { throw 'Installer checksum mismatch' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChatChat-Windows-desktop-candidate
+          path: |
+            desktop/release/*.exe
+            desktop/release/SHA256SUMS.txt
+            desktop/SECURITY.zh-CN.md
+            desktop/README.zh-CN.md
+          if-no-files-found: error
+          retention-days: 14
+# Silent install/reinstall/uninstall verification is restricted to the ephemeral CI runner.
+# This does not establish consumer-machine UI/login acceptance or code signing.

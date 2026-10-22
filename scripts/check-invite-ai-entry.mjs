@@ -42,15 +42,23 @@ for (const contract of [
   requireText(teamCss, contract, "Invite AI visibility / advanced-control boundary");
 }
 
+const freshSeat = await readFile("src/extension/fresh-seat.ts", "utf8");
 for (const step of [
   "async function openUrl()",
-  "detectProviderUrl(draft)",
-  "requestOriginPermissions([detection.origin], locale)",
-  "chrome.tabs.create({ url: detection.normalizedUrl, active: true })",
-  "waitForTabComplete(tab.id, 35_000)",
-  "attachTab(tab, true)",
+  "planFreshSeat(draft, { confirmedCustomUrl })",
+  "createFreshSeat(plan",
+  "requestOriginPermissions(plans.flatMap",
+  "createTab: (url) => chrome.tabs.create({ url, active: true })",
+  "waitForTab: (tabId) => waitForTabComplete(tabId, 35_000)",
+  "getTab: (tabId) => chrome.tabs.get(tabId)",
 ]) {
-  requireText(panel, step, "existing automatic URL onboarding pipeline");
+  requireText(panel, step, "dedicated fresh-seat onboarding pipeline");
+}
+for (const step of ["planFreshSeat", "createFreshSeat", "custom-confirmation-required", "unexpected-destination", "sourceTabId"]) {
+  requireText(freshSeat, step, "fresh-seat permission, destination and user-confirmation boundary");
+}
+if (panel.includes("participantFromDetection(tab.id, detection, false)")) {
+  fail("Discovery must not attach a user's old chat as an automatically writable seat.");
 }
 
 // The old defensive Web Room stylesheet can keep hiding generic URL controls;
@@ -63,9 +71,8 @@ if (webCssIndex < 0 || teamCssIndex < 0 || teamCssIndex <= webCssIndex) {
   fail("team-settings.css must load after web-app.css so only the marked Invite AI entry can override the generic hide.");
 }
 
-// Zero-config onboarding owns the room until the starter council is assembled.
-// Afterwards Invite AI is normal product chrome, while repair/team-management
-// actions remain hidden behind the explicit disclosure.
+// Invite AI is available in an empty room and after optional starter assembly.
+// Repair/team-management actions remain behind explicit disclosure.
 for (const contract of [
   'data-chatchat-invite-ai="true"',
   "inviteVisibleByDefault",
@@ -81,7 +88,7 @@ for (const contract of [
 
 // "Paste any AI website URL" is stronger than known-provider catalog support.
 // Keep a synthetic production-browser proof for an unknown reserved domain so
-// the novice promise must continue traversing custom detection → AUTO_SETUP →
+// the explicitly confirmed custom entry must continue traversing detection → AUTO_SETUP →
 // persisted local recipe → READY without exposing manual repair by default.
 for (const contract of [
   'params.get("target") === "custom"',
@@ -119,7 +126,7 @@ for (const jargon of ["selector", "adapter", "recipe", "cookie", "token"]) {
 }
 
 console.log("✓ ChatChat exposes URL onboarding as first-class Invite AI without exposing advanced repair plumbing");
-console.log("✓ Invite AI appears after starter-room assembly while advanced team controls stay disclosure-gated");
+console.log("✓ Invite AI remains available with optional starter assembly while advanced controls stay disclosure-gated");
 console.log("✓ Invite AI browser proof covers both a known Provider and an unknown custom URL through AUTO_SETUP → persisted recipe → READY");
 
 function requireText(haystack, needle, label) {

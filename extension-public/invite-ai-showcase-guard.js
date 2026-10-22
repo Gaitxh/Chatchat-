@@ -19,6 +19,13 @@
     });
     if (!entry) return fail("Invite AI entry never became visible.");
 
+    // Localization and the portal are mounted independently. Observe their
+    // settled public copy instead of racing the first English render.
+    const localized = await waitFor(() => {
+      const text = entry.querySelector("label")?.textContent?.trim();
+      return text === (zh ? "＋ 邀请 AI" : "+ Invite AI");
+    }, 4_000);
+    if (!localized) return fail("Invite AI localized label did not settle.");
     const label = entry.querySelector("label")?.textContent?.trim() ?? "";
     const input = entry.querySelector("input");
     const button = entry.querySelector("button");
@@ -43,7 +50,16 @@
     }
 
     setReactInputValue(input, TARGET_URL);
-    await waitFor(() => input.value === TARGET_URL && !button.disabled ? button : null, 4_000);
+    if (custom) {
+      const confirmation = await waitFor(() => document.querySelector('.custom-fresh-confirmation input[type="checkbox"]'), 4_000);
+      if (!(confirmation instanceof HTMLInputElement) || !button.disabled) {
+        return fail("Custom new-chat entry must require explicit confirmation before invitation.");
+      }
+      confirmation.click();
+      document.documentElement.dataset.chatchatInviteAiCustomConfirmed = "true";
+    }
+    const enabled = await waitFor(() => input.value === TARGET_URL && !button.disabled ? button : null, 4_000);
+    if (!enabled) return fail("Invite AI action did not become available after the required confirmation.");
     button.click();
     document.documentElement.dataset.chatchatInviteAiClicked = "true";
 

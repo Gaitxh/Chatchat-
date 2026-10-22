@@ -20,7 +20,7 @@ chrome://extensions
 → 选择 dist-extension/
 ```
 
-点击 ChatChat 工具栏按钮即可打开 Side Panel。
+点击 ChatChat 工具栏按钮即可打开独立会议窗口；已有真实会议会被聚焦，不会重复新建。Side Panel 保留为紧凑兼容入口。普通用户安装预构建包，请先阅读[本地安装指南](LOCAL_INSTALL.zh-CN.md)。
 
 ## 添加 AI 参与者
 

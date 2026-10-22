@@ -1,3 +1,5 @@
+> **当前目标：Windows 独立桌面 Harness。** 请先阅读 [桌面版安装与使用说明](desktop/README.zh-CN.md)。下方是此前浏览器扩展分支的功能与开发文档，不是 Windows 用户安装步骤。
+
 <div align="center">
   <img src="assets/readme/chatchat-hero-minimal.svg" width="100%" alt="ChatChat — 一个提案，多种独立思想，共同协商" />
 
@@ -7,6 +9,15 @@
 
   <p><a href="README.md">English</a> · <a href="docs/BROWSER_EXTENSION.zh-CN.md">浏览器扩展</a> · <a href="docs/CONSULTATION_PROTOCOL.zh-CN.md">协商协议</a> · <a href="docs/MEETING_SECRETARIAT.zh-CN.md">大会秘书处</a> · <a href="https://github.com/Gaitxh/Chatchat-/issues">想法与问题</a></p>
 </div>
+
+
+## Windows 一键安装（普通用户）
+
+下载维护者提供的 **`ChatChat-Setup-0.10.1-x64.exe`**，在 Windows 10/11 x64 上双击安装。安装程序自带 Electron 与独立 Chromium；**不需要安装 Node、Git、Rust、Chrome 扩展，也不用打开开发者模式**。安装完成后，在会议室点击 **＋** 添加模型，在软件管理的浏览器中正常登录，再由两个已就绪来源开始讨论。
+
+**当前是未签名的开发预览候选，不是已验收的稳定发行版。** Windows 11 上已经完成独立运行时的自动化测试和原生安装包构建，但尚未完成首次安装／升级／卸载的全链路验收，也没有使用第三方真实账号完成多模型协商验收。请不要为运行该程序关闭系统防护。
+
+详细说明：[Windows 桌面安装与使用](desktop/README.zh-CN.md)。下方历史内容描述此前浏览器扩展版本，不是 Windows 桌面版的安装操作。
 
 ---
 
@@ -261,7 +272,7 @@ Replay 不重新调用 Provider。复制 Markdown 和导出 SVG 都在浏览器�
 
 ---
 
-## 默认零配置
+## 本地预览版：自主选择席位
 
 Full Room 是主产品入口。普通用户第一次使用，应该只感觉到：
 
@@ -274,7 +285,7 @@ Full Room 是主产品入口。普通用户第一次使用，应该只感觉到�
 6 · 开会
 ```
 
-如果浏览器里已有至少两个已知 AI 来源，ChatChat 优先使用它们；数量不足时才准备起步团队，并为 ChatChat 打开专用干净会话，不劫持用户原来的私人 AI 对话。
+席位由用户通过“＋ 邀请 AI”自主选择；建议起步团队也是可选操作。已有标签页仅用于发现来源，不作为可以自动发送消息的旧聊天。ChatChat 会另开专用标签页访问新对话入口，但入口识别本身不证明网站已经创建全新对话。无法自动确认助手回复时，需要明确选择回复区域；不会将输入回显当成就绪。
 
 Provider 账号留在各自浏览器标签页中；ChatChat 没有中转服务器。历史与证据快照保存在本地。
 

@@ -1,0 +1,11 @@
+import {execFileSync} from 'node:child_process';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const desktop=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const root=path.resolve(desktop,'..');
+execFileSync(process.execPath,[path.join(root,'node_modules/typescript/bin/tsc'),'-p',path.join(root,'tsconfig.json')],{cwd:root,stdio:'inherit'});
+await fs.mkdir(path.join(desktop,'generated'),{recursive:true});
+await fs.rm(path.join(desktop,'generated/src'),{recursive:true,force:true});
+await fs.cp(path.join(root,'dist/src'),path.join(desktop,'generated/src'),{recursive:true});
+console.log('Prepared the reviewed shared consultation core for the desktop application.');

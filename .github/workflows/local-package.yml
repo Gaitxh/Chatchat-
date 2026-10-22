@@ -1,0 +1,51 @@
+name: Local extension preview package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install development dependencies
+        run: npm ci
+
+      - name: Check existing product contracts and types
+        run: npm run check
+
+      - name: Run existing deterministic tests
+        run: npm test
+
+      - name: Test archive and packaging boundaries
+        run: npm run test:package
+
+      - name: Build and package unsigned developer preview
+        run: npm run package:local
+
+      - name: Verify package matches current build
+        run: npm run check:package
+
+      - name: Upload candidate only (no publication)
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatchat-local-unsigned-developer-preview-${{ github.sha }}
+          path: |
+            dist/local-package/chatchat-*-unsigned-developer-preview.zip
+            dist/local-package/RELEASE-METADATA.json
+            dist/local-package/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14

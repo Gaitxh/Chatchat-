@@ -52,16 +52,35 @@ const proofPack = fs.readFileSync("src/validation/proof-pack.ts", "utf8");
 const onboardingCopy = extractVisibleCopy(webOnboarding);
 
 for (const required of [
-  "ZERO-CONFIG START",
-  "零配置开始",
+  "CHOOSE YOUR AI TEAM",
+  "自选 AI 团队",
   "chrome.permissions.request",
-  "permissionReady",
-  "Automatic team:",
-  "不用填配置表",
+  "Optional starter team:",
+  "可选起步团队",
   "buildAutomaticTeamPlan",
+  "planFreshSeat",
 ]) {
   if (!webOnboarding.includes(required)) {
-    throw new Error(`Zero-config Web Room contract is missing: ${required}`);
+    throw new Error(`Explicit-choice Web Room contract is missing: ${required}`);
+  }
+}
+
+// Suggestions and existing permissions are not user consent. Background
+// discovery may update the suggested roster, but must not start it or ask grants.
+const refreshStart = webOnboarding.indexOf("async function refreshPlan()");
+const refreshEnd = webOnboarding.indexOf("function completeAssembly()", refreshStart);
+if (refreshStart < 0 || refreshEnd < 0) throw new Error("Onboarding discovery boundary is missing.");
+const discoveryOnly = webOnboarding.slice(refreshStart, refreshEnd);
+if (/\bassemble\s*\(|chrome\.permissions\.request|chrome\.tabs\.create/.test(discoveryOnly)) {
+  throw new Error("Background discovery must not assemble a team, open provider tabs or request permissions.");
+}
+if (!webOnboarding.includes('button.addEventListener("click"') || !webOnboarding.includes("const selected = [...plan]")) {
+  throw new Error("Suggested team assembly must be an explicit user action on a frozen selection.");
+}
+for (const rule of webAppCss.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+  if (rule[1].includes('[data-chatchat-onboarding="zero-config"] .participants-card')
+    && /display\s*:\s*none/.test(rule[2])) {
+    throw new Error("An empty room must keep its + Invite AI card visible.");
   }
 }
 
@@ -201,7 +220,7 @@ for (const required of [
 }
 
 console.log("✓ ChatChat primary browser product language is equal-participant consultation");
-console.log("✓ ChatChat Web Room defaults to zero-config automatic setup");
+console.log("✓ ChatChat Web Room starts with explicit seat choice and optional starter suggestions");
 console.log("✓ ChatChat novice onboarding hides internal setup jargon");
 console.log("✓ ChatChat toolbar opens the Full Room directly");
 console.log("✓ ChatChat treats provider login as an automatic-resume state, not configuration failure");

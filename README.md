@@ -1,3 +1,5 @@
+> **Current target: a standalone Windows desktop harness.** Start with [Windows desktop installation](desktop/README.md). The browser-extension documentation below describes the earlier delivery path, not the Windows end-user installation.
+
 <div align="center">
   <img src="assets/readme/chatchat-hero-minimal.svg" width="100%" alt="ChatChat — one proposal, independent minds, shared reasoning" />
 
@@ -7,6 +9,15 @@
 
   <p><a href="README.zh-CN.md">简体中文</a> · <a href="docs/BROWSER_EXTENSION.md">Browser Extension</a> · <a href="docs/CONSULTATION_PROTOCOL.md">Protocol</a> · <a href="docs/MEETING_SECRETARIAT.md">Meeting Secretariat</a> · <a href="https://github.com/Gaitxh/Chatchat-/issues">Ideas & Issues</a></p>
 </div>
+
+
+## Windows one-click installation (end users)
+
+Download the maintainer-supplied **`ChatChat-Setup-0.10.1-x64.exe`** for Windows 10/11 x64 and launch Setup. Electron and Chromium are bundled: **no Node, Git, Rust, browser extension, or Developer Mode required**. Click **+** to add provider seats, sign in normally in the app-owned browser, then start a meeting with two verified-ready sources.
+
+**This remains an unsigned development candidate, not a validated stable release.** Windows native runtime tests and packaging have passed; real provider accounts and a complete fresh-install/upgrade/uninstall acceptance test are still outstanding. Do not disable Windows security protections.
+
+See [Windows desktop installation and usage](desktop/README.md). The browser-extension documentation below describes the older delivery route only.
 
 ---
 

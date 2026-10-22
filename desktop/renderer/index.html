@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+    <meta name="color-scheme" content="light">
+    <title>ChatChat · 独立思考，共同讨论</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script type="module" src="./app.mjs"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#proposal">跳到提案输入</a>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><div><strong>ChatChat<span class="preview-tag">桌面预览</span></strong><span class="brand-subtitle">独立思考，共同讨论</span></div></div>
+        <nav aria-label="工作区"><button id="new-meeting" class="button quiet" type="button">＋ 新讨论</button><button id="history-open" class="button quiet" type="button">历史记录 <span id="history-count" class="count">0</span></button><button id="data-folder" class="button icon-button" type="button" aria-label="打开本机数据文件夹" title="打开本机数据文件夹">▤</button></nav>
+      </header>
+
+      <div id="feedback" class="feedback" hidden><p id="feedback-text" role="alert"></p><button id="feedback-dismiss" class="button quiet" type="button" aria-label="关闭操作提示">关闭</button></div>
+      <div id="announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
+      <main class="workspace" id="workspace">
+        <section class="room-heading" aria-label="房间状态">
+          <div><p class="eyebrow">YOUR COUNCIL ROOM</p><h1>把问题放在桌上<span class="heading-dot">。</span></h1></div>
+          <div class="runtime-summary"><span id="runtime-badge" class="status-badge muted">连接中</span><p id="runtime-message">正在连接桌面应用…</p></div>
+        </section>
+
+        <details id="onboarding" class="onboarding" open>
+          <summary><span>从一个问题，到多方观点</span><span class="onboarding-summary">三步开始 <span aria-hidden="true">⌄</span></span></summary>
+          <ol class="onboarding-steps">
+            <li id="step-add"><span class="step-number">01</span><div><strong>邀请至少 2 个 AI</strong><p>选择不同来源，加入平等席位。</p></div></li>
+            <li id="step-login"><span class="step-number">02</span><div><strong>在独立窗口登录</strong><p>登录后自动检查；需要时也可手动检查。</p></div></li>
+            <li id="step-start"><span class="step-number">03</span><div><strong>写下提案，开始讨论</strong><p>先独立思考，再交流；分歧始终保留。</p></div></li>
+          </ol>
+        </details>
+
+        <section class="room" aria-labelledby="room-title">
+          <div class="room-toolbar"><div><h2 id="room-title">讨论室</h2><span id="seat-count" class="secondary">0 / 8 席 · 0 个就绪</span></div><button id="add-seat" class="button secondary-button" type="button">＋ 邀请 AI</button></div>
+          <div class="room-layout">
+            <div id="seats-roof" class="seat-roof" aria-label="上方席位"></div>
+            <div id="seats-left" class="seat-wing seat-wing-left" aria-label="左侧席位"></div>
+            <section class="stage" aria-label="讨论与结果">
+              <div class="stage-top"><div class="stage-indicator" aria-hidden="true"></div><span id="meeting-status">等待你的第一个提案</span><span id="meeting-round" class="secondary"></span></div>
+              <div id="meeting-context" class="meeting-context" hidden><h2 id="meeting-proposal"></h2><p id="meeting-error" class="meeting-error" role="alert" hidden></p></div>
+              <div class="panel-tabs" role="tablist" aria-label="讨论内容"><button id="tab-outcome" class="panel-tab" role="tab" type="button" aria-selected="true" aria-controls="panel-outcome" tabindex="0">各方立场</button><button id="tab-discussion" class="panel-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-discussion" tabindex="-1">讨论过程 <span id="event-count" class="count">0</span></button><button id="export-current" class="button quiet export-button" type="button" disabled>导出记录</button></div>
+              <div id="panel-outcome" class="panel-content" role="tabpanel" aria-labelledby="tab-outcome" tabindex="0"></div>
+              <div id="panel-discussion" class="panel-content" role="tabpanel" aria-labelledby="tab-discussion" tabindex="0" hidden></div>
+              <div class="stage-footer"><span aria-hidden="true">◉</span> 平等席位 · 首轮独立 · 保留异议</div>
+            </section>
+            <div id="seats-right" class="seat-wing seat-wing-right" aria-label="右侧席位"></div>
+          </div>
+          <p class="privacy-note">登录在应用专属浏览器窗口完成。不会读取你现有浏览器的登录信息。网站可能限制自动操作，连接状态不代表回答正确。</p>
+        </section>
+      </main>
+
+      <footer class="composer-dock">
+        <form id="proposal-form" class="composer">
+          <div class="composer-heading"><label for="proposal">你的提案</label><span class="secondary" id="composer-shortcut">Ctrl / ⌘ + Enter 开始</span></div>
+          <textarea id="proposal" name="proposal" rows="2" maxlength="8000" placeholder="例如：这个方案最值得做的部分是什么，又有哪些容易忽略的风险？" aria-describedby="start-help"></textarea>
+          <div class="composer-controls"><div class="composer-options"><label class="select-field" for="mode"><span>讨论方式</span><select id="mode" name="mode"><option value="balanced">均衡讨论</option><option value="explore">探索可能</option><option value="decide">辅助决策</option><option value="verify">核查论据</option><option value="stress_test">压力测试</option></select></label><label class="select-field" for="rounds"><span>最多轮数</span><select id="rounds" name="rounds"><option value="2">2 轮</option><option value="3" selected>3 轮</option><option value="4">4 轮</option><option value="5">5 轮</option></select></label></div><button id="start-meeting" class="button primary-button" type="submit" disabled>开始讨论 <span aria-hidden="true">↗</span></button><button id="stop-meeting" class="button danger-button" type="button" hidden>停止讨论</button></div>
+          <p id="start-help" class="composer-help">正在连接桌面应用…</p>
+        </form>
+      </footer>
+    </div>
+
+    <dialog id="provider-dialog" class="dialog provider-dialog" aria-labelledby="provider-title">
+      <div class="dialog-heading"><div><p class="eyebrow">INVITE AN INDEPENDENT VOICE</p><h2 id="provider-title">邀请 AI 入席</h2></div><button class="button quiet" type="button" data-close="provider-dialog" aria-label="关闭邀请窗口">关闭</button></div>
+      <p class="dialog-intro">选择来源后，会打开独立浏览器窗口。登录后回到这里检查状态。每个来源一个平等席位，最多 8 个。</p>
+      <div id="provider-list" class="provider-list"></div>
+      <details class="custom-provider"><summary>添加其他网站</summary><form id="custom-provider-form"><label for="custom-url">公开 HTTPS 聊天网址</label><div class="custom-input"><input id="custom-url" type="url" inputmode="url" placeholder="https://…" required maxlength="2048" autocomplete="off" spellcheck="false"><button id="custom-add" class="button secondary-button" type="submit">添加</button></div><p class="secondary">自定义网站仅作手动席位；识别到网站不代表可自动讨论。</p></form></details>
+      <p id="provider-error" class="dialog-error" role="alert" hidden></p>
+      <p class="compatibility-note">自动操作仍属实验性。网站可能拒绝自动化或要求额外验证；请以实际检查结果为准。</p>
+    </dialog>
+
+    <dialog id="history-dialog" class="dialog history-dialog" aria-labelledby="history-title">
+      <div class="dialog-heading"><div><p class="eyebrow">SAVED ON THIS DEVICE</p><h2 id="history-title">历史讨论</h2></div><button class="button quiet" type="button" data-close="history-dialog" aria-label="关闭历史记录">关闭</button></div>
+      <p class="dialog-intro">查看本机保存的讨论与各方立场。加载记录只会回看，不会重新运行。</p>
+      <label class="sr-only" for="history-search">搜索历史提案</label><input id="history-search" type="search" placeholder="搜索提案…" autocomplete="off">
+      <div id="history-list" class="history-list"></div><p id="history-error" class="dialog-error" role="alert" hidden></p>
+    </dialog>
+    <noscript>此桌面应用需要 JavaScript。请重新打开已安装的 ChatChat 应用。</noscript>
+  </body>
+</html>

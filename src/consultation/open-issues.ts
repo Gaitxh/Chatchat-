@@ -42,6 +42,7 @@ export function findMeetingIssueResolver(
   if (sourceIndex < 0) return undefined;
 
   for (const candidate of events.slice(sourceIndex + 1)) {
+    if (candidate.provenance?.source === "runtime_fallback") continue;
     if (source.kind === "question") {
       if (!explicitlyAnswersRequest(candidate, source.id)) continue;
       if (target ? candidate.actorId === target.actorId : candidate.actorId !== source.actorId) return candidate;
@@ -63,15 +64,12 @@ export function findMeetingIssueResolver(
     }
 
     if (source.kind === "uncertain" && candidate.actorId === source.actorId) {
+      // Confidence alone describes the new position, not resolution of this
+      // particular concern. Finals carry no exact uncertainty-resolution edge.
       if (
         candidate.kind === "revision"
         && candidate.confidence > source.confidence
-        && (candidate.causedBy ?? []).some((eventId) => eventId !== source.id)
-      ) return candidate;
-      if (
-        candidate.kind === "final_position"
-        && candidate.confidence > source.confidence
-        && normalize(candidate.stance) !== "uncertain"
+        && (candidate.causedBy ?? []).includes(source.id)
       ) return candidate;
     }
   }
@@ -199,8 +197,4 @@ function issueRank(kind: OpenMeetingIssueKind): number {
   if (kind === "challenged_claim") return 1;
   if (kind === "evidence_awaiting_response") return 2;
   return 3;
-}
-
-function normalize(value: string): string {
-  return value.trim().toLocaleLowerCase().replace(/\s+/g, " ");
 }

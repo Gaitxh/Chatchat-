@@ -1,0 +1,21 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import vm from "node:vm";
+import ts from "typescript";
+// Exercise the actual UI functions, not a reimplemented calculation.
+const text = fs.readFileSync(new URL("../src/extension/consultation-panel.tsx", import.meta.url), "utf8");
+const tree = ts.createSourceFile("panel.tsx", text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const selected = tree.statements.filter(node => ts.isFunctionDeclaration(node) && ["liveAlignment", "latestPosition"].includes(node.name?.text));
+assert.equal(selected.length, 2);
+const source = selected.map(node => node.getText(tree)).join("\n");
+const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+const context = vm.createContext({});vm.runInContext(compiled + "\nglobalThis.calculate = liveAlignment;", context);
+const seats = ["a", "b", "c", "d"].map(seatId => ({ seatId }));
+const event = (actorId, stance, fallback = false) => ({ actorId, kind: "final_position", stance, confidence: 0, ...(fallback ? { provenance: { source: "runtime_fallback" } } : {}) });
+assert.equal(context.calculate(seats, seats.map(s => event(s.seatId, "Unavailable", true))), 0);
+assert.equal(context.calculate(seats, [event("a", "A"), event("b", "A"), event("c", "B"), event("d", "A", true)]), 50);
+assert.equal(context.calculate(seats, [event("a", "A")]), 25);
+assert.equal(context.calculate(seats, seats.map(s => event(s.seatId, "Uncertain"))), 100);
+assert.equal(context.calculate(seats.slice(0, 2), [event("a", " A  B "), event("b", "A B")]), 50);
+assert.equal(context.calculate([], []), 0);
+console.log("✓ Actual live UI alignment excludes runtime failures, retains the roster denominator and matches report normalization");

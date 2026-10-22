@@ -159,3 +159,19 @@ function seat(
     failedTurns: finalState === "failed" ? 1 : 0,
   };
 }
+
+// Explicit new runtime provenance must agree with the core, even without an
+// attendance sidecar. Genuine model-authored uncertainty remains a real stance.
+const unavailableReport: typeof report = {
+  ...report, consensusStance: null, consensusRatio: 0, disagreements: [],
+  positions: report.positions.map((position) => ({ ...position, stance: "Uncertain", confidence: 0, provenance: { source: "runtime_fallback" as const } })),
+};
+const unavailableFloor = deriveFinalPositionFloor(unavailableReport, []);
+assert(unavailableFloor.seats.length === report.positions.length && unavailableFloor.fallbackActorIds.length === report.positions.length, "Unavailable seats must remain visible without becoming groups.");
+assert(unavailableFloor.groups.length === 0 && unavailableFloor.largestGroupShare === 0 && unavailableFloor.reportAlignmentMatchesGroups, "All-failure floor must show 0% alignment, matching the report.");
+const realUncertainty = {
+  ...unavailableReport, consensusStance: "Uncertain", consensusRatio: 1,
+  positions: unavailableReport.positions.map(({ provenance: _runtime, ...position }) => position),
+};
+assert(deriveFinalPositionFloor(realUncertainty, []).largestGroupShare === 1, "Zero confidence or Uncertain text alone must not imply runtime failure.");
+console.log("✓ Runtime-unavailable final seats remain visible without false agreement groups");

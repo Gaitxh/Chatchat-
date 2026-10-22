@@ -6,7 +6,13 @@ import {
 import type { AdapterRecipe } from "../src/provider-sdk/recipe.js";
 import { providerCouncilStartUrl } from "../src/provider-sdk/session-runtime.js";
 import type { ProviderProfile } from "../src/provider-sdk/types.js";
-import type { CouncilContext, CouncilEvent } from "../src/core/types.js";
+import type { CouncilContext, CouncilEvent, CouncilParticipantTurnUpdate } from "../src/core/types.js";
+import { CouncilOrchestrator } from "../src/core/orchestrator.js";
+import { deriveCouncilVerdictReadout } from "../src/consultation/council-verdict-readout.js";
+import { deriveConsultationReceipt } from "../src/consultation/receipt.js";
+import { deriveFinalPositionFloor } from "../src/theater/final-position-floor.js";
+import { buildProviderAttendanceAudit } from "../src/theater/provider-attendance.js";
+import type { ProviderExecutionAuditEvent } from "../src/provider-sdk/execution-audit.js";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Assertion failed: ${message}`);
@@ -156,6 +162,63 @@ const agent = new BrowserCouncilAgent(
 const fallback = await agent.respond(context("debate"));
 assert(fallback.length === 1 && fallback[0]?.kind === "uncertain", "Malformed live provider output should degrade to uncertainty instead of crashing the whole Council.");
 assert(fallback[0]?.kind === "uncertain" && fallback[0].confidence === 0, "A bridge failure must never fabricate confidence.");
+
+const failureAudit: ProviderExecutionAuditEvent[] = [];
+const failureUpdates: CouncilParticipantTurnUpdate[] = [];
+function unavailableAgent(id: string): BrowserCouncilAgent {
+  return new BrowserCouncilAgent(
+    { ...profile, profileId: id, displayName: id },
+    { ...recipe, profileId: id },
+    async () => { throw new Error("deterministic transport timeout"); },
+    async () => undefined,
+    (event) => { failureAudit.push(event); },
+  );
+}
+const unavailableCouncil = new CouncilOrchestrator([unavailableAgent("missing-a"), unavailableAgent("missing-b")]);
+const failedRun = await unavailableCouncil.run("Unavailable seats are not model agreement", {
+  maxRounds: 2,
+  onParticipantTurn: (update) => { failureUpdates.push(update); },
+});
+assert(failedRun.report.consensusStance === null && failedRun.report.consensusRatio === 0, "Two failed providers must have no model leading stance and zero authored alignment.");
+assert(failedRun.report.confidence === 0 && failedRun.report.disagreements.length === 0, "Failures must not invent confidence or model dissent.");
+assert(failedRun.report.stopReason === "round_budget", "Execution failure must not produce stable convergence.");
+assert(failedRun.report.positions.length === 2 && failedRun.blackboard.events.length === 6, "Every unavailable seat and all public fallback history must remain visible.");
+assert(failureUpdates.filter((update) => update.state === "failed").length === 6, "Fallback turns must report execution failure.");
+assert(!failureUpdates.some((update) => update.state === "completed"), "A published runtime placeholder is not a completed model turn.");
+assert(deriveCouncilVerdictReadout(failedRun.report, failedRun.blackboard.events).attentionState === "no-leading-stance", "All failed providers must not yield a stable-alignment verdict.");
+const failureReceipt = deriveConsultationReceipt(failedRun.report, failedRun.blackboard.events);
+assert(failureReceipt.consensusRatio === 0 && failureReceipt.participantNames.length === 2, "The share receipt must preserve unavailable seats without claiming authored alignment.");
+const failureAttendance = buildProviderAttendanceAudit(unavailableCouncil.participants, [], failureAudit, failedRun.blackboard.events);
+assert(failureAttendance.fallbackTurns === 6 && failureAttendance.verifiedTurns === 0, "Failure provenance must preserve the existing fallback attendance receipts.");
+const failedFloor = deriveFinalPositionFloor(failedRun.report, failedRun.blackboard.events, failureAttendance);
+assert(failedFloor.seats.length === 2 && failedFloor.seats.every((seat) => seat.recordSource === "fallback_placeholder"), "Unavailable Finals must remain visible as runtime placeholders on the floor.");
+assert(failedFloor.unexplainedFinalShiftActorIds.length === 0, "A failure must not invent a model stance change.");
+
+const uncertainAudit: ProviderExecutionAuditEvent[] = [];
+const uncertainUpdates: CouncilParticipantTurnUpdate[] = [];
+function genuinelyUncertainAgent(id: string): BrowserCouncilAgent {
+  return new BrowserCouncilAgent(
+    { ...profile, profileId: id, displayName: id },
+    { ...recipe, profileId: id },
+    async (_profile, _recipe, prompt) => ({ responseText: JSON.stringify({ contributions: [prompt.includes("PHASE: final")
+      ? { kind: "final_position", stance: "Uncertain", content: "I have no basis for a choice.", confidence: 0, caveats: ["Missing evidence."] }
+      : { kind: "uncertain", content: "I have no basis for a choice.", confidence: 0 }] }) }),
+    async () => undefined,
+    (event) => { uncertainAudit.push(event); },
+  );
+}
+const uncertainCouncil = new CouncilOrchestrator([genuinelyUncertainAgent("uncertain-a"), genuinelyUncertainAgent("uncertain-b")]);
+const uncertainRun = await uncertainCouncil.run("Genuine zero-confidence model uncertainty", {
+  maxRounds: 2,
+  onParticipantTurn: (update) => { uncertainUpdates.push(update); },
+});
+assert(uncertainRun.report.consensusStance === "Uncertain" && uncertainRun.report.consensusRatio === 1, "Genuine zero-confidence uncertainty must count as participant speech.");
+assert(uncertainRun.report.confidence === 0 && uncertainRun.report.positions.every((position) => position.caveats.includes("Missing evidence.")), "Genuine uncertainty and its caveats must survive the final report.");
+assert(uncertainUpdates.filter((update) => update.state === "completed").length === 6 && !uncertainUpdates.some((update) => update.state === "failed"), "Model uncertainty must not be mistaken for execution failure.");
+const uncertainAttendance = buildProviderAttendanceAudit(uncertainCouncil.participants, [], uncertainAudit, uncertainRun.blackboard.events);
+assert(uncertainAttendance.verifiedTurns === 6 && uncertainAttendance.fallbackTurns === 0, "Deterministic parsed turns must retain their execution receipts without claiming live provider validation.");
+const uncertainFloor = deriveFinalPositionFloor(uncertainRun.report, uncertainRun.blackboard.events, uncertainAttendance);
+assert(uncertainFloor.reportAlignmentMatchesGroups && uncertainFloor.fallbackActorIds.length === 0, "Genuine uncertain Finals must stay distinct from fallback seats.");
 
 let repairCalls = 0;
 const repairedAgent = new BrowserCouncilAgent(

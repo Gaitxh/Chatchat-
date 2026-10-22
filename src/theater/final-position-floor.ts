@@ -33,6 +33,8 @@ export interface FinalPositionRevisionStep {
 
 export interface FinalPositionSeat {
   actorId: string;
+  /** Explicit new-record runtime provenance, not a confidence heuristic. */
+  runtimeFallback: boolean;
   participantName: string;
   providerId: string;
   stance: string;
@@ -122,6 +124,7 @@ export function deriveFinalPositionFloor(
 
   const grouped = new Map<string, FinalPositionSeat[]>();
   for (const seat of seats) {
+    if (seat.runtimeFallback) continue;
     const current = grouped.get(seat.stanceKey) ?? [];
     current.push(seat);
     grouped.set(seat.stanceKey, current);
@@ -154,7 +157,7 @@ export function deriveFinalPositionFloor(
   );
 
   const minorityActorIds = seats
-    .filter((seat) => reportLeadingKey !== null && seat.stanceKey !== reportLeadingKey)
+    .filter((seat) => !seat.runtimeFallback && reportLeadingKey !== null && seat.stanceKey !== reportLeadingKey)
     .map((seat) => seat.actorId);
   const unexplainedFinalShiftActorIds = seats.filter((seat) => seat.unexplainedFinalShift).map((seat) => seat.actorId);
   const degradedActorIds = seats.filter((seat) => isExecutionDegraded(seat.executionState)).map((seat) => seat.actorId);
@@ -212,7 +215,8 @@ function buildSeat(
   const changedExplicitStance = revisionSteps.some((step) =>
     step.fromStance !== undefined && normalizeFinalStance(step.fromStance) !== normalizeFinalStance(step.toStance),
   );
-  const execution = finalExecutionState(attendance);
+  const runtimeFallback = position.provenance?.source === "runtime_fallback" || finalEvent?.provenance?.source === "runtime_fallback";
+  const execution = runtimeFallback ? { ...finalExecutionState(attendance), state: "fallback" as const } : finalExecutionState(attendance);
   const recordSource = finalRecordSource(execution.state);
   const stanceDiffersFromLatestPreFinal = Boolean(
     latestPreFinal
@@ -223,6 +227,7 @@ function buildSeat(
 
   return {
     actorId: position.participant.id,
+    runtimeFallback,
     participantName: position.participant.name,
     providerId: position.participant.provider,
     stance: position.stance,

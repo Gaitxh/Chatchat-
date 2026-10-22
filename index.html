@@ -1,26 +1,45 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light" />
-    <meta name="theme-color" content="#f7f5f0" />
-    <meta name="description" content="ChatChat — browser-first local AI consultation." />
-    <title>ChatChat · AI Consultation</title>
-    <script>
-      const params = new URLSearchParams(location.search);
-      if (!params.has("showcase")) {
-        params.set("showcase", "consultation");
-        params.set("lang", navigator.language?.toLowerCase().startsWith("zh") ? "zh" : "en");
-        history.replaceState(null, "", `${location.pathname}?${params.toString()}`);
-      }
-    </script>
-    <script src="/consultation-showcase-bootstrap.js"></script>
-  </head>
-  <body>
-    <div id="extension-root"></div>
-    <div id="consultation-theater-root"></div>
-    <script type="module" src="/src/extension/consultation-theater-portal.tsx"></script>
-    <script type="module" src="/src/extension/consultation-panel.tsx"></script>
-  </body>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light" />
+  <meta name="description" content="ChatChat 本地协商会议室安装说明 / local consultation room installation guide." />
+  <title>ChatChat · 本地安装 / Local installation</title>
+  <link rel="stylesheet" href="/src/local-entry.css" />
+</head>
+<body>
+  <main>
+    <header><span class="wordmark">ChatChat</span><span class="badge">本地窗口预览版 · Developer preview</span></header>
+    <section aria-labelledby="intro">
+      <p class="eyebrow">一个问题，多个独立观点。</p>
+      <h1 id="intro">让 AI 坐到同一张桌前。</h1>
+      <p class="lead">选择你自己的模型账号。先独立回答，再相互质疑、补证和修改立场。</p>
+      <p class="notice" role="note"><strong>这里是安装说明，不是真实会议。</strong>本页面不会调用模型，也不会把模拟发言展示成真实 AI 回答。</p>
+    </section>
+    <section aria-labelledby="install">
+      <h2 id="install">本地使用，不需要开发环境</h2>
+      <ol>
+        <li><strong>解压预构建安装包。</strong>打开包里的 <code>START-HERE.html</code>，将整个目录放在一个固定位置。无需安装 Node.js、Git 或 Rust。</li>
+        <li><strong>手动加载扩展。</strong>在 Chrome 或 Edge 的扩展管理页打开开发者模式，选择“加载已解压的扩展程序”，选中包内 <code>extension/</code> 目录。</li>
+        <li><strong>打开独立会议窗口。</strong>固定 ChatChat 工具栏图标并点击它。使用已有模型登录所在的同一浏览器个人资料；不同个人资料的登录不会自动共享。</li>
+        <li><strong>选择席位，再提问。</strong>用“＋”选择 AI 网站。未登录时在原网站正常登录；完成连接检查后，输入问题并开始协商。</li>
+      </ol>
+      <p class="fine">这是需要手动加载的浏览器驱动预览版，不是已签名的原生桌面安装器，也不代表已经上架扩展商店。仅打开普通网页不能控制你的模型标签页。</p>
+    </section>
+    <section class="privacy" aria-labelledby="privacy">
+      <h2 id="privacy">“本地”指什么？</h2>
+      <p>会议编排和历史保存在本机浏览器中；使用在线模型时，问题与必要的讨论上下文仍会发送给所选模型网站。ChatChat 不搬运浏览器 Cookie，也不要求你把网站密码输入到 ChatChat。</p>
+      <p>网站入口被识别，不等于已经通过真实收发验证。登录、站点权限、连接检查和真实协商验收是不同状态。</p>
+    </section>
+    <details lang="en"><summary>English installation and limits</summary>
+      <h2>Local consultation room — developer preview</h2>
+      <p>This page is installation guidance, not a live meeting or simulated model conversation.</p>
+      <p>Extract the prebuilt package into a stable folder and open its START-HERE.html. In Chrome or Edge, enable Developer mode and load the included extension/ folder. Pin the ChatChat toolbar icon and open the meeting window. Choose your AI seats, sign in normally on each provider website when necessary, complete the connection checks, and submit a proposal.</p>
+      <p>End users do not need Node.js, Git, Rust, administrator rights, or a local web server. This preview still requires manual extension loading. It is not a signed native desktop installer or a published store listing.</p>
+      <p>Use the same browser profile as your existing AI logins. Local orchestration and history do not make online model inference offline: selected providers receive the proposal and relevant discussion. Site recognition is not proof of compatibility or readiness.</p>
+    </details>
+    <footer>开发者：源码构建见仓库 README。真实会议从已安装扩展进入；合成测试须明确标识。</footer>
+  </main>
+</body>
 </html>

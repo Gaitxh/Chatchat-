@@ -130,16 +130,43 @@ html[data-surface="web-app"] .quick-open {
   display: none !important;
 }
 
-/* Fresh users get a focused launch lobby, not an empty control room. */
+/* Empty rooms keep the normal + Invite AI entry visible. Starter assembly is optional. */
 html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] #spectator-mode-root,
-html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] .participants-card,
 html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] #consultation-history-root,
 html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] .setup-card {
   display: none !important;
 }
 
-html[data-surface="web-app"][data-chatchat-onboarding="zero-config"] .proposal-card {
-  grid-column: 1 / -1;
+html[data-surface="web-app"] .fresh-seat-notice,
+html[data-surface="web-app"] .custom-fresh-notice {
+  margin: 9px 0;
+  color: #68645d;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+html[data-surface="web-app"] .custom-fresh-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+html[data-surface="web-app"] .fresh-provider-choices {
+  margin-top: 10px;
+  font-size: 11px;
+}
+
+html[data-surface="web-app"] .fresh-provider-choices summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+html[data-surface="web-app"] .fresh-provider-choices > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
 }
 
 html[data-surface="web-app"] .proposal-card textarea {

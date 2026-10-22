@@ -85,12 +85,20 @@ export function FinalPositionFloor({
           <FinalGroup
             key={group.id}
             group={group}
-            seats={model.seats.filter((seat) => seat.stanceKey === group.stanceKey)}
+            seats={model.seats.filter((seat) => group.memberActorIds.includes(seat.actorId))}
             totalParticipants={model.participantCount}
             zh={zh}
           />
         ))}
       </div>
+
+      {model.seats.some((seat) => seat.runtimeFallback) ? (
+        <section className="final-position-group" data-runtime-unavailable="true">
+          <h3>{zh ? "未取得最终回答的席位" : "Seats without a final model answer"}</h3>
+          <p>{zh ? "运行失败保留为记录，不计入模型一致意见。" : "Runtime failures remain visible, but are not agreement votes."}</p>
+          {model.seats.filter((seat) => seat.runtimeFallback).map((seat) => <FinalSeat key={seat.actorId} seat={seat} zh={zh} />)}
+        </section>
+      ) : null}
 
       {model.unexplainedFinalShiftActorIds.length ? (
         <div className="final-position-floor__unexplained" data-final-position-unexplained="true">

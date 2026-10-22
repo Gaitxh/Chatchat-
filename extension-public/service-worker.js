@@ -3,6 +3,18 @@ import {
   observeTextSource,
   publicEvidenceUrl,
 } from "./source-extract.js";
+import {
+  createRoomLauncher,
+  createRoomMessageListener,
+  createWelcomeInstaller,
+} from "./room-launcher.js";
+
+const appUrl = chrome.runtime.getURL("app/app.html");
+const openFullRoom = createRoomLauncher(chrome, {
+  appUrl,
+  createTab: () => chrome.tabs.create({ url: appUrl, active: true }),
+});
+const showWelcomeOnInstall = createWelcomeInstaller(chrome);
 
 const MAX_EVIDENCE_BYTES = 256 * 1024;
 const EVIDENCE_TIMEOUT_MS = 8_000;
@@ -19,8 +31,11 @@ const configurePrimaryAction = async () => {
   }
 };
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   void configurePrimaryAction();
+  void showWelcomeOnInstall(details).catch((error) => {
+    console.warn("ChatChat could not open its local welcome page", error);
+  });
 });
 
 chrome.runtime.onStartup.addListener(() => {
@@ -28,8 +43,12 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 chrome.action.onClicked.addListener(() => {
-  void openFullRoom();
+  void openFullRoom().catch((error) => {
+    console.warn("ChatChat could not open the Full Room", error);
+  });
 });
+
+chrome.runtime.onMessage.addListener(createRoomMessageListener(chrome, openFullRoom));
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === CLAIM_PROVIDER_SELF_HEALING) {
@@ -76,24 +95,6 @@ async function claimProviderSelfHealing(message) {
   });
   recoveryClaimQueue = task.then(() => undefined, () => undefined);
   return task;
-}
-
-async function openFullRoom() {
-  const appUrl = chrome.runtime.getURL("app/app.html");
-  try {
-    const tabs = await chrome.tabs.query({});
-    const existing = tabs.find((tab) => typeof tab.url === "string" && tab.url.startsWith(appUrl));
-    if (existing?.id) {
-      await chrome.tabs.update(existing.id, { active: true });
-      if (typeof existing.windowId === "number" && chrome.windows?.update) {
-        await chrome.windows.update(existing.windowId, { focused: true }).catch(() => undefined);
-      }
-      return;
-    }
-    await chrome.tabs.create({ url: appUrl, active: true });
-  } catch (error) {
-    console.warn("ChatChat could not open the Full Room", error);
-  }
 }
 
 async function verifyEvidenceSource(rawUrl) {

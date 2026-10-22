@@ -14,3 +14,7 @@ src-tauri/gen/
 !.vscode/extensions.json
 .chatchat/
 profiles/
+
+dist-web/
+
+artifacts/
