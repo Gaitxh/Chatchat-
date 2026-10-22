@@ -562,6 +562,7 @@ test('optional real-model synthesis requires an explicit click, preserves dissen
   const complete = await finished(controller);
   assert.equal(complete.meeting.status, 'completed');
   assert.equal(complete.synthesisAvailable, true);
+  assert.equal(complete.synthesisPlannedRequests, 2);
   const events = complete.meeting.events.filter((e) => e.kind === 'final_position' && e.provenance?.source !== 'runtime_fallback');
   assert.ok(events.length >= 2);
   const callsBefore = sent(runtime).length;
@@ -602,6 +603,7 @@ test('optional real-model synthesis requires an explicit click, preserves dissen
   await controller.loadMeeting(originalId);
   assert.equal(controller.getState().meeting.synthesis.status, 'reviewed');
   assert.equal(controller.getState().synthesisAvailable, false);
+  assert.equal(controller.getState().synthesisPlannedRequests, 0);
   assert.equal(sent(runtime).length, callsBefore + 2, 'Historical loading must never resend synthesis');
 });
 

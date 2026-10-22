@@ -218,9 +218,11 @@ test('optional reviewed answer requires an explicit click, links real meeting ev
     },
   };
   state.synthesisAvailable = true;
+  state.synthesisPlannedRequests = 2;
   await page.evaluate((updated) => window.fixturePush(updated), state);
   const synthButton = page.getByRole('button', { name: /生成复核答案/ });
   assert.equal(await synthButton.count(), 1);
+  assert.match(await synthButton.textContent(), /最多另发 2 次模型消息/);
   assert.match(await page.locator('.synthesis-help').textContent(), /明确发起/);
   const callsBefore = await page.evaluate(() => window.fixtureCalls);
   assert.equal(callsBefore.filter((x) => x[0] === 'synthesizeMeeting').length, 0);

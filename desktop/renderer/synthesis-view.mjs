@@ -23,7 +23,12 @@ export function renderSynthesisView({ meeting, state, actorName, node, pill, but
     wrap.append(node('p', 'synthesis-help',
       '现有报告已记录每个 AI 的实际最终立场。额外的综合答案必须由你明确发起：一席起草，其他可用席位交叉审查，不等于事实核验。'));
     if (state.synthesisAvailable) {
-      wrap.append(button('生成复核答案 · 需额外模型调用', 'synthesizeMeeting', undefined, 'button primary-button'));
+      const planned = Number.isInteger(state.synthesisPlannedRequests)
+        && state.synthesisPlannedRequests >= 2 && state.synthesisPlannedRequests <= 8
+        ? '最多另发 ' + state.synthesisPlannedRequests + ' 次模型消息'
+        : '需额外模型调用';
+      wrap.append(button('生成复核答案 · ' + planned,
+        'synthesizeMeeting', undefined, 'button primary-button'));
       wrap.append(node('p', 'secondary synthesis-note',
         '只在本次真实会议刚结束且原聊天仍有效时可用。历史回放不会重新连接或调用模型。'));
     } else {

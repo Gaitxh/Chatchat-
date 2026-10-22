@@ -317,16 +317,19 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
     if (quarantinedArchives.length) {
       info.message = [info.message, `${quarantinedArchives.length} 份异常历史记录已保留原文件（.corrupt- 后缀），并暂停加载。请先导出其他记录，再检查本地数据文件夹。`].filter(Boolean).join(' ');
     }
-    const canSynthesize = Boolean(meeting?.status === 'completed'
+    const eligibleForSynthesis = meeting?.status === 'completed'
       && synthesisEligibleMeetingId === meeting.id && !meeting.synthesis
-      && !active && !mutation && !storageError
-      && participatingAuthors(meeting.report,
-        [...seats.values()].filter((seat) => seat.status === 'ready')).length >= 2);
-    // Transient capability belongs to the live UI state, never the archive's
-    // immutable meeting evidence (historical replay must match original data).
+      && !active && !mutation && !storageError;
+    const candidateAuthors = eligibleForSynthesis
+      ? participatingAuthors(meeting.report,
+        [...seats.values()].filter((seat) => seat.status === 'ready'))
+      : [];
+    const canSynthesize = candidateAuthors.length >= 2;
+    // A draft plus (N - 1) peer reviews means *at most* N more website
+    // messages. The number is UI metadata, not part of immutable history.
     return copy({
       version, runtime: info, providers: catalog(), seats: [...seats.values()], meeting,
-      synthesisAvailable: canSynthesize,
+      synthesisAvailable: canSynthesize, synthesisPlannedRequests: canSynthesize ? candidateAuthors.length : 0,
       history: [...archives.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 200),
       busy: Boolean(active || mutation),
     });
