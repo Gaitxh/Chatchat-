@@ -102,7 +102,7 @@ const archivedPath = (dataDir, id) => join(dataDir, 'controller', 'meetings', `$
 test('empty startup is honest, detached, and opens no model windows', async (t) => {
   const { controller, runtime } = await fixture(t);
   const state = controller.getState();
-  assert.equal(state.version, '0.10.3');
+  assert.equal(state.version, '0.10.4');
   assert.equal(state.meeting, null);
   assert.deepEqual(state.seats, []);
   assert.equal(state.busy, false);
@@ -823,4 +823,143 @@ test('unfinished meeting cannot silently produce a partial backup', async (t) =>
   const exported = await controller.backupData();
   assert.equal(exported.meetingCount, 1);
   assert.equal(JSON.parse(exported.content).meetings[0].meeting.status, 'cancelled');
+});
+
+test('backup restore imports historical meetings without sending, opening or reattaching any model seat', async (t) => {
+  const { controller: exporter, runtime: originalRuntime } = await fixture(t);
+  await ready(exporter);
+  const alpha = exporter.startMeeting(input({ proposal: 'Import historic alpha' })).meeting.id;
+  await finished(exporter);
+  await exporter.newMeeting();
+  const beta = exporter.startMeeting(input({ proposal: 'Import historic beta' })).meeting.id;
+  await finished(exporter);
+  const backup = await exporter.backupData();
+  const exportedCalls = originalRuntime.calls.length;
+
+  const importDir = await mkdtemp(join(tmpdir(), 'chatchat-restore-target-'));
+  const importedRuntime = new Runtime();
+  const receiver = createController({ runtime: importedRuntime, dataDir: importDir, core });
+  t.after(async () => { await receiver.close(); await rm(importDir, {recursive:true,force:true}); });
+  const preview = receiver.previewRestoreData(backup.content);
+  assert.deepEqual(preview, {
+    meetingCount: 2, newMeetings: 2, existingMeetings: 0,
+    ignoredSeatBookmarks: 2, excludedDamagedInSource: 0,
+  });
+  assert.deepEqual(importedRuntime.calls, []);
+  const result = await receiver.restoreBackupData(backup.content);
+  assert.equal(result.imported, 2);
+  assert.equal(result.existingMeetings, 0);
+  assert.equal(receiver.getState().history.length, 2);
+  assert.deepEqual(receiver.getState().seats, [], 'Only meeting archives are restored, NOT login seats');
+  assert.equal(receiver.getState().synthesisAvailable, false);
+  assert.deepEqual(importedRuntime.calls, [], 'Restore must NEVER prepare, send, or open Provider chats');
+  assert.equal(originalRuntime.calls.length, exportedCalls);
+  const loaded = await receiver.loadMeeting(alpha);
+  assert.equal(loaded.meeting.proposal, 'Import historic alpha');
+  assert.equal(loaded.meeting.status, 'completed');
+  assert.match(await receiver.exportData(beta), /Import historic beta/);
+  assert.equal(receiver.getState().synthesisAvailable, false);
+  assert.equal(receiver.previewRestoreData(backup.content).newMeetings, 0);
+  const second = await receiver.restoreBackupData(backup.content);
+  assert.equal(second.imported, 0);
+  assert.equal(second.existingMeetings, 2);
+  assert.equal(receiver.getState().history.length, 2);
+  const newRuntime = new Runtime();
+  const afterRestart = createController({ runtime: newRuntime, dataDir: importDir, core });
+  t.after(() => afterRestart.close());
+  assert.equal(afterRestart.getState().history.length, 2);
+  assert.deepEqual(newRuntime.calls, []);
+});
+
+test('restoration rejects self-consistent but unfinished or malformed meeting snapshots before writing any history', async (t) => {
+  const { controller: exporter } = await fixture(t);
+  await ready(exporter);
+  const id = exporter.startMeeting(input()).meeting.id;
+  await finished(exporter);
+  const original = JSON.parse((await exporter.backupData()).content);
+  const { buildMeetingBackup } = await import('../main/backup.mjs');
+  const targetDir = await mkdtemp(join(tmpdir(), 'chatchat-malicious-restore-'));
+  const runtime = new Runtime();
+  const target = createController({ runtime, dataDir: targetDir, core });
+  t.after(async () => { await target.close();await rm(targetDir,{recursive:true,force:true}); });
+  const beforeFiles = await readdir(join(targetDir,'controller','meetings'));
+
+  const damaged = structuredClone(original);
+  damaged.meetings[0].meeting.status = 'running';
+  const unfinished = buildMeetingBackup(damaged);
+  assert.throws(() => target.previewRestoreData(unfinished), /unfinished/);
+  await assert.rejects(target.restoreBackupData(unfinished), /unfinished/);
+
+  const badActor = structuredClone(original);
+  badActor.meetings[0].meeting.events[0].actorId = 42;
+  const invalid = buildMeetingBackup(badActor);
+  assert.throws(() => target.previewRestoreData(invalid), /meeting event/);
+  await assert.rejects(target.restoreBackupData(invalid), /meeting event/);
+  const invalidPosition = structuredClone(original);
+  invalidPosition.meetings[0].meeting.report.positions[0].participant = null;
+  const badPositionBackup = buildMeetingBackup(invalidPosition);
+  assert.throws(() => target.previewRestoreData(badPositionBackup), /participant final position/);
+  await assert.rejects(target.restoreBackupData(badPositionBackup), /participant final position/);
+  const corrupted = JSON.stringify({ ...original, injectedCookie: 'do-not-restore' });
+  assert.throws(() => target.previewRestoreData(corrupted), /integrity/);
+  assert.equal(target.getState().history.length, 0);
+  assert.deepEqual(await readdir(join(targetDir,'controller','meetings')),beforeFiles);
+  assert.deepEqual(runtime.calls, []);
+  assert.ok(!((await readdir(join(targetDir,'controller','meetings'))).includes(id+'.json')));
+});
+
+test('a colliding meeting ID is not overwritten by a user-selected backup', async (t) => {
+  const { controller: original, dataDir, runtime } = await fixture(t);
+  await ready(original);
+  const id = original.startMeeting(input()).meeting.id;
+  await finished(original);
+  const currentBytes = await readFile(archivedPath(dataDir,id),'utf8');
+  const backup = await original.backupData();
+  const preview = original.previewRestoreData(backup.content);
+  assert.equal(preview.newMeetings,0);
+  assert.equal(preview.existingMeetings,1);
+  const restore = await original.restoreBackupData(backup.content);
+  assert.equal(restore.imported,0);
+  assert.equal(restore.existingMeetings,1);
+  assert.equal(await readFile(archivedPath(dataDir,id),'utf8'),currentBytes);
+  assert.equal(original.getState().history.length,1);
+  assert.equal(runtime.calls.filter((c)=>c.method==='send').length > 0,true);
+});
+
+test('closing during backup restoration aborts and leaves no partially imported history', async (t) => {
+  const {controller: exporter}=await fixture(t);
+  await ready(exporter);
+  exporter.startMeeting(input({proposal:'Restore should not survive close races'}));
+  await finished(exporter);
+  const content=(await exporter.backupData()).content;
+  const dataDir=await mkdtemp(join(tmpdir(),'chatchat-shutdown-restore-'));
+  const runtime=new Runtime();
+  const receiver=createController({runtime,dataDir,core});
+  t.after(async()=>{await receiver.close();await rm(dataDir,{recursive:true,force:true});});
+  const pending=receiver.restoreBackupData(content);
+  const closing=receiver.close();
+  await assert.rejects(pending,/cancelled|closed|unavailable|overwritten/i);
+  await closing;
+  assert.equal((await readdir(join(dataDir,'controller','meetings'))).filter((p)=>p.endsWith('.json')).length,0);
+  assert.deepEqual(runtime.calls.filter((x)=>x.method==='send'||x.method==='prepare'),[]);
+});
+
+
+test('startup cleans only abandoned app-created restoration staging files and preserves real history', async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'chatchat-orphan-restore-'));
+  t.after(async () => rm(dir, {recursive:true,force:true}));
+  const folder = join(dir, 'controller', 'meetings');
+  await mkdir(folder, {recursive:true});
+  const suffix = '9aa13d9d-1234-4dcb-a5ea-56d1527d05d9';
+  const orphan = join(folder, 'meeting-' + suffix + '.json.' + suffix + '.restore.tmp');
+  const unrelated = join(folder, 'meeting-' + suffix + '.json.corrupt-' + suffix);
+  await writeFile(orphan, '{private forgotten staging material}');
+  await writeFile(unrelated, '{original corrupted archive evidence}');
+  const runtime = new Runtime();
+  const controller = createController({runtime,dataDir:dir,core});
+  t.after(() => controller.close());
+  assert.equal(existsSync(orphan),false);
+  assert.equal(await readFile(unrelated,'utf8'),'{original corrupted archive evidence}');
+  assert.deepEqual(runtime.calls,[]);
+  assert.equal(controller.getState().history.length,0);
 });

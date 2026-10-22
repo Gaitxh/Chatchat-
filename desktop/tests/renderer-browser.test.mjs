@@ -8,7 +8,7 @@ import { chromium } from 'playwright-core';
 const browserPath = process.env.CHATCHAT_RENDERER_BROWSER;
 const skip = browserPath ? false : 'Set CHATCHAT_RENDERER_BROWSER to run the isolated, sandboxed browser UI checks.';
 const fixtures = {
-  version: '0.10.3', runtime: { available: true, label: '测试浏览器', message: '隔离测试环境' },
+  version: '0.10.4', runtime: { available: true, label: '测试浏览器', message: '隔离测试环境' },
   providers: [
     { id: 'alpha', name: '测试甲', url: 'https://alpha.example/', automation: 'experimental' },
     { id: 'beta', name: '测试乙', url: 'https://beta.example/', automation: 'experimental' },
@@ -43,7 +43,7 @@ async function openRenderer(t, { bridge = true, viewport = { width: 1100, height
       onState: (callback) => { listener = callback; return () => { listener = undefined; }; },
       getState: async () => structuredClone(state),
     };
-    for (const method of ['addSeat', 'openSeat', 'checkSeat', 'removeSeat', 'startMeeting', 'synthesizeMeeting', 'stopMeeting', 'newMeeting', 'loadMeeting', 'exportMeeting', 'backupLocalData', 'verifyBackupFile', 'openDataFolder']) {
+    for (const method of ['addSeat', 'openSeat', 'checkSeat', 'removeSeat', 'startMeeting', 'synthesizeMeeting', 'stopMeeting', 'newMeeting', 'loadMeeting', 'exportMeeting', 'backupLocalData', 'verifyBackupFile', 'previewRestoreBackup', 'confirmRestoreBackup', 'openDataFolder']) {
       window.chatChat[method] = async (arg) => {
         window.fixtureCalls.push([method, arg]);
         if (window.fixtureFailure === method) throw new Error('测试错误：请完成网站验证');
@@ -73,6 +73,15 @@ async function openRenderer(t, { bridge = true, viewport = { width: 1100, height
         if (method === 'exportMeeting' || method === 'backupLocalData') return { saved: !window.fixtureCancelExport };
         if (method === 'openDataFolder') return { opened: true };
         if (method === 'verifyBackupFile') return { verified: true, meetingCount: 1, seatBookmarkCount: 0, skippedDamagedArchives: 0 };
+        if (method === 'previewRestoreBackup') return {
+          selected: true, previewToken: 'a'.repeat(36), meetingCount: 3,
+          newMeetings: 2, existingMeetings: 1, ignoredSeatBookmarks: 2,
+          excludedDamagedInSource: 0,
+        };
+        if (method === 'confirmRestoreBackup') return {
+          restored: true, imported: 2, existingMeetings: 1,
+          ignoredSeatBookmarks: 2, excludedDamagedInSource: 0,
+        };
         return push();
       };
     }
@@ -278,4 +287,27 @@ test('history backup is explicit, excludes website logins and never starts Provi
   assert.equal(after.some(([method])=>method==='startMeeting'),false);
   assert.equal(after.some(([method])=>method==='synthesizeMeeting'),false);
   assert.deepEqual(errors, []);
+});
+
+
+test('restoring a local backup requires preview and explicit confirmation; never starts a model chat', { skip }, async (t) => {
+  const { page, errors } = await openRenderer(t);
+  await page.locator('#history-open').click();
+  await page.locator('#history-dialog').waitFor({state:'visible'});
+  const confirm=page.locator('#confirm-restore');
+  assert.equal(await confirm.isVisible(),false);
+  await page.locator('#preview-restore').click();
+  await page.locator('#restore-preview').waitFor({state:'visible'});
+  assert.match(await page.locator('#restore-preview').innerText(), /可新增 2 场/);
+  assert.match(await page.locator('#restore-preview').innerText(), /不恢复 Cookie/);
+  assert.equal(await confirm.isEnabled(),true);
+  await confirm.click();
+  await page.locator('#restore-preview').waitFor({state:'hidden'});
+  const calls=await page.evaluate(()=>window.fixtureCalls);
+  assert.equal(calls.filter(([method])=>method==='previewRestoreBackup').length,1);
+  const imports=calls.filter(([method])=>method==='confirmRestoreBackup');
+  assert.equal(imports.length,1);
+  assert.equal(imports[0][1],'a'.repeat(36));
+  assert.ok(!calls.some(([method])=>['startMeeting','openSeat','synthesizeMeeting'].includes(method)));
+  assert.deepEqual(errors,[]);
 });

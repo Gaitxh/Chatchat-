@@ -32,6 +32,30 @@ let activeTab = 'outcome';
 let eventLimit = 40;
 let lastMeetingId = null;
 let previousStatus = null;
+let restorePreview = null;
+function showRestorePreview(result) {
+  restorePreview = result?.selected ? result : null;
+  const label = $('restore-preview');
+  const button = $('confirm-restore');
+  if (!restorePreview) {
+    label.textContent = '';
+    label.hidden = true;
+    button.hidden = true;
+    button.disabled = true;
+    return;
+  }
+  label.textContent = '备份校验通过：共 ' + restorePreview.meetingCount + ' 场会议，可新增 '
+    + restorePreview.newMeetings + ' 场，跳过已有 '
+    + restorePreview.existingMeetings + ' 场。忽略 '
+    + restorePreview.ignoredSeatBookmarks
+    + ' 个席位书签，不恢复 Cookie 或网页登录。'
+    + (restorePreview.excludedDamagedInSource > 0
+      ? ' 注意：源备份未包含 ' + restorePreview.excludedDamagedInSource + ' 份受损历史。' : '')
+    + ' 点击确认还会出现系统确认框。';
+  label.hidden = false;
+  button.hidden = restorePreview.newMeetings === 0;
+  button.disabled = restorePreview.newMeetings === 0 || !connected || state.busy || pending.size > 0;
+}
 let lastAnnouncement = '';
 const fingerprints = new Map();
 
@@ -77,6 +101,7 @@ const session = createSession({
   },
   onError: (text) => message(text),
   onNotice: (text) => message(text, false),
+  onRestorePreview: (result) => showRestorePreview(result),
 });
 
 function unavailableForRoster() { return !connected || pending.size > 0 || state.busy || isRunning(state); }
@@ -303,6 +328,8 @@ function renderHistory() {
   }
   $('backup-all').disabled = unavailable || (!state.history.length && !state.seats.length);
   $('verify-backup').disabled = unavailable;
+  $('preview-restore').disabled = unavailable;
+  $('confirm-restore').disabled = unavailable || !restorePreview || restorePreview.newMeetings === 0;
 }
 
 function renderComposer() {
@@ -422,6 +449,16 @@ $('add-seat').addEventListener('click', () => openDialog('provider-dialog'));
 $('history-open').addEventListener('click', () => openDialog('history-dialog'));
 $('backup-all').addEventListener('click', () => void command('backupLocalData'));
 $('verify-backup').addEventListener('click', () => void command('verifyBackupFile'));
+$('preview-restore').addEventListener('click', () => {
+  showRestorePreview(null);
+  void command('previewRestoreBackup');
+});
+$('confirm-restore').addEventListener('click', async () => {
+  const token = restorePreview?.previewToken;
+  if (!token || !restorePreview?.newMeetings) return;
+  try { await command('confirmRestoreBackup', token); }
+  finally { showRestorePreview(null); }
+});
 $('data-folder').addEventListener('click', () => void command('openDataFolder'));
 $('feedback-dismiss').addEventListener('click', clearMessage);
 $('export-current').addEventListener('click', () => { if (state.meeting) void command('exportMeeting', state.meeting.id); });

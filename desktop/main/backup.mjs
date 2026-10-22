@@ -84,8 +84,11 @@ export function buildMeetingBackup(data) {
   return result;
 }
 
-/** For a future opt-in restore flow. This function never writes to the disk. */
-export function inspectMeetingBackup(content) {
+/** Returns detached, canonical JSON *only after* validating the complete file.
+ * Caller MUST check each meeting's archive contract before writing to disk.
+ * This is an ordinary checksum, not an authenticity or digital signature.
+ */
+export function verifiedMeetingBackup(content) {
   if (typeof content !== 'string' || Buffer.byteLength(content, 'utf8') > MAX_BACKUP_BYTES) {
     throw new Error('Backup exceeds the allowed size.');
   }
@@ -104,6 +107,12 @@ export function inspectMeetingBackup(content) {
     || sha256(JSON.stringify(snapshot)) !== decoded.integrity.digest) {
     throw new Error('Saved backup did not pass its SHA-256 integrity check.');
   }
+  return structuredClone(snapshot);
+}
+
+/** Read-only metadata for the user; never returns login files or executable actions. */
+export function inspectMeetingBackup(content) {
+  const snapshot = verifiedMeetingBackup(content);
   return { format: BACKUP_FORMAT, meetingCount: snapshot.meetingCount,
     seatBookmarkCount: snapshot.seats.length, skippedDamagedArchives: snapshot.skippedDamagedArchives };
 }

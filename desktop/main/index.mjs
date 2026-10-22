@@ -1,5 +1,5 @@
 import { app, BrowserWindow, protocol, ipcMain, dialog, shell, session } from 'electron';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +15,26 @@ app.setAppUserModelId('com.gaitxh.chatchat.desktop');
 if(!app.isPackaged && process.env.CHATCHAT_TEST_USER_DATA) app.setPath('userData',path.resolve(process.env.CHATCHAT_TEST_USER_DATA));
 protocol.registerSchemesAsPrivileged([{scheme:'chatchat',privileges:{standard:true,secure:true,supportFetchAPI:true}}]);
 let mainWindow, controller, runtime, loginPoll, polling=false, quitting=false;
+// Restore preview exists ONLY in this process. Renderer never sees the source
+// path, JSON bytes, or any browser/session files.
+let restorePreview=null;
+const RESTORE_PREVIEW_TTL=10*60*1000;
+const BACKUP_MAX_BYTES=64*1024*1024;
+async function readUserSelectedBackup(filePath){
+ try {
+  const stat=await fs.lstat(filePath);
+  if(!stat.isFile() || stat.isSymbolicLink() || stat.size>BACKUP_MAX_BYTES) {
+   throw new Error('Invalid selected file.');
+  }
+  const content=await fs.readFile(filePath,'utf8');
+  if(Buffer.byteLength(content,'utf8')>BACKUP_MAX_BYTES) throw new Error('Oversized file.');
+  return content;
+ }catch{
+  // Do not relay native file paths and system exception details to the
+  // renderer; the operating-system picker already knows the selected path.
+  throw new Error('无法读取或验证此备份文件，请检查文件是否完整。');
+ }
+}
 const gotLock=app.requestSingleInstanceLock();
 if(!gotLock) app.quit();
 else {
@@ -69,6 +89,52 @@ async function boot(){
    try {
     const {method,args}=validateCommand(input);
     if(method==='openDataFolder') {const error=await shell.openPath(dataDir);if(error)throw new Error('无法打开本地数据目录。');return {ok:true,result:{opened:true}};}
+    if(method==='previewRestoreBackup') {
+      restorePreview=null;
+      if(controller.getState().busy) throw new Error('Finish the current meeting operation before restoring history.');
+      const choice=await dialog.showOpenDialog(mainWindow,{
+        title:'选择 ChatChat 历史备份（先预览，不导入）',
+        properties:['openFile'],
+        filters:[{name:'ChatChat JSON 备份',extensions:['json']}],
+      });
+      if(choice.canceled || !choice.filePaths?.length) return {ok:true,result:{selected:false}};
+      const filePath=choice.filePaths[0];
+      const content=await readUserSelectedBackup(filePath);
+      const summary=controller.previewRestoreData(content);
+      const hash=createHash('sha256').update(content,'utf8').digest('hex');
+      const previewToken=randomUUID();
+      restorePreview={previewToken,filePath,hash,createdAt:Date.now(),summary};
+      return {ok:true,result:{selected:true,previewToken,...summary}};
+    }
+    if(method==='confirmRestoreBackup') {
+      const preview=restorePreview;
+      restorePreview=null; // Single-use token, even for cancel/rejection.
+      if(!preview || preview.previewToken!==args || Date.now()-preview.createdAt>RESTORE_PREVIEW_TTL) {
+        throw new Error('Restore preview expired. Please choose the backup again.');
+      }
+      if(controller.getState().busy) throw new Error('Finish the current meeting operation before importing history.');
+      const content=await readUserSelectedBackup(preview.filePath);
+      if(createHash('sha256').update(content,'utf8').digest('hex')!==preview.hash){
+        throw new Error('Backup changed after preview. No history was imported.');
+      }
+      const summary=controller.previewRestoreData(content);
+      if(JSON.stringify(summary)!==JSON.stringify(preview.summary)){
+        throw new Error('Local history or backup changed since preview. Preview again before importing.');
+      }
+      const response=await dialog.showMessageBox(mainWindow,{
+        type:'warning',title:'确认恢复历史会议',
+        message:'只导入尚不存在的历史会议，不覆盖现有记录。',
+        detail:'预计新导入 '+summary.newMeetings+' 场；跳过已有 '+summary.existingMeetings+' 场。'
+          +' 备份中的 '+summary.ignoredSeatBookmarks+' 个席位书签不会自动加入，更不会恢复登录状态、Cookie 或发送模型请求。'
+          + (summary.excludedDamagedInSource > 0
+            ? ' 注意：源备份曾遗漏 '+summary.excludedDamagedInSource+' 份受损历史。' : '')
+          +' 本操作需要你确认。',
+        buttons:['取消','确认导入历史'],defaultId:0,cancelId:0,noLink:true,
+      });
+      if(response.response!==1) return {ok:true,result:{restored:false}};
+      const result=await controller.restoreBackupData(content);
+      return {ok:true,result:{restored:true,...result}};
+    }
     if(method==='verifyBackupFile') {
       const choice=await dialog.showOpenDialog(mainWindow,{
         title:'验证 ChatChat 会议备份（只读，不会导入）',

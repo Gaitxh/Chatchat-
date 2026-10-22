@@ -13,6 +13,11 @@ test('no generic paths, script execution, credential or unknown command IPC',()=
  assert.equal(validateCommand({method:'synthesizeMeeting'}).method,'synthesizeMeeting');
  assert.equal(validateCommand({method:'backupLocalData'}).method,'backupLocalData');
  assert.equal(validateCommand({method:'verifyBackupFile'}).method,'verifyBackupFile');
+ assert.equal(validateCommand({method:'previewRestoreBackup'}).method,'previewRestoreBackup');
+ assert.throws(()=>validateCommand({method:'previewRestoreBackup',args:{path:'C:/cookies'}}));
+ assert.equal(validateCommand({method:'confirmRestoreBackup',args:'a'.repeat(36)}).args,'a'.repeat(36));
+ assert.throws(()=>validateCommand({method:'confirmRestoreBackup',args:{path:'C:/cookies'}}));
+ assert.throws(()=>validateCommand({method:'confirmRestoreBackup',args:'../meeting.json'}));
  assert.throws(()=>validateCommand({method:'verifyBackupFile',args:{path:'C:/secret'}}));
  assert.throws(()=>validateCommand({method:'backupLocalData',args:{directory:'C:\\Windows'}}));
  assert.throws(()=>validateCommand({method:'synthesizeMeeting',args:{force:true}}));

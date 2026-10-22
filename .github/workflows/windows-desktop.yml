@@ -39,6 +39,13 @@ jobs:
           $env:CHATCHAT_RENDERER_BROWSER = Join-Path $PWD '.build-cache/browser/chrome-win64/chrome.exe'
           npm test
           exit $LASTEXITCODE
+      - name: Isolated native Electron backup preview, cancel, tamper and restore
+        working-directory: desktop
+        run: |
+          $env:CHATCHAT_ELECTRON_EXECUTABLE = Join-Path $PWD 'node_modules/electron/dist/electron.exe'
+          $env:CHATCHAT_SMOKE_BROWSER = Join-Path $PWD '.build-cache/browser/chrome-win64/chrome.exe'
+          node scripts/smoke-restore-electron.mjs
+          exit $LASTEXITCODE
       - name: Build one-click per-user installer (unsigned without signing credentials)
         working-directory: desktop
         run: |

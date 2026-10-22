@@ -80,9 +80,12 @@
       <div class="backup-options">
       <button id="backup-all" class="button secondary-button" type="button">备份全部会议</button>
       <button id="verify-backup" class="button quiet" type="button">验证备份文件</button>
-      <span class="secondary">保存为可校验的明文 JSON，不含模型网站登录状态或 Cookie。当前仅支持导出和完整性验证，暂不提供自动恢复；备份包含明文会议内容，请妥善保管。</span>
+      <button id="preview-restore" class="button quiet" type="button">预览恢复</button>
+      <button id="confirm-restore" class="button secondary-button" type="button" disabled hidden>确认恢复历史</button>
+      <span class="secondary">保存为可校验的明文 JSON，不含模型网站登录状态或 Cookie。恢复只导入尚不存在的历史会议，须先预览并由用户确认；不恢复登录资料或自动发送消息。备份包含明文会议内容，请妥善保管。</span>
       </div>
       <p id="backup-status" class="backup-status" role="status" aria-live="polite" hidden></p>
+      <p id="restore-preview" class="backup-status" role="status" aria-live="polite" hidden></p>
       <div id="history-list" class="history-list"></div><p id="history-error" class="dialog-error" role="alert" hidden></p>
     </dialog>
     <noscript>此桌面应用需要 JavaScript。请重新打开已安装的 ChatChat 应用。</noscript>

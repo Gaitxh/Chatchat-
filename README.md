@@ -13,7 +13,7 @@
 
 ## Windows one-click installation (end users)
 
-Download the maintainer-supplied **`ChatChat-Setup-0.10.3-x64.exe`** for Windows 10/11 x64 and launch Setup. Electron and Chromium are bundled: **no Node, Git, Rust, browser extension, or Developer Mode required**. Click **+** to add provider seats, sign in normally in the app-owned browser, then start a meeting with two verified-ready sources.
+Download the maintainer-supplied **`ChatChat-Setup-0.10.4-x64.exe`** for Windows 10/11 x64 and launch Setup. Electron and Chromium are bundled: **no Node, Git, Rust, browser extension, or Developer Mode required**. Click **+** to add provider seats, sign in normally in the app-owned browser, then start a meeting with two verified-ready sources.
 
 **This remains an unsigned development candidate, not a validated stable release.** Windows native runtime tests and packaging have passed; real provider accounts and a complete fresh-install/upgrade/uninstall acceptance test are still outstanding. Do not disable Windows security protections.
 

@@ -21,3 +21,7 @@ From the History dialog, users may manually export all validated saved meetings 
 ## Offline Electron ZIP for Windows builds
 
 Maintainers may set CHATCHAT_ELECTRON_DIST to an absolute path to electron-v45.0.0-win32-x64.zip before running npm run package:win. The archive filename, version, architecture, and SHA-256 are checked against the pinned electron npm package checksums before packaging. Invalid archives fail closed. This is a developer build option, not an end-user setup requirement; the normal CI download path remains unchanged.
+
+## Opt-in safe archive restore (0.10.4)
+
+Users can now open History → Preview Restore → Confirm Restore. The backup is inspected locally before a separate native Windows confirmation, re-read and SHA-256 checked immediately before commit, and imported only into missing meeting IDs. Existing meetings are never replaced; credentials, cookies, managed browser profiles, and seat bookmarks are not imported. Historical viewing and restore never dispatch Provider prompts. Import uses app-owned temporary files and no-overwrite hard links; a crash may leave some completed entries, and an idempotent retry skips those rather than overwriting them. A checksum is not a digital signature; restore backups only from trusted sources. Native Electron cancellation, post-preview tamper, and successful import are covered by an offline fixture.

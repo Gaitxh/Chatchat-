@@ -24,7 +24,7 @@ export const EVENT_KINDS = {
 
 export function emptyState() {
   return {
-    version: '0.10.3', runtime: { available: false, label: '桌面连接', message: '正在连接桌面应用…' },
+    version: '0.10.4', runtime: { available: false, label: '桌面连接', message: '正在连接桌面应用…' },
     providers: [], seats: [], meeting: null, history: [], busy: false, synthesisAvailable: false,
     synthesisPlannedRequests: 0,
   };
@@ -149,12 +149,12 @@ export function formatDate(value) {
 
 export const BRIDGE_METHODS = [
   'getState', 'addSeat', 'openSeat', 'checkSeat', 'removeSeat', 'startMeeting', 'synthesizeMeeting',
-  'stopMeeting', 'newMeeting', 'loadMeeting', 'exportMeeting', 'backupLocalData', 'verifyBackupFile', 'openDataFolder', 'onState',
+  'stopMeeting', 'newMeeting', 'loadMeeting', 'exportMeeting', 'backupLocalData', 'verifyBackupFile', 'previewRestoreBackup', 'confirmRestoreBackup', 'openDataFolder', 'onState',
 ];
 
 // A state push is newer than a command's in-flight snapshot. Never paint an old
 // response over it, including the initial getState response.
-export function createSession({ bridge, onChange = () => {}, onError = () => {}, onNotice = () => {} }) {
+export function createSession({ bridge, onChange = () => {}, onError = () => {}, onNotice = () => {}, onRestorePreview = () => {} }) {
   let state = emptyState();
   let connected = false;
   let epoch = 0;
@@ -224,6 +224,39 @@ export function createSession({ bridge, onChange = () => {}, onError = () => {},
                 ? ' 注意：该备份未包含 ' + result.skippedDamagedArchives + ' 份受损历史。' : '')
               + ' 仅验证文件内容是否完整，未修改本地数据。'
             : '已取消备份校验。');
+        } else if (method === 'previewRestoreBackup') {
+          if (typeof result?.selected !== 'boolean') throw new Error('未取得备份预览结果。');
+          if (result.selected) {
+            if (typeof result.previewToken !== 'string' ||
+              !/^[a-f0-9-]{36}$/.test(result.previewToken)
+              || !Number.isSafeInteger(result.meetingCount) || result.meetingCount < 0
+              || !Number.isSafeInteger(result.newMeetings) || result.newMeetings < 0
+              || !Number.isSafeInteger(result.existingMeetings) || result.existingMeetings < 0
+              || result.newMeetings + result.existingMeetings !== result.meetingCount
+              || !Number.isSafeInteger(result.ignoredSeatBookmarks) || result.ignoredSeatBookmarks < 0
+              || !Number.isSafeInteger(result.excludedDamagedInSource) || result.excludedDamagedInSource < 0) {
+              throw new Error('备份预览信息不完整或不可信。');
+            }
+            onRestorePreview(result);
+            onNotice('备份预览完成。仅导入缺失的历史会议，不会恢复登录状态。');
+          } else {
+            onRestorePreview(null);
+            onNotice('已取消选择备份。');
+          }
+        } else if (method === 'confirmRestoreBackup') {
+          if (typeof result?.restored !== 'boolean') throw new Error('未取得明确的恢复结果。');
+          onRestorePreview(null);
+          if (result.restored) {
+            if (!Number.isSafeInteger(result.imported) || result.imported < 0
+              || !Number.isSafeInteger(result.existingMeetings) || result.existingMeetings < 0) {
+              throw new Error('恢复结果不完整。');
+            }
+            onNotice('已恢复 ' + result.imported + ' 场历史会议；跳过已有 '
+              + result.existingMeetings + ' 场。'
+              + (result.excludedDamagedInSource > 0
+                ? ' 原备份未包含 ' + result.excludedDamagedInSource + ' 份受损历史。' : '')
+              + ' 未恢复任何登录状态，也没有调用模型。');
+          } else onNotice('已取消历史恢复，没有修改任何会议。');
         } else if (method === 'openDataFolder') {
           if (result?.opened !== true) throw new Error('未能打开数据文件夹，请重试。');
           onNotice('已打开本机数据文件夹。');

@@ -32,6 +32,11 @@ function fixture(overrides = {}) {
     if (method === 'exportMeeting' || method === 'backupLocalData') return { saved: true };
     if (method === 'openDataFolder') return { opened: true };
     if (method === 'verifyBackupFile') return { verified: true, meetingCount: 2, seatBookmarkCount: 2, skippedDamagedArchives: 0 };
+    if (method === 'previewRestoreBackup') return {
+      selected: true, previewToken: 'b'.repeat(36), meetingCount: 2,
+      newMeetings: 1, existingMeetings: 1, ignoredSeatBookmarks: 2, excludedDamagedInSource: 0,
+    };
+    if (method === 'confirmRestoreBackup') return { restored: true, imported: 1, existingMeetings: 1 };
     return readyState();
   }]));
   bridge.onState = (callback) => { listener = callback; return () => { unsubscribed = true; }; };
@@ -164,6 +169,39 @@ test('backup notice warns when damaged archives cannot be included', async () =>
   assert.match(notices.at(-1), /2 份受损历史/);
   assert.equal(await session.run('verifyBackupFile'), true);
   assert.match(notices.at(-1), /未包含 2 份受损历史/);
+  session.dispose();
+});
+
+test('two-step local restore preview uses only opaque ticket, never a filesystem path or model call', async () => {
+  const source = fixture();
+  const previews = [];
+  const notices = [];
+  const session = createSession({
+    bridge:source.bridge, onNotice:(msg)=>notices.push(msg),
+    onRestorePreview:(value)=>previews.push(value),
+  });
+  await session.connect();
+  assert.equal(await session.run('previewRestoreBackup'),true);
+  assert.equal(previews.at(-1).previewToken,'b'.repeat(36));
+  assert.equal(previews.at(-1).newMeetings,1);
+  assert.equal(await session.run('confirmRestoreBackup','b'.repeat(36)),true);
+  assert.equal(source.calls.at(-1)[0],'confirmRestoreBackup');
+  assert.equal(source.calls.at(-1)[1],'b'.repeat(36));
+  assert.equal(previews.at(-1),null);
+  assert.match(notices.at(-1),/已恢复 1 场/);
+  assert.equal(source.calls.filter((x)=>x[0]==='startMeeting').length,0);
+  session.dispose();
+});
+
+test('restore bridge refuses malformed preview and never claims a completed import', async () => {
+  const source=fixture({previewRestoreBackup:async()=>({selected:true,previewToken:'../secret'})});
+  const errors=[],previews=[];
+  const session=createSession({bridge:source.bridge,onError:(value)=>errors.push(value),
+    onRestorePreview:(value)=>previews.push(value)});
+  await session.connect();
+  assert.equal(await session.run('previewRestoreBackup'),false);
+  assert.equal(previews.length,0);
+  assert.ok(errors.length>0);
   session.dispose();
 });
 

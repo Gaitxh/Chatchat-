@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync } from 'node:fs';
-import { open, rename, unlink } from 'node:fs/promises';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync } from 'node:fs';
+import { open, rename, unlink, link } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isIP } from 'node:net';
-import { buildMeetingBackup } from './backup.mjs';
+import { buildMeetingBackup, verifiedMeetingBackup } from './backup.mjs';
 import {
   authoredReferenceEvents, participatingAuthors, chooseDraftAuthor, draftPrompt, reviewPrompt,
   parseSynthesisDraft, parseSynthesisReview, synthesisStatus,
@@ -180,7 +180,7 @@ async function productionCore() {
  * explicit driver sentinels, NOT CSS selectors or a compatibility assertion.
  * Only runtime.prepareSeat/send operate the browser and own real selectors.
  */
-export function createController({ runtime, dataDir, onChange = () => {}, version = '0.10.3', core } = {}) {
+export function createController({ runtime, dataDir, onChange = () => {}, version = '0.10.4', core } = {}) {
   if (!runtime || typeof dataDir !== 'string' || !dataDir) throw new Error('runtime and dataDir are required.');
   const directory = join(dataDir, 'controller');
   const archiveDirectory = join(directory, 'meetings');
@@ -198,6 +198,7 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
   let synthesisEligibleMeetingId = null;
   let active = null;
   let mutation = false;
+  let restoreInFlight = null;
   let closing = false;
   let closed = false;
   let closeTask;
@@ -225,6 +226,13 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
       }
     }
     for (const filename of readdirSync(archiveDirectory)) {
+      // A crash may leave a private restore staging file before its
+      // no-overwrite hard-link commit. Delete ONLY this exact app-owned pattern.
+      if (/^meeting-[0-9a-f-]{36}\.json\.[0-9a-f-]{36}\.restore\.tmp$/.test(filename)) {
+        try { unlinkSync(join(archiveDirectory, filename)); }
+        catch { throw new Error('Cannot clean an interrupted restore staging file.'); }
+        continue;
+      }
       if (!filename.endsWith('.json') || !MEETING_ID.test(filename.slice(0, -5))) continue;
       let saved;
       try {
@@ -823,6 +831,156 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
       skippedDamagedArchives: excludedDamaged };
   }
 
+  function verifiedRestoreRecords(content) {
+    const snapshot = verifiedMeetingBackup(content);
+    const seen = new Set();
+    const records = snapshot.meetings.map((saved) => {
+      const m = saved?.meeting;
+      if (saved?.schema !== 1 || !m || !MEETING_ID.test(m.id)
+        || seen.has(m.id) || !TERMINAL.has(m.status)
+        || typeof m.proposal !== 'string' || !m.proposal.trim() || m.proposal.length > 8000
+        || typeof m.phase !== 'string' || m.phase.length > 60
+        || !Number.isInteger(m.round) || m.round < 0 || m.round > 9
+        || !Array.isArray(m.events) || m.events.length > MAX_EVENTS
+        || !validSynthesisArchive(m.synthesis, m.events)
+        || !MODES.has(saved.mode) || !Number.isInteger(saved.maxRounds)
+        || saved.maxRounds < 2 || saved.maxRounds > 8
+        || typeof saved.updatedAt !== 'string' || saved.updatedAt.length > 40
+        || !Number.isFinite(Date.parse(saved.updatedAt))
+        || !Array.isArray(saved.roster) || saved.roster.length > 8
+        || m.status === 'completed' && (!m.report
+          || !Array.isArray(m.report.positions) || !Array.isArray(m.report.disagreements))
+        || m.report && (!Array.isArray(m.report.positions)
+          || !Array.isArray(m.report.disagreements)
+          || m.report.positions.length > 8 || m.report.disagreements.length > 8)) {
+        throw new Error('Backup contains an invalid or unfinished meeting archive.');
+      }
+      seen.add(m.id);
+      const roster = new Set();
+      for (const seat of saved.roster) {
+        const normalized = seatCopy({ ...seat, status: 'closed' }, true);
+        if (roster.has(normalized.id)) throw new Error('Backup has a repeated participant.');
+        roster.add(normalized.id);
+      }
+      for (const event of m.events) {
+        if (!event || typeof event !== 'object' || Array.isArray(event)
+          || typeof event.id !== 'string' || !event.id || event.id.length > 200
+          || typeof event.actorId !== 'string' || event.actorId.length > 100
+          || typeof event.kind !== 'string' || event.kind.length > 60
+          || typeof event.content !== 'string' || event.content.length > 16000
+          || !Number.isInteger(event.round) || event.round < 0 || event.round > 9) {
+          throw new Error('Backup has an invalid meeting event.');
+        }
+      }
+      if (m.report) {
+        if (typeof m.report.confidence !== 'number' || !Number.isFinite(m.report.confidence)
+          || m.report.confidence < 0 || m.report.confidence > 1
+          || typeof m.report.consensusRatio !== 'number' || !Number.isFinite(m.report.consensusRatio)
+          || m.report.consensusRatio < 0 || m.report.consensusRatio > 1) {
+          throw new Error('Backup has an invalid final council report.');
+        }
+        for (const position of [...m.report.positions, ...m.report.disagreements]) {
+          if (!position || typeof position !== 'object' || Array.isArray(position)
+            || !position.participant || !ID.test(position.participant.id)
+            || typeof position.participant.name !== 'string'
+            || position.participant.name.length > 100
+            || typeof position.stance !== 'string' || position.stance.length > 200
+            || typeof position.content !== 'string' || position.content.length > 16000
+            || typeof position.confidence !== 'number' || !Number.isFinite(position.confidence)
+            || position.confidence < 0 || position.confidence > 1
+            || !Array.isArray(position.caveats) || position.caveats.length > 16
+            || position.caveats.some((x) => typeof x !== 'string' || x.length > 2000)) {
+            throw new Error('Backup has an invalid participant final position.');
+          }
+        }
+      }
+      const serialized = JSON.stringify(saved);
+      if (!serialized || Buffer.byteLength(serialized, 'utf8') > MAX_FILE_BYTES) {
+        throw new Error('Backup contains an oversized meeting archive.');
+      }
+      return copy(saved);
+    });
+    return { records, ignoredSeatBookmarks: snapshot.seats.length,
+      excludedDamagedInSource: snapshot.skippedDamagedArchives };
+  }
+
+  function previewRestoreData(content) {
+    idle();
+    if (storageError) throw new Error('Local storage is unavailable.');
+    const parsed = verifiedRestoreRecords(content);
+    const newRecords = parsed.records.filter((record) => !archives.has(record.meeting.id)
+      && !existsSync(join(archiveDirectory, record.meeting.id + '.json')));
+    return {
+      meetingCount: parsed.records.length,
+      newMeetings: newRecords.length,
+      existingMeetings: parsed.records.length - newRecords.length,
+      ignoredSeatBookmarks: parsed.ignoredSeatBookmarks,
+      excludedDamagedInSource: parsed.excludedDamagedInSource,
+    };
+  }
+
+  async function restoreBackupData(content) {
+    idle();
+    if (storageError) throw new Error('Local storage is unavailable.');
+    const parsed = verifiedRestoreRecords(content);
+    mutation = true;
+    // Shutdown waits for the restore transaction to finish rolling back,
+    // rather than terminating the process halfway through a history import.
+    let resolveRestore;
+    restoreInFlight = new Promise((resolve) => { resolveRestore = resolve; });
+    notify();
+    const committed = [];
+    let duplicates = 0;
+    try {
+      await writeTail;
+      if (storageError || closing || closed) throw new Error('Local storage is unavailable.');
+      for (const record of parsed.records) {
+        if (closing || closed || lifecycle.signal.aborted) throw abortError();
+        const id = record.meeting.id;
+        const target = join(archiveDirectory, id + '.json');
+        if (archives.has(id) || existsSync(target)) { duplicates += 1; continue; }
+        const temporary = target + '.' + randomUUID() + '.restore.tmp';
+        let file;
+        try {
+          file = await open(temporary, 'wx', 0o600);
+          await file.writeFile(JSON.stringify(record), 'utf8');
+          await file.sync();
+          await file.close();
+          file = null;
+          if (closing || closed || lifecycle.signal.aborted) throw abortError();
+          // Creating a hard link is atomic and fails with EEXIST. Unlike a
+          // Windows rename, it can never replace an existing archive.
+          try { await link(temporary, target); }
+          catch (error) {
+            if (error?.code === 'EEXIST') { duplicates += 1; continue; }
+            throw error;
+          }
+          committed.push({ id, target });
+          archives.set(id, metadata(record));
+        } finally {
+          await file?.close().catch(() => {});
+          await unlink(temporary).catch(() => {});
+        }
+      }
+      return { imported: committed.length, existingMeetings: duplicates,
+        ignoredSeatBookmarks: parsed.ignoredSeatBookmarks,
+        excludedDamagedInSource: parsed.excludedDamagedInSource };
+    } catch (error) {
+      let rollbackFailed = false;
+      for (const item of committed.reverse()) {
+        try { await unlink(item.target); archives.delete(item.id); }
+        catch { rollbackFailed = true; }
+      }
+      if (rollbackFailed) storageFailed(new Error('Some imported records could not be rolled back. Inspect the local meeting folder.'));
+      throw new Error('Backup import did not finish; existing meetings were never overwritten. ' + errorText(error));
+    } finally {
+      mutation = false;
+      resolveRestore();
+      restoreInFlight = null;
+      notify();
+    }
+  }
+
   async function exportData(id) {
     if (!archives.has(id)) throw new Error('Unknown meeting.');
     await writeTail;
@@ -877,7 +1035,8 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
         const stopping = stopMeeting(); // Abort/fence synchronously before closing the browser.
         // Always invoke close, including when a faulty driver's stop never settles.
         const results = await deadline(() => Promise.allSettled([
-          stopping, deadline(() => runtime.close(), { timeoutMs: closeTimeoutMs, label: 'Browser close' }), writeTail,
+          stopping, deadline(() => runtime.close(), { timeoutMs: closeTimeoutMs, label: 'Browser close' }),
+          writeTail, restoreInFlight,
         ]), { timeoutMs: 3 * closeTimeoutMs + 50, label: 'Controller shutdown' });
         const failure = results.find((result) => result.status === 'rejected');
         if (failure) throw failure.reason;
@@ -889,5 +1048,5 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
   }
   return { getState, addSeat, openSeat, checkSeat, removeSeat,
     startMeeting, synthesizeMeeting, stopMeeting, newMeeting, loadMeeting,
-    exportData, backupData, runtimeChanged, close };
+    exportData, backupData, previewRestoreData, restoreBackupData, runtimeChanged, close };
 }
