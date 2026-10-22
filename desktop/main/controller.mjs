@@ -3,6 +3,10 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync 
 import { open, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isIP } from 'node:net';
+import {
+  authoredReferenceEvents, participatingAuthors, chooseDraftAuthor, draftPrompt, reviewPrompt,
+  parseSynthesisDraft, parseSynthesisReview, synthesisStatus,
+} from './synthesis.mjs';
 
 const MODES = new Set(['balanced', 'explore', 'decide', 'verify', 'stress_test']);
 const TERMINAL = new Set(['completed', 'cancelled', 'failed']);
@@ -60,6 +64,43 @@ function seatCopy(seat, persisted = false) {
     url: publicURL(seat.url), status: persisted ? 'closed' : STATUSES.has(seat.status) ? seat.status : 'error',
     detail: persisted ? 'Open this seat to check its managed browser session.' : seat.detail ? errorText(seat.detail) : '',
   };
+}
+
+const SYNTHESIS_STATES = new Set(['drafting', 'reviewing', 'reviewed', 'disputed',
+  'incomplete', 'failed', 'cancelled', 'interrupted']);
+
+function validSynthesisArchive(synthesis, events) {
+  if (synthesis === undefined) return true;
+  if (!synthesis || typeof synthesis !== 'object' || Array.isArray(synthesis)
+    || !SYNTHESIS_STATES.has(synthesis.status) || !ID.test(synthesis.writerId)
+    || !Array.isArray(synthesis.reviewerIds) || synthesis.reviewerIds.length > 7
+    || synthesis.reviewerIds.some((id) => typeof id !== 'string' || !ID.test(id) || id === synthesis.writerId)
+    || new Set(synthesis.reviewerIds).size !== synthesis.reviewerIds.length
+    || !Array.isArray(synthesis.reviews) || synthesis.reviews.length > 7
+    || typeof synthesis.error !== 'undefined' && (typeof synthesis.error !== 'string' || synthesis.error.length > 2000)) return false;
+  const allowed = new Map(authoredReferenceEvents(events).map((event) => [event.id, event.actorId]));
+  const validIds = (value, min = 1) => Array.isArray(value) && value.length >= min
+    && value.length <= 16 && new Set(value).size === value.length && value.every((id) => allowed.has(id));
+  const draft = synthesis.draft;
+  if (draft !== null && draft !== undefined) {
+    if (!draft || typeof draft !== 'object' || typeof draft.answer !== 'string'
+      || !draft.answer.trim() || draft.answer.length > 6500 || draft.writerId !== synthesis.writerId
+      || !validIds(draft.eventIds)
+      || new Set(draft.eventIds.map((id) => allowed.get(id))).size < 2
+      || !Array.isArray(draft.caveats) || draft.caveats.length > 8
+      || draft.caveats.some((x) => typeof x !== 'string' || x.length > 260)) return false;
+  }
+  const seen = new Set();
+  for (const review of synthesis.reviews) {
+    if (!review || typeof review !== 'object' || !synthesis.reviewerIds.includes(review.participantId)
+      || seen.has(review.participantId) || !['completed', 'failed'].includes(review.status)) return false;
+    seen.add(review.participantId);
+    if (review.status === 'completed') {
+      if (!['approve', 'revise', 'reject'].includes(review.verdict) || typeof review.commentary !== 'string'
+        || !review.commentary.trim() || review.commentary.length > 1600 || !validIds(review.eventIds)) return false;
+    } else if (typeof review.error !== 'string' || review.error.length > 1200) return false;
+  }
+  return true;
 }
 
 function readJSON(path) {
@@ -138,7 +179,7 @@ async function productionCore() {
  * explicit driver sentinels, NOT CSS selectors or a compatibility assertion.
  * Only runtime.prepareSeat/send operate the browser and own real selectors.
  */
-export function createController({ runtime, dataDir, onChange = () => {}, version = '0.10.1', core } = {}) {
+export function createController({ runtime, dataDir, onChange = () => {}, version = '0.10.2', core } = {}) {
   if (!runtime || typeof dataDir !== 'string' || !dataDir) throw new Error('runtime and dataDir are required.');
   const directory = join(dataDir, 'controller');
   const archiveDirectory = join(directory, 'meetings');
@@ -151,6 +192,9 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
   const interrupted = [];
   const quarantinedArchives = [];
   let meeting = null;
+  // In-memory gate: a historical/loaded meeting can never silently reopen
+  // a chat or re-dispatch synthesis calls after app restart.
+  let synthesisEligibleMeetingId = null;
   let active = null;
   let mutation = false;
   let closing = false;
@@ -193,10 +237,24 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
         quarantinedArchives.push(filename);
         continue;
       }
+      let needsRecovery = false;
       if (!TERMINAL.has(saved.meeting.status)) {
         saved.meeting.status = 'failed';
         saved.meeting.phase = 'interrupted';
         saved.meeting.error = [saved.meeting.error, 'The app stopped before this meeting finished. It was not resumed.'].filter(Boolean).join(' ');
+        needsRecovery = true;
+      }
+      // The parent meeting can be completed while optional peer synthesis was
+      // still running. Resume neither drafts nor reviewers after app restart:
+      // a provider may already have received the last prompt.
+      if (['drafting', 'reviewing'].includes(saved.meeting.synthesis?.status)) {
+        saved.meeting.synthesis.status = 'interrupted';
+        saved.meeting.synthesis.error = [saved.meeting.synthesis.error,
+          'The app closed during answer review. Nothing was re-sent. Inspect the original provider chat before starting a new council.']
+          .filter(Boolean).join(' ').slice(0, 1200);
+        needsRecovery = true;
+      }
+      if (needsRecovery) {
         saved.updatedAt = timestamp();
         interrupted.push(saved);
       }
@@ -223,6 +281,7 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
     const m = saved.meeting;
     if (saved.schema !== 1 || !m || m.id !== id || typeof m.proposal !== 'string' || m.proposal.length > 8000
       || !Array.isArray(m.events) || m.events.length > MAX_EVENTS
+      || !validSynthesisArchive(m.synthesis, m.events)
       || !['preparing', 'running', ...TERMINAL].includes(m.status) || typeof saved.updatedAt !== 'string') {
       throw new Error('Invalid local meeting archive.');
     }
@@ -258,8 +317,16 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
     if (quarantinedArchives.length) {
       info.message = [info.message, `${quarantinedArchives.length} 份异常历史记录已保留原文件（.corrupt- 后缀），并暂停加载。请先导出其他记录，再检查本地数据文件夹。`].filter(Boolean).join(' ');
     }
+    const canSynthesize = Boolean(meeting?.status === 'completed'
+      && synthesisEligibleMeetingId === meeting.id && !meeting.synthesis
+      && !active && !mutation && !storageError
+      && participatingAuthors(meeting.report,
+        [...seats.values()].filter((seat) => seat.status === 'ready')).length >= 2);
+    // Transient capability belongs to the live UI state, never the archive's
+    // immutable meeting evidence (historical replay must match original data).
     return copy({
       version, runtime: info, providers: catalog(), seats: [...seats.values()], meeting,
+      synthesisAvailable: canSynthesize,
       history: [...archives.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 200),
       busy: Boolean(active || mutation),
     });
@@ -330,6 +397,9 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
   }
   async function seatOperation(action) {
     idle();
+    // The user can change the associated model Chat by reopening a seat.
+    // Avoid synthesizing into a conversation whose identity may have changed.
+    synthesisEligibleMeetingId = null;
     mutation = true;
     const operation = { active: true };
     const stillCurrent = () => {
@@ -553,31 +623,145 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
       phase: 'preparing', round: 0, events: [], report: null,
       participatingSeatIds: frozenRoster.map((seat) => seat.id) };
     const record = { schema: 1, meeting, roster: frozenRoster.map(({ runtimeId: _runtimeId, ...seat }) => seat), mode: input.mode, maxRounds: input.maxRounds, updatedAt: timestamp() };
-    const job = { record, roster: frozenRoster, abort: new AbortController(), cancelled: false, failures: new Map(), operation: 0, task: null, stopping: null };
+    const job = { kind: 'council', record, roster: frozenRoster, abort: new AbortController(), cancelled: false, failures: new Map(), operation: 0, task: null, stopping: null };
     active = job;
+    synthesisEligibleMeetingId = meeting.id;
     archives.set(meeting.id, metadata(record));
     job.task = Promise.resolve().then(() => execute(job));
     notify();
     return getState();
   }
+  // Deliberately opt-in. Starts no Provider work during archive playback,
+  // startup, meeting completion or normal seat readiness polling.
+  function synthesizeMeeting() {
+    idle();
+    getState();
+    if (!meeting || meeting.status !== 'completed' || meeting.synthesis
+      || meeting.id !== synthesisEligibleMeetingId || storageError) {
+      throw new Error('Only a just-completed live meeting can create a reviewed answer.');
+    }
+    const saved = readArchive(meeting.id);
+    const roster = (Array.isArray(saved.roster) ? saved.roster : [])
+      .filter((seat) => seats.get(seat.id)?.status === 'ready'
+        && runtimeIds.has(seat.id) && !seatFailures.has(seat.id));
+    const authors = participatingAuthors(saved.meeting.report, roster);
+    if (authors.length < 2) throw new Error('Two real model authors are needed to cross-review an answer.');
+    const writer = chooseDraftAuthor(saved.meeting.id, authors);
+    const reviewers = authors.filter((seat) => seat.id !== writer.id);
+    // The exact frozen peers, not a privileged chairman or a majority vote.
+    const synthesis = {
+      status: 'drafting', writerId: writer.id,
+      reviewerIds: reviewers.map((seat) => seat.id),
+      draft: null, reviews: [], error: '', startedAt: timestamp(),
+    };
+    saved.meeting.synthesis = synthesis;
+    meeting = saved.meeting;
+    synthesisEligibleMeetingId = null;
+    const job = {
+      kind: 'synthesis', record: saved, roster: authors, writer, reviewers,
+      abort: new AbortController(), cancelled: false, task: null, stopping: null,
+    };
+    active = job;
+    job.task = Promise.resolve().then(() => executeSynthesis(job));
+    notify();
+    return getState();
+  }
+
+  async function executeSynthesis(job) {
+    const signal = job.abort.signal;
+    const synthesis = job.record.meeting.synthesis;
+    const meetingRecord = job.record.meeting;
+    try {
+      await writeTail;
+      live(job);
+      if (storageError) throw new Error('Local archive persistence is unavailable.');
+      await saveJob(job); // Record explicit intent before ANY new Provider send.
+      live(job);
+      const author = job.writer;
+      const drafted = await deadline((operationSignal) =>
+        runtime.send(runtimeId(author.id), {
+          prompt: draftPrompt(meetingRecord),
+          operationId: meetingRecord.id + ':' + author.id + ':synthesis-draft',
+          signal: operationSignal, timeoutMs,
+        }), { signal, timeoutMs, label: 'Synthesis draft' });
+      live(job);
+      const draft = parseSynthesisDraft(drafted.responseText, meetingRecord.events);
+      synthesis.draft = { ...draft, writerId: author.id };
+      synthesis.status = 'reviewing';
+      await saveJob(job);
+      live(job);
+      notify();
+      // Reviews have independent Provider transport receipts. A failed/absent
+      // reviewer is NOT an approval; all failures remain visible.
+      await Promise.all(job.reviewers.map(async (seat) => {
+        let entry;
+        try {
+          const received = await deadline((operationSignal) =>
+            runtime.send(runtimeId(seat.id), {
+              prompt: reviewPrompt(meetingRecord, draft),
+              operationId: meetingRecord.id + ':' + seat.id + ':synthesis-review',
+              signal: operationSignal, timeoutMs,
+            }), { signal, timeoutMs, label: 'Synthesis peer review' });
+          live(job);
+          entry = { participantId: seat.id, status: 'completed',
+            ...parseSynthesisReview(received.responseText, meetingRecord.events) };
+        } catch (caught) {
+          live(job);
+          entry = { participantId: seat.id, status: 'failed', error: errorText(caught) };
+        }
+        live(job);
+        synthesis.reviews.push(entry);
+        await saveJob(job);
+        live(job);
+        notify();
+      }));
+      live(job);
+      synthesis.status = synthesisStatus(synthesis.reviewerIds, synthesis.reviews);
+    } catch (caught) {
+      if (!job.cancelled) {
+        synthesis.status = 'failed';
+        synthesis.error = errorText(caught);
+        // No automatic retries: the Provider may already have received the prompt.
+      }
+    } finally {
+      synthesis.completedAt = timestamp();
+      try { await saveJob(job); } catch (error) {
+        storageFailed(error);
+        synthesis.status = 'failed';
+        synthesis.error = [synthesis.error, `Local storage: ${errorText(error)}`].filter(Boolean).join(' ').slice(0, 1200);
+      }
+      if (active === job && !job.cancelled) { active = null; notify(); }
+    }
+  }
+
   async function stopMeeting() {
     const job = active;
     if (!job) return getState();
     if (!job.stopping) {
       job.cancelled = true;
       job.abort.abort();
-      job.record.meeting.status = 'cancelled';
-      job.record.meeting.phase = 'cancelled';
+      if (job.kind === 'synthesis') {
+        job.record.meeting.synthesis.status = 'cancelled';
+        job.record.meeting.synthesis.error = 'Peer review was stopped. Provider submissions already sent cannot be withdrawn.';
+      } else {
+        job.record.meeting.status = 'cancelled';
+        job.record.meeting.phase = 'cancelled';
+      }
       job.stopping = (async () => {
         const results = await Promise.allSettled([
           deadline(() => runtime.stop(), { timeoutMs: closeTimeoutMs, label: 'Browser stop' }),
           deadline(() => job.task, { timeoutMs: closeTimeoutMs, label: 'Meeting cancellation' }),
         ]);
         for (const result of results) if (result.status === 'rejected') {
-          job.record.meeting.error = [job.record.meeting.error, errorText(result.reason)].filter(Boolean).join(' ').slice(0, 1200);
+          const outcome = job.kind === 'synthesis' ? job.record.meeting.synthesis : job.record.meeting;
+          outcome.error = [outcome.error, errorText(result.reason)].filter(Boolean).join(' ').slice(0, 1200);
         }
         try { await deadline(() => saveJob(job), { timeoutMs: closeTimeoutMs, label: 'Saving cancelled meeting' }); }
-        catch (error) { storageFailed(error); job.record.meeting.error = [job.record.meeting.error, `Local storage: ${errorText(error)}`].filter(Boolean).join(' ').slice(0, 1800); }
+        catch (error) {
+          storageFailed(error);
+          const outcome = job.kind === 'synthesis' ? job.record.meeting.synthesis : job.record.meeting;
+          outcome.error = [outcome.error, 'Local storage: ' + errorText(error)].filter(Boolean).join(' ').slice(0, 1800);
+        }
         if (active === job) active = null;
         notify();
       })();
@@ -590,6 +774,7 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
     if (active) await stopMeeting();
     idle();
     meeting = null;
+    synthesisEligibleMeetingId = null;
     notify();
     return getState();
   }
@@ -600,6 +785,7 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
     const saved = readArchive(id);
     if (!TERMINAL.has(saved.meeting.status)) throw new Error('This meeting has not finished.');
     meeting = copy(saved.meeting);
+    synthesisEligibleMeetingId = null;
     notify();
     return getState();
   }
@@ -610,6 +796,25 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
     const m = saved.meeting;
     const lines = ['# ChatChat consultation', '', `Proposal: ${m.proposal}`, '', `Status: ${m.status}`, `Mode: ${saved.mode}`, `Phase: ${m.phase}`, `Round: ${m.round}`];
     if (m.error) lines.push('', `Error: ${m.error}`);
+    if (m.synthesis) {
+      const syn = m.synthesis;
+      lines.push('', '## Optional post-meeting synthesis',
+        '', 'Review state: ' + syn.status,
+        'This draft reflects model discussion; it is not an independent fact-check.');
+      if (syn.draft) {
+        lines.push('', '### Answer draft', '', syn.draft.answer,
+          '', 'Internal discussion event IDs: ' + syn.draft.eventIds.join(', '));
+        for (const caveat of syn.draft.caveats) lines.push('Caveat: ' + caveat);
+      }
+      for (const review of syn.reviews) {
+        lines.push('', '### Reviewer: ' + review.participantId, '',
+          'Review receipt: ' + review.status,
+          ...(review.verdict ? ['Verdict: ' + review.verdict] : []),
+          ...(review.eventIds?.length ? ['Related discussion event IDs: ' + review.eventIds.join(', ')] : []),
+          '', review.commentary ?? review.error ?? 'No review reply.');
+      }
+      if (syn.error) lines.push('', 'Synthesis limitation: ' + syn.error);
+    }
     if (m.report) {
       lines.push('', '## Actual final positions', '', 'Alignment describes participant positions; it is not proof.');
       for (const position of m.report.positions) {
@@ -648,5 +853,6 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
     })();
     return closeTask;
   }
-  return { getState, addSeat, openSeat, checkSeat, removeSeat, startMeeting, stopMeeting, newMeeting, loadMeeting, exportData, runtimeChanged, close };
+  return { getState, addSeat, openSeat, checkSeat, removeSeat,
+    startMeeting, synthesizeMeeting, stopMeeting, newMeeting, loadMeeting, exportData, runtimeChanged, close };
 }

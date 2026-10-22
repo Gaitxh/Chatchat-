@@ -7,6 +7,7 @@ import {
   MODES, SEAT_STATUS, MEETING_STATUS, PHASES, EVENT_KINDS, createSession,
   emptyState, isRunning, startBlocker, reportView, actorName, formatDate, seatDisplayDetail,
 } from './model.mjs';
+import { renderSynthesisView } from './synthesis-view.mjs';
 
 const $ = (id) => document.getElementById(id);
 const node = (tag, className = '', text) => {
@@ -168,7 +169,8 @@ function positionCard(position, { failed = false, dissent = false } = {}) {
 function renderOutcome() {
   const meeting = state.meeting;
   if (!changed('outcome', [meeting?.id, meeting?.status, meeting?.phase, meeting?.round, meeting?.report,
-    meeting?.events?.filter((event) => event.kind === 'final_position'), state.runtime.available, connected])) return;
+    meeting?.events?.filter((event) => event.kind === 'final_position'), state.runtime.available, connected,
+    meeting?.synthesis, state.synthesisAvailable, [...pending]])) return;
   const target = $('panel-outcome');
   const report = reportView(meeting?.report);
   if (!meeting) {
@@ -187,6 +189,7 @@ function renderOutcome() {
       for (const event of finals) fragment.append(positionCard({ ...event, participant: { name: actorName(state, event.actorId) } }, { failed: event.provenance?.source === 'runtime_fallback' }));
     }
   } else {
+    fragment.append(renderSynthesisView({ meeting, state, actorName, node, pill, button }));
     const summary = node('div', 'outcome-summary');
     summary.append(node('p', 'eyebrow', '本次讨论 · 实际记录'), node('h3', '', !report.authored.length ? '未取得真实最终立场' : report.stance ? '观点已汇集，判断留给你' : '本次未形成共同倾向'));
     if (report.stance) {
@@ -224,6 +227,7 @@ function renderDiscussion() {
   const list = node('ol', 'discussion-list');
   for (const event of events.slice(-eventLimit)) {
     const item = node('li', `event-card${event.provenance?.source === 'runtime_fallback' ? ' failed-event' : ''}`);
+    item.dataset.eventId = String(event.id);
     const heading = node('div', 'event-heading');
     heading.append(node('strong', '', actorName(state, event.actorId)), node('span', 'secondary', `第 ${event.round} 轮`), pill(EVENT_KINDS[event.kind] || '讨论记录'));
     item.append(heading);
@@ -298,7 +302,8 @@ function renderComposer() {
   $('start-meeting').hidden = active;
   $('stop-meeting').hidden = !active;
   $('stop-meeting').disabled = !connected || pending.has('stopMeeting');
-  $('stop-meeting').textContent = pending.has('stopMeeting') ? '正在停止…' : '停止讨论';
+  $('stop-meeting').textContent = pending.has('stopMeeting') ? '正在停止…'
+    : ['drafting', 'reviewing'].includes(state.meeting?.synthesis?.status) ? '停止复核' : '停止讨论';
   $('proposal').disabled = active || pending.has('startMeeting');
   $('mode').disabled = active || pending.has('startMeeting');
   $('rounds').disabled = active || pending.has('startMeeting');
@@ -327,7 +332,8 @@ function render() {
   $('data-folder').disabled = !connected || pending.size > 0;
   $('new-meeting').disabled = unavailableForRoster();
   $('add-seat').disabled = unavailableForBrowser() || state.seats.length >= 8;
-  $('meeting-status').textContent = state.meeting ? MEETING_STATUS[state.meeting.status] || '已保存的讨论' : '等待你的第一个提案';
+  $('meeting-status').textContent = ['drafting', 'reviewing'].includes(state.meeting?.synthesis?.status)
+    ? '综合答案复核中' : state.meeting ? MEETING_STATUS[state.meeting.status] || '已保存的讨论' : '等待你的第一个提案';
   $('meeting-round').textContent = state.meeting && state.meeting.round > 0 ? `第 ${state.meeting.round} 轮 · ${PHASES[state.meeting.phase] || '准备中'}` : '';
   document.querySelector('.stage').classList.toggle('is-running', active);
   $('meeting-context').hidden = !state.meeting;
@@ -425,6 +431,22 @@ document.addEventListener('click', async (event) => {
   if (!target || target.disabled) return;
   const { action, id } = target.dataset;
   if (action === 'invite') { openDialog('provider-dialog'); return; }
+  if (action === 'synthesizeMeeting') {
+    if (state.synthesisAvailable && await command('synthesizeMeeting')) selectTab('outcome');
+    return;
+  }
+  if (action === 'viewEvent') {
+    const events = state.meeting?.events || [];
+    if (!events.some((entry) => entry.id === id)) return;
+    eventLimit = Math.min(500, Math.max(eventLimit, events.length));
+    renderDiscussion();
+    selectTab('discussion');
+    const target = [...document.querySelectorAll('.event-card')]
+      .find((item) => item.dataset.eventId === id);
+    target?.scrollIntoView({ block: 'center', behavior: 'instant' });
+    target?.focus?.({ preventScroll: true });
+    return;
+  }
   if (action === 'moreEvents') {
     const panel = $('panel-discussion');
     const oldHeight = panel.scrollHeight;

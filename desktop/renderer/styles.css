@@ -312,3 +312,18 @@ select { padding: 7px 24px 7px 8px; min-height: 34px; font-size: 12px; }
   .status-badge, .seat-avatar, .stage, .button, .panel-tab, .empty-seat { border: 1px solid ButtonText; }
   .panel-tab[aria-selected="true"] { border-bottom: 3px solid Highlight; }
 }
+
+
+.synthesis-panel { margin: 0 0 24px; border: 1px solid #d2dfdc; border-radius: 13px; padding: 19px; background: #f8fcfa; }
+.synthesis-heading, .synthesis-review-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.synthesis-heading h3 { font-size: 18px; font-weight: 680; margin: 0; }
+.synthesis-help, .synthesis-note { line-height: 1.85; font-size: 12px; color: var(--muted); margin: 12px 0; }
+.synthesis-subheading { font-size: 13px; font-weight: 700; margin: 17px 0 9px; }
+.synthesis-answer { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.9; color: var(--ink); }
+.synthesis-caveats { margin: 12px 0; font-size: 12px; line-height: 1.8; }
+.synthesis-citations { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.synthesis-citations strong { width: 100%; font-size: 11px; }
+.synthesis-citation { font-size: 10px; overflow-wrap: anywhere; max-width: 100%; }
+.synthesis-review { border-top: 1px solid var(--line); padding: 12px 0 4px; }
+.synthesis-review p { white-space: pre-wrap; font-size: 12px; line-height: 1.8; margin: 7px 0; overflow-wrap: anywhere; }
+.synthesis-panel button:focus-visible { outline: 3px solid #29685b; outline-offset: 3px; }

@@ -2,7 +2,7 @@ import path from 'node:path';
 export const APP_URL = 'chatchat://app/index.html';
 export const CHANNEL = 'chatchat:command';
 export const STATE_CHANNEL = 'chatchat:state';
-export const METHODS = Object.freeze(['getState','addSeat','openSeat','checkSeat','removeSeat','startMeeting','stopMeeting','newMeeting','loadMeeting','exportMeeting','openDataFolder']);
+export const METHODS = Object.freeze(['getState','addSeat','openSeat','checkSeat','removeSeat','startMeeting','synthesizeMeeting','stopMeeting','newMeeting','loadMeeting','exportMeeting','openDataFolder']);
 export function trustedFrame(event, window) {
   return Boolean(window && !window.isDestroyed() && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === APP_URL);
 }
@@ -10,7 +10,7 @@ export function validateCommand(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(k => !['method','args'].includes(k)) || !METHODS.includes(value.method)) throw new Error('Invalid desktop command.');
   const text = JSON.stringify(value); if (text.length > 100000) throw new Error('Desktop command is too large.');
   const args = value.args;
-  if (['getState','stopMeeting','newMeeting','openDataFolder'].includes(value.method)) {
+  if (['getState','synthesizeMeeting','stopMeeting','newMeeting','openDataFolder'].includes(value.method)) {
     if (args !== undefined && args !== null) throw new Error('This command takes no arguments.');
   } else if (['openSeat','checkSeat','removeSeat','loadMeeting','exportMeeting'].includes(value.method)) {
     if (typeof args !== 'string' || !/^[a-zA-Z0-9:_-]{1,180}$/.test(args)) throw new Error('Invalid seat or meeting identifier.');

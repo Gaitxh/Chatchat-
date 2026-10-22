@@ -13,7 +13,7 @@ const [
   showcaseGuard,
   loginWorkflow,
   loginBootstrap,
-] = await Promise.all([
+] = (await Promise.all([
   readFile("src/extension/browser-authority-ledger.ts", "utf8"),
   readFile("src/extension/browser-authority-store.ts", "utf8"),
   readFile("src/extension/browser-authority-runtime.ts", "utf8"),
@@ -26,7 +26,7 @@ const [
   readFile("extension-public/browser-authority-showcase-guard.js", "utf8"),
   readFile(".github/workflows/login-concierge-ui.yml", "utf8"),
   readFile("extension-public/login-concierge-showcase-bootstrap.js", "utf8"),
-]);
+])).map((value) => value.replace(/\r\n/g, "\n"));
 
 for (const text of [
   'BROWSER_AUTHORITY_RECEIPTS_KEY = "chatchat.browser-authority.receipts.v1"',

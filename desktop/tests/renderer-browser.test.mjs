@@ -8,7 +8,7 @@ import { chromium } from 'playwright-core';
 const browserPath = process.env.CHATCHAT_RENDERER_BROWSER;
 const skip = browserPath ? false : 'Set CHATCHAT_RENDERER_BROWSER to run the isolated, sandboxed browser UI checks.';
 const fixtures = {
-  version: '0.10.1', runtime: { available: true, label: '测试浏览器', message: '隔离测试环境' },
+  version: '0.10.2', runtime: { available: true, label: '测试浏览器', message: '隔离测试环境' },
   providers: [
     { id: 'alpha', name: '测试甲', url: 'https://alpha.example/', automation: 'experimental' },
     { id: 'beta', name: '测试乙', url: 'https://beta.example/', automation: 'experimental' },
@@ -24,7 +24,7 @@ async function openRenderer(t, { bridge = true, viewport = { width: 1100, height
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  const files = new Map(await Promise.all(['index.html', 'styles.css', 'app.mjs', 'model.mjs'].map(async (file) => [file, await readFile(new URL(`../renderer/${file}`, import.meta.url), 'utf8')])));
+  const files = new Map(await Promise.all(['index.html', 'styles.css', 'app.mjs', 'model.mjs', 'synthesis-view.mjs'].map(async (file) => [file, await readFile(new URL(`../renderer/${file}`, import.meta.url), 'utf8')])));
   await page.route('**/*', async (route) => {
     const url = new URL(route.request().url());
     const filename = url.pathname.slice(1);
@@ -43,7 +43,7 @@ async function openRenderer(t, { bridge = true, viewport = { width: 1100, height
       onState: (callback) => { listener = callback; return () => { listener = undefined; }; },
       getState: async () => structuredClone(state),
     };
-    for (const method of ['addSeat', 'openSeat', 'checkSeat', 'removeSeat', 'startMeeting', 'stopMeeting', 'newMeeting', 'loadMeeting', 'exportMeeting', 'openDataFolder']) {
+    for (const method of ['addSeat', 'openSeat', 'checkSeat', 'removeSeat', 'startMeeting', 'synthesizeMeeting', 'stopMeeting', 'newMeeting', 'loadMeeting', 'exportMeeting', 'openDataFolder']) {
       window.chatChat[method] = async (arg) => {
         window.fixtureCalls.push([method, arg]);
         if (window.fixtureFailure === method) throw new Error('测试错误：请完成网站验证');
@@ -192,5 +192,60 @@ test('extra unready and manual seats do not block two ready models and are expli
   assert.equal(await page.locator('.seat-card').count(), 3);
   assert.equal(await page.locator('.seat-card').filter({ hasText: '本次未参与' }).count(), 1);
   assert.match(await page.locator('.seat-card').filter({ hasText: '本次未参与' }).textContent(), /Manual/);
+  assert.deepEqual(errors, []);
+});
+
+test('optional reviewed answer requires an explicit click, links real meeting events and preserves review dissent', { skip }, async (t) => {
+  const { page, errors } = await openRenderer(t);
+  const state = await page.evaluate(() => window.chatChat.getState());
+  state.seats = [
+    { id:'alpha', providerId:'alpha', name:'Alpha', url:'https://alpha.example/', status:'ready', detail:'' },
+    { id:'beta', providerId:'beta', name:'Beta', url:'https://beta.example/', status:'ready', detail:'' },
+  ];
+  state.meeting = {
+    id:'meeting-current', proposal:'Should we deploy?', status:'completed', phase:'completed', round:3,
+    events:[
+      { id:'ref-01', actorId:'alpha', kind:'final_position', round:3, content:'Limited pilot.' },
+      { id:'ref-02', actorId:'beta', kind:'final_position', round:3, content:'Wait for additional evidence.' },
+    ],
+    report:{
+      consensusStance:null,positions:[
+        { participant:{id:'alpha',name:'Alpha'},stance:'pilot',content:'Only a small trial.',confidence:0.6,caveats:[] },
+        { participant:{id:'beta',name:'Beta'},stance:'wait',content:'Need more proof.',confidence:0.6,caveats:[] },
+      ],disagreements:[
+        { participant:{id:'beta',name:'Beta'},stance:'wait',content:'Need more proof.',confidence:0.6,caveats:[] },
+      ],
+    },
+  };
+  state.synthesisAvailable = true;
+  await page.evaluate((updated) => window.fixturePush(updated), state);
+  const synthButton = page.getByRole('button', { name: /生成复核答案/ });
+  assert.equal(await synthButton.count(), 1);
+  assert.match(await page.locator('.synthesis-help').textContent(), /明确发起/);
+  const callsBefore = await page.evaluate(() => window.fixtureCalls);
+  assert.equal(callsBefore.filter((x) => x[0] === 'synthesizeMeeting').length, 0);
+  await synthButton.click();
+  const callsAfter = await page.evaluate(() => window.fixtureCalls);
+  assert.equal(callsAfter.filter((x) => x[0] === 'synthesizeMeeting').length, 1);
+
+  state.synthesisAvailable = false;
+  state.meeting.synthesis = {
+    status:'disputed',writerId:'alpha',reviewerIds:['beta'],
+    draft: { writerId:'alpha',
+      answer:'Trial first. <img src=x onerror=window.synthesisPwned=true>',
+      eventIds:['ref-01','ref-02'],caveats:['Source facts are not verified.'] },
+    reviews:[{participantId:'beta',status:'completed',verdict:'reject',
+      commentary:'The original dissent was not given sufficient weight.',eventIds:['ref-02']}],
+  };
+  await page.evaluate((updated) => window.fixturePush(updated), state);
+  await page.getByText('保留不同意见', { exact:true }).first().waitFor();
+  assert.equal(await page.locator('.synthesis-answer').count(), 1);
+  assert.match(await page.locator('.synthesis-answer').textContent(), /<img src=x onerror=/);
+  assert.equal(await page.locator('.synthesis-panel img').count(), 0);
+  assert.equal(await page.evaluate(() => Boolean(window.synthesisPwned)), false);
+  assert.match(await page.locator('.synthesis-review').textContent(), /反对草稿/);
+  await page.getByRole('button', { name:'定位原始会议发言 ref-02' }).click();
+  assert.equal(await page.locator('#tab-discussion').getAttribute('aria-selected'), 'true');
+  assert.equal(await page.locator('.event-card').filter({hasText:'Wait for additional evidence.'}).count(),1);
   assert.deepEqual(errors, []);
 });

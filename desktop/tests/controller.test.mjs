@@ -102,7 +102,7 @@ const archivedPath = (dataDir, id) => join(dataDir, 'controller', 'meetings', `$
 test('empty startup is honest, detached, and opens no model windows', async (t) => {
   const { controller, runtime } = await fixture(t);
   const state = controller.getState();
-  assert.equal(state.version, '0.10.1');
+  assert.equal(state.version, '0.10.2');
   assert.equal(state.meeting, null);
   assert.deepEqual(state.seats, []);
   assert.equal(state.busy, false);
@@ -553,4 +553,209 @@ test('malformed archives are preserved in quarantine while healthy history remai
   t.after(() => again.close());
   assert.equal(again.getState().history.length, 1);
   assert.equal((await readdir(join(dataDir, 'controller', 'meetings'))).filter((name) => name.includes('.corrupt-')).length, 1);
+});
+
+test('optional real-model synthesis requires an explicit click, preserves dissent and archives peer review', async (t) => {
+  const { controller, runtime, dataDir } = await fixture(t);
+  await ready(controller);
+  const originalId = controller.startMeeting(input({ proposal: 'Pilot or full release?' })).meeting.id;
+  const complete = await finished(controller);
+  assert.equal(complete.meeting.status, 'completed');
+  assert.equal(complete.synthesisAvailable, true);
+  const events = complete.meeting.events.filter((e) => e.kind === 'final_position' && e.provenance?.source !== 'runtime_fallback');
+  assert.ok(events.length >= 2);
+  const callsBefore = sent(runtime).length;
+  runtime.sendHook = async (_id, args) => {
+    if (args.prompt.includes('Return only <CHATCHAT_SYNTHESIS_V1>')) {
+      return {
+        responseText: '<CHATCHAT_SYNTHESIS_V1>' + JSON.stringify({
+          answer: 'Run a reversible pilot first. Preserve the concern about missing evidence.',
+          eventIds: events.slice(0, 2).map((e) => e.id),
+          caveats: ['The model claims have not been independently fact-checked.'],
+        }) + '</CHATCHAT_SYNTHESIS_V1>', elapsedMs: 1,
+      };
+    }
+    assert.match(args.prompt, /CHATCHAT_REVIEW_V1/);
+    return { responseText: '<CHATCHAT_REVIEW_V1>' + JSON.stringify({
+      verdict: 'approve', commentary: 'The answer retains the minority conditions.',
+      eventIds: [events[1].id],
+    }) + '</CHATCHAT_REVIEW_V1>', elapsedMs: 1 };
+  };
+  const started = controller.synthesizeMeeting();
+  assert.equal(started.meeting.synthesis.status, 'drafting');
+  assert.equal(started.synthesisAvailable, false);
+  await until(() => !controller.getState().busy, 'synthesis finished');
+  const result = controller.getState();
+  assert.equal(result.meeting.id, originalId);
+  assert.equal(result.meeting.status, 'completed');
+  assert.equal(result.meeting.synthesis.status, 'reviewed');
+  assert.equal(result.meeting.synthesis.reviews.length, 1);
+  assert.equal(sent(runtime).length, callsBefore + 2);
+  assert.match(result.meeting.synthesis.draft.answer, /reversible pilot/);
+  assert.throws(() => controller.synthesizeMeeting(), /just-completed live meeting/);
+  const exported = await controller.exportData(originalId);
+  assert.match(exported, /Optional post-meeting synthesis/);
+  assert.match(exported, /Internal discussion event IDs/);
+  const archived = JSON.parse(await readFile(archivedPath(dataDir, originalId), 'utf8'));
+  assert.equal(archived.meeting.synthesis.status, 'reviewed');
+  await controller.newMeeting();
+  await controller.loadMeeting(originalId);
+  assert.equal(controller.getState().meeting.synthesis.status, 'reviewed');
+  assert.equal(controller.getState().synthesisAvailable, false);
+  assert.equal(sent(runtime).length, callsBefore + 2, 'Historical loading must never resend synthesis');
+});
+
+test('synthesis refuses fabricated evidence IDs without blaming peers or changing the original report', async (t) => {
+  const { controller, runtime } = await fixture(t);
+  await ready(controller);
+  controller.startMeeting(input());
+  const completed = await finished(controller);
+  const originalReport = completed.meeting.report;
+  const initialSends = sent(runtime).length;
+  runtime.sendHook = async () => ({
+    responseText: '<CHATCHAT_SYNTHESIS_V1>' + JSON.stringify({
+      answer: 'Fabricated supporting event', eventIds: ['imaginary-event'], caveats: [],
+    }) + '</CHATCHAT_SYNTHESIS_V1>', elapsedMs: 1,
+  });
+  controller.synthesizeMeeting();
+  await until(() => !controller.getState().busy, 'failed synthesis');
+  const result = controller.getState().meeting;
+  assert.equal(result.synthesis.status, 'failed');
+  assert.equal(result.synthesis.draft, null);
+  assert.equal(result.status, 'completed');
+  assert.deepEqual(result.report, originalReport);
+  assert.equal(sent(runtime).length, initialSends + 1, 'No reviewer should see invalid draft');
+});
+
+test('peer rejection remains visible rather than silently becoming consensus', async (t) => {
+  const { controller, runtime } = await fixture(t);
+  await ready(controller);
+  controller.startMeeting(input());
+  const prior = await finished(controller);
+  const refs = prior.meeting.events.filter((e) => e.kind === 'final_position' && !e.provenance).slice(0, 2);
+  assert.equal(refs.length,2);
+  runtime.sendHook = async (_id, opts) => ({
+    responseText: opts.prompt.includes('CHATCHAT_SYNTHESIS_V1') ?
+      '<CHATCHAT_SYNTHESIS_V1>' + JSON.stringify({answer:'Possible recommendation',eventIds:refs.map((e)=>e.id),caveats:[]}) + '</CHATCHAT_SYNTHESIS_V1>' :
+      '<CHATCHAT_REVIEW_V1>' + JSON.stringify({verdict:'reject',commentary:'The minority argument is underrepresented.',eventIds:[refs[1].id]}) + '</CHATCHAT_REVIEW_V1>',
+    elapsedMs: 1,
+  });
+  controller.synthesizeMeeting();
+  await until(() => !controller.getState().busy, 'review rejected');
+  assert.equal(controller.getState().meeting.synthesis.status, 'disputed');
+  assert.equal(controller.getState().meeting.synthesis.reviews[0].verdict, 'reject');
+});
+
+test('stopping synthesis leaves the completed council intact and does not retry a late draft', async (t) => {
+  const { controller, runtime, dataDir } = await fixture(t);
+  await ready(controller);
+  controller.startMeeting(input());
+  const before = await finished(controller);
+  const originalReport = before.meeting.report;
+  const initialSends = sent(runtime).length;
+  const blocked = deferred();
+  runtime.sendHook = () => blocked.promise;
+  const status = controller.synthesizeMeeting();
+  assert.equal(status.meeting.synthesis.status, 'drafting');
+  await until(() => sent(runtime).length === initialSends + 1, 'post-council draft dispatched');
+  const stopped = await controller.stopMeeting();
+  assert.equal(stopped.meeting.status, 'completed');
+  assert.equal(stopped.meeting.synthesis.status, 'cancelled');
+  assert.deepEqual(stopped.meeting.report, originalReport);
+  assert.equal(controller.getState().busy, false);
+  blocked.resolve({responseText:'<CHATCHAT_SYNTHESIS_V1>{}</CHATCHAT_SYNTHESIS_V1>',elapsedMs:1});
+  await delay(40);
+  assert.equal(sent(runtime).length, initialSends + 1);
+  const archive = JSON.parse(await readFile(archivedPath(dataDir, stopped.meeting.id), 'utf8'));
+  assert.equal(archive.meeting.synthesis.status, 'cancelled');
+});
+
+test('a crashed reviewing phase becomes interrupted history with no automatic Provider work', async (t) => {
+  const { controller, dataDir } = await fixture(t);
+  await ready(controller);
+  const id = controller.startMeeting(input()).meeting.id;
+  const prior = await finished(controller);
+  assert.equal(prior.meeting.status, 'completed');
+  await controller.close();
+  const filename = archivedPath(dataDir, id);
+  const saved = JSON.parse(await readFile(filename, 'utf8'));
+  saved.meeting.synthesis = {
+    status: 'reviewing', writerId: saved.roster[0].id,
+    reviewerIds: [saved.roster[1].id], draft: null, reviews: [],
+  };
+  await writeFile(filename, JSON.stringify(saved));
+  const runtime = new Runtime();
+  const restored = createController({ runtime, dataDir, core });
+  t.after(() => restored.close());
+  assert.deepEqual(runtime.calls, [], 'No new chat or provider send during startup recovery');
+  const state = await restored.loadMeeting(id);
+  assert.equal(state.meeting.status, 'completed');
+  assert.equal(state.meeting.synthesis.status, 'interrupted');
+  assert.match(state.meeting.synthesis.error, /Nothing was re-sent/);
+  assert.equal(state.synthesisAvailable, false);
+  assert.equal(isRunningHistory(state.meeting), false, 'Historical synthesis must no longer appear active');
+  const disk = JSON.parse(await readFile(filename, 'utf8'));
+  assert.equal(disk.meeting.synthesis.status, 'interrupted');
+  assert.deepEqual(runtime.calls, []);
+});
+
+function isRunningHistory(meeting) {
+  return ['drafting', 'reviewing'].includes(meeting?.synthesis?.status);
+}
+
+test('invalid peer review is recorded as incomplete, never silently approved', async (t) => {
+  const { controller, runtime } = await fixture(t);
+  await ready(controller);
+  controller.startMeeting(input());
+  const prior = await finished(controller);
+  const refs = prior.meeting.events.filter((e) => e.kind === 'final_position' && !e.provenance).slice(0, 2);
+  assert.equal(refs.length, 2);
+  runtime.sendHook = async (_id, opts) => ({
+    responseText: opts.prompt.includes('CHATCHAT_SYNTHESIS_V1') ?
+      '<CHATCHAT_SYNTHESIS_V1>' + JSON.stringify({
+        answer:'Try a limited pilot; review unresolved objections.',
+        eventIds:refs.map((e) => e.id),caveats:[],
+      }) + '</CHATCHAT_SYNTHESIS_V1>' :
+      '<CHATCHAT_REVIEW_V1>' + JSON.stringify({
+        verdict:'approve',commentary:'Approval without any source reference',eventIds:[],
+      }) + '</CHATCHAT_REVIEW_V1>',
+    elapsedMs:1,
+  });
+  controller.synthesizeMeeting();
+  await until(() => !controller.getState().busy, 'incomplete reviewer response');
+  const syn = controller.getState().meeting.synthesis;
+  assert.equal(syn.status, 'incomplete');
+  assert.equal(syn.reviews.length, 1);
+  assert.equal(syn.reviews[0].status, 'failed');
+  assert.equal(syn.draft.eventIds.length, 2);
+});
+
+test('malformed synthesis archives are quarantined without losing unrelated completed meetings', async (t) => {
+  const { controller, dataDir } = await fixture(t);
+  await ready(controller);
+  const first = controller.startMeeting(input()).meeting.id;
+  await finished(controller);
+  await controller.newMeeting();
+  const second = controller.startMeeting(input({proposal:'Keep this good history'})).meeting.id;
+  await finished(controller);
+  await controller.close();
+  const file = archivedPath(dataDir, first);
+  const altered = JSON.parse(await readFile(file, 'utf8'));
+  altered.meeting.synthesis = {
+    status:'reviewed',writerId:'not-a-real-seat',
+    reviewerIds:['invalid'],draft:{answer:'Fabricated',eventIds:['invented'],caveats:[]},
+    reviews:[],
+  };
+  const bytes = JSON.stringify(altered);
+  await writeFile(file, bytes);
+  const runtime = new Runtime();
+  const restored = createController({runtime,dataDir,core});
+  t.after(() => restored.close());
+  assert.equal(restored.getState().history.length, 1);
+  assert.equal(restored.getState().history[0].id, second);
+  const dir = join(dataDir,'controller','meetings');
+  const name = (await readdir(dir)).find((n) => n.startsWith(first+'.json.corrupt-'));
+  assert.ok(name);
+  assert.equal(await readFile(join(dir,name),'utf8'),bytes);
+  assert.deepEqual(runtime.calls,[]);
 });

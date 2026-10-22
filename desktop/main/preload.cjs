@@ -1,5 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron');
-const methods=['getState','addSeat','openSeat','checkSeat','removeSeat','startMeeting','stopMeeting','newMeeting','loadMeeting','exportMeeting','openDataFolder'];
+const methods=['getState','addSeat','openSeat','checkSeat','removeSeat','startMeeting','synthesizeMeeting','stopMeeting','newMeeting','loadMeeting','exportMeeting','openDataFolder'];
 const bridge={};
 for(const method of methods) bridge[method]=async(args)=>{
   const reply=await ipcRenderer.invoke('chatchat:command',{method,...(args===undefined?{}:{args})});

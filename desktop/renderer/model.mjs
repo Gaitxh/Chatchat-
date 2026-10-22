@@ -24,8 +24,8 @@ export const EVENT_KINDS = {
 
 export function emptyState() {
   return {
-    version: '0.10.1', runtime: { available: false, label: '桌面连接', message: '正在连接桌面应用…' },
-    providers: [], seats: [], meeting: null, history: [], busy: false,
+    version: '0.10.2', runtime: { available: false, label: '桌面连接', message: '正在连接桌面应用…' },
+    providers: [], seats: [], meeting: null, history: [], busy: false, synthesisAvailable: false,
   };
 }
 
@@ -38,7 +38,7 @@ export function isState(value) {
 }
 
 export function isRunning(state) {
-  return ['preparing', 'running'].includes(state.meeting?.status);
+  return ['preparing', 'running'].includes(state.meeting?.status) || ['drafting', 'reviewing'].includes(state.meeting?.synthesis?.status);
 }
 
 export function startBlocker(state, { connected = true, pending = false, proposal = '' } = {}) {
@@ -147,7 +147,7 @@ export function formatDate(value) {
 }
 
 export const BRIDGE_METHODS = [
-  'getState', 'addSeat', 'openSeat', 'checkSeat', 'removeSeat', 'startMeeting',
+  'getState', 'addSeat', 'openSeat', 'checkSeat', 'removeSeat', 'startMeeting', 'synthesizeMeeting',
   'stopMeeting', 'newMeeting', 'loadMeeting', 'exportMeeting', 'openDataFolder', 'onState',
 ];
 

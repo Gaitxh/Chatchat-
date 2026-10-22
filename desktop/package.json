@@ -1,6 +1,6 @@
 {
   "name": "chatchat-desktop",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "private": true,
   "description": "Local Windows multi-model deliberation desktop harness",
   "type": "module",
