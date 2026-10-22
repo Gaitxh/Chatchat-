@@ -102,7 +102,7 @@ const archivedPath = (dataDir, id) => join(dataDir, 'controller', 'meetings', `$
 test('empty startup is honest, detached, and opens no model windows', async (t) => {
   const { controller, runtime } = await fixture(t);
   const state = controller.getState();
-  assert.equal(state.version, '0.10.6');
+  assert.equal(state.version, '0.10.7');
   assert.equal(state.meeting, null);
   assert.deepEqual(state.seats, []);
   assert.equal(state.busy, false);

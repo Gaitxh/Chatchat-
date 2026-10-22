@@ -109,7 +109,7 @@ test('real sandboxed two-browser council → opt-in draft → peer review → lo
     await controller.close();
     await runtime.close();
     await Promise.allSettled(contexts.map((context)=>context.close()));
-    await fs.rm(dataDir,{recursive:true,force:true});
+    await fs.rm(dataDir,{recursive:true,force:true,maxRetries:16,retryDelay:150});
   });
 
   await controller.addSeat({providerId:'openai-chatgpt'});

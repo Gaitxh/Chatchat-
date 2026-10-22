@@ -32,6 +32,11 @@ test('Windows build is one-click, current-user, self-contained and equally harde
  }
  assert.match(packaging,/SHA256SUMS.txt/);
  const workflow=await fs.readFile(new URL('../../.github/workflows/windows-desktop.yml',import.meta.url),'utf8');
+ assert.match(workflow,/pull_request:/);
+ assert.match(workflow,/branches: \[main\]/);
+ assert.match(workflow,/contents: read/);
+ assert.match(workflow,/npm run check/);
+ assert.match(workflow,/npm test/);
  assert.match(workflow,/runs-on: windows-latest/);
  assert.match(workflow,/npm run package:win/);
 

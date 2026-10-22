@@ -29,6 +29,7 @@ const MESSAGES = Object.freeze({
   AMBIGUOUS_SURFACE: 'The page contains multiple possible chat controls. Automatic sending is paused.',
   MANUAL_ONLY: 'Manual-only seat. This website can be opened and used by you, but ChatChat will not send prompts or count it as an automatic council participant.',
   UNEXPECTED_CHAT: 'The page contains an existing or unexpected conversation. A fresh, empty chat is required.',
+  PROMPT_MISMATCH: 'The new user message on the website does not match the prompt sent by ChatChat. Check the original provider chat before starting a new meeting; no automatic retry is allowed.',
   NONEMPTY_COMPOSER: 'The composer contains an unsent draft. Automatic sending is paused.',
   GENERATING: 'The page is already generating a response. Automatic sending is paused.',
   NOT_PREPARED: 'Prepare a fresh chat for this meeting before sending.',
@@ -94,6 +95,7 @@ export class ManagedBrowserRuntime {
   #integrityPromise;
   #integrityFailed = false;
   #headless;
+  #replySettleMs;
   #onChange;
   #seats = new Map();
   #browsers = new Map();
@@ -109,7 +111,8 @@ export class ManagedBrowserRuntime {
   #removing = new Set();
   #epoch = 0;
 
-  constructor({ dataDir, executablePath, onChange = () => {}, headless = false, chromium, networkProxy, browserVerifier } = {}) {
+  constructor({ dataDir, executablePath, onChange = () => {}, headless = false,
+    chromium, networkProxy, browserVerifier, replySettleMs } = {}) {
     if (typeof dataDir !== 'string' || !dataDir || dataDir.length > 4096
       || (executablePath !== undefined && (typeof executablePath !== 'string' || !path.isAbsolute(executablePath)))
       || typeof onChange !== 'function' || typeof headless !== 'boolean') throw failure('INVALID_REQUEST');
@@ -119,6 +122,13 @@ export class ManagedBrowserRuntime {
     this.#headless = headless;
     this.#chromium = chromium;
     this.#injected = chromium !== undefined;
+    // Production never permits callers to shorten the settle window. The
+    // injected driver-only override exists for deterministic offline tests.
+    if (replySettleMs !== undefined && (!this.#injected
+      || !Number.isInteger(replySettleMs) || replySettleMs < 100 || replySettleMs > 10_000)) {
+      throw failure('INVALID_REQUEST');
+    }
+    this.#replySettleMs = this.#injected ? (replySettleMs ?? 200) : 5_000;
     // Production MUST use the pinned-socket tunnel. Injected Chromium and
     // proxy factories exist only for controlled, offline driver tests.
     this.#proxyFactory = networkProxy ?? (this.#injected ? null : startOutboundProxy);
@@ -303,14 +313,23 @@ export class ManagedBrowserRuntime {
       let lastText = null;
       let stableSince = 0;
       for (;;) {
-        const current = await this.#inspect(seat, page, task, adapter, { capture: baseline });
+        const current = await this.#inspect(seat, page, task, adapter,
+          { capture: { ...baseline, expectedPrompt: prompt } });
         if (current.userCount < baseline.users || current.userCount > baseline.users + 1
-          || current.assistantCount < baseline.assistants || current.assistantCount > baseline.assistants + 1) throw failure('UNEXPECTED_CHAT');
+          || current.assistantCount < baseline.assistants || current.assistantCount > baseline.assistants + 1) {
+          throw failure('UNEXPECTED_CHAT');
+        }
+        // Counts alone do not prove the observed answer belongs to OUR prompt.
+        // Accept only when the newly displayed user turn exactly matches the
+        // prompt that was filled and sent, not a concurrent/rewritten message.
+        if (current.userCount === baseline.users + 1 && current.userPromptMatches !== true) {
+          throw failure('PROMPT_MISMATCH');
+        }
         const text = current.responseText;
         const complete = !current.busy && !current.hasDraft && current.replyComplete === true;
         if (typeof text === 'string' && text.trim() && complete) {
           if (text !== lastText) { lastText = text; stableSince = Date.now(); }
-          else if (Date.now() - stableSince >= 1_500) {
+          else if (Date.now() - stableSince >= this.#replySettleMs) {
             task.check();
             record.session.users = baseline.users + 1;
             record.session.assistants = baseline.assistants + 1;

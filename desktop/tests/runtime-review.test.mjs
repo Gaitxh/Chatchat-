@@ -127,10 +127,10 @@ class MockPage extends EventEmitter {
     this.context.driver.timeline.push('page-close');
     this.emit('close');
   }
-  addTurn(text, { complete = true, busy = false } = {}) {
+  addTurn(text, { complete = true, busy = false, userText = this.editor.value } = {}) {
     this.editor.value = '';
     this.stopButton.style.display = busy ? 'block' : 'none';
-    const user = new Element('DIV', [this.adapter.user]);
+    const user = new Element('DIV', [this.adapter.user], { text: userText });
     const assistant = new Element('DIV', [this.adapter.assistant]);
     const content = new Element('DIV', [this.adapter.text], { text });
     const copy = new Element('BUTTON', [this.adapter.complete], { style: { display: complete ? 'block' : 'none', visibility: 'visible' } });
@@ -257,6 +257,17 @@ async function reload(f, chromium = new MockChromium()) {
   f.runtimes.push(runtime);
   return { runtime, chromium };
 }
+
+test('production capture delay cannot be shortened through caller-injected settings', async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'chatchat-quiet-window-'));
+  t.after(() => rm(dir,{recursive:true,force:true}));
+  assert.throws(() => new ManagedBrowserRuntime({
+    dataDir: dir, executablePath: join(dir,'missing.exe'), replySettleMs:100,
+  }), code('INVALID_REQUEST'));
+  assert.throws(() => new ManagedBrowserRuntime({
+    dataDir:dir, chromium:new MockChromium(), replySettleMs:99,
+  }), code('INVALID_REQUEST'));
+});
 
 test('startup opens zero windows, copies are detached, and missing bundles are honestly unavailable', async (t) => {
   const f = await fixture(t);
@@ -496,7 +507,7 @@ test('send persists intent before its only click, captures only the new complete
   const [first, duplicate] = await Promise.all([send(f.runtime, seat.id), send(f.runtime, seat.id)]);
   assert.equal(first.responseText, 'First complete reply');
   assert.deepEqual(duplicate, first);
-  assert.ok(first.elapsedMs >= 1500, 'Complete text must remain stable for the full capture window');
+  assert.ok(first.elapsedMs >= 200, 'Complete text must remain stable for the entire injected fixture window');
   first.responseText = 'Outside mutation';
   assert.equal((await send(f.runtime, seat.id)).responseText, 'First complete reply');
   assert.equal(page.fills.length, 1);
@@ -508,6 +519,9 @@ test('send persists intent before its only click, captures only the new complete
   assert.equal((await send(f.runtime, seat.id, { operationId: 'second-operation' })).responseText, 'Second complete reply');
   assert.equal(page.clicks.length, 2);
   assert.equal((await f.runtime.checkSeat(seat.id)).status, 'ready');
+  for (const oldUser of page.scope.querySelectorAll(page.adapter.user).slice(0, -1)) {
+    oldUser.forbidText = true;
+  }
   const stored = await readFile(journalPath(f), 'utf8');
   assert.doesNotMatch(stored, /Review prompt|First complete reply|Second complete reply|cookie|password/i);
   assert.deepEqual((await journal(f)).operations.map((entry) => entry.state), ['completed', 'completed']);
@@ -560,13 +574,44 @@ test('changed drafts and origin drift between fill and click prevent every submi
   }
 });
 
-test('surface rejects ambiguous reply counts, oversized text, and never captures old or user text', async (t) => {
+test('REGRESSION: a visually completed answer is not accepted before a slow stream resumes', async (t) => {
+  const f = await fixture(t, { runtimeOptions: { replySettleMs: 2400 } });
+  const { seat, page } = await f.prepared();
+  let timer;
+  page.onClick = (p) => {
+    const turn = p.addTurn('PARTIAL_RESPONSE_DURING_STREAM_PAUSE', { complete: true, busy: false });
+    timer = setTimeout(() => {
+      turn.content.text = 'COMPLETED_RESPONSE_AFTER_STREAM_PAUSE';
+    }, 1950);
+  };
+  t.after(() => clearTimeout(timer));
+  const actual = await send(f.runtime, seat.id, { timeoutMs: 6600, operationId: 'delayed-continuation' });
+  assert.equal(actual.responseText, 'COMPLETED_RESPONSE_AFTER_STREAM_PAUSE',
+    'A completion control can appear before a streaming model has finished');
+  assert.equal(page.clicks.length, 1);
+});
+
+test('REGRESSION: a foreign or rewritten user chat message must never become a credited model reply', async (t) => {
+  const f = await fixture(t);
+  const { seat, page } = await f.prepared();
+  page.onClick = (p) => {
+    p.addTurn('Looks like a completed answer', { userText: 'A DIFFERENT USER PROMPT' });
+  };
+  const result = await outcome(send(f.runtime, seat.id, { timeoutMs: 850, operationId: 'wrong-user-turn' }));
+  assert.equal(result.error?.code, 'AMBIGUOUS_SEND');
+  assert.equal(result.error?.causeCode, 'PROMPT_MISMATCH');
+  assert.match(f.runtime.list()[0].detail, /new user message/);
+  assert.equal(page.clicks.length, 1);
+  assert.equal((await journal(f)).operations[0].state, 'uncertain');
+});
+
+test('surface rejects ambiguous reply counts or oversized text and never captures old transcript', async (t) => {
   for (const scenario of ['two-assistants', 'no-user', 'oversized']) {
     const f = await fixture(t);
     const { seat, page } = await f.prepared();
     page.onClick = (p) => {
       const turn = p.addTurn(scenario === 'oversized' ? 'x'.repeat(65537) : 'Reply');
-      turn.user.forbidText = true;
+      if (scenario !== 'oversized') turn.user.forbidText = true;
       if (scenario === 'two-assistants') p.scope.append(new Element('DIV', [p.adapter.assistant]));
       if (scenario === 'no-user') turn.user.selectors.clear();
     };

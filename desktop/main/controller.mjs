@@ -180,7 +180,7 @@ async function productionCore() {
  * explicit driver sentinels, NOT CSS selectors or a compatibility assertion.
  * Only runtime.prepareSeat/send operate the browser and own real selectors.
  */
-export function createController({ runtime, dataDir, onChange = () => {}, version = '0.10.6', core } = {}) {
+export function createController({ runtime, dataDir, onChange = () => {}, version = '0.10.7', core } = {}) {
   if (!runtime || typeof dataDir !== 'string' || !dataDir) throw new Error('runtime and dataDir are required.');
   const directory = join(dataDir, 'controller');
   const archiveDirectory = join(directory, 'meetings');

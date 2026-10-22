@@ -35,3 +35,9 @@ If a website changes its chat layout, ChatChat now reports a layout/adapter issu
 ## Installer payload proof (0.10.6)
 
 Every Windows release build extracts the actual NSIS installer embedded app-64.7z to a temporary QA directory and verifies **every** file against the already-reviewed win-unpacked application, including pinned Chromium critical files. Invalid paths, duplicate names, missing or modified files fail the build. Results are saved in release/NSIS-PAYLOAD-VERIFICATION.json and included in CI artifacts. This is an offline, non-executing archive check: it does not prove that a Windows installation, true version upgrade or uninstall worked. Actual install/reinstall/uninstall testing remains confined to an ephemeral **GitHub-hosted** Windows CI runner and has a bounded installer process wait; it has not yet run for this local preview.
+
+## Conservative reply capture and draft PR Windows CI (0.10.7)
+
+Real-model web answers are now associated with the newly displayed user message: a mismatched message fences the send as ambiguous, never credited or blindly retried. A newly visible Copy button alone cannot prove stream completion; production waits for a longer five-second quiet period in addition to completion control and no observed streaming indicator. This remains a heuristic, NOT a mathematical guarantee of terminal completion. Some site-specific text formatting will fail closed. Offline fixture tests reproduce the old premature reply and wrong-prompt failures.
+
+The Windows standalone workflow also runs on pull requests targeting main when desktop files change. It requests read-only repository permissions and uses temporary GitHub-hosted Windows runners for actual install/reinstall/uninstall with preserved local files. Opening a draft PR does not merge to main. Code signing, consumer-machine acceptance, real Provider accounts and cross-version upgrade are separate outstanding gates.

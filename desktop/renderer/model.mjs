@@ -24,7 +24,7 @@ export const EVENT_KINDS = {
 
 export function emptyState() {
   return {
-    version: '0.10.6', runtime: { available: false, label: '桌面连接', message: '正在连接桌面应用…' },
+    version: '0.10.7', runtime: { available: false, label: '桌面连接', message: '正在连接桌面应用…' },
     providers: [], seats: [], meeting: null, history: [], busy: false, synthesisAvailable: false,
     synthesisPlannedRequests: 0,
   };
@@ -72,6 +72,8 @@ export function seatDisplayDetail(seat) {
       '网站已跳转至其他域名。请检查登录流程，回到原模型网站后重新检查。'],
     [/The page contains an existing or unexpected conversation/i,
       '检测到旧聊天或不符合预期的对话。需要为本场会议创建新的空白 Chat。'],
+    [/The new user message on the website does not match the prompt/i,
+      '模型网页显示的用户消息与本轮提案不一致（也可能是网页排版改变了文本）。本次回答不计入讨论，请核对原网页；系统不会自动重发。'],
     [/The composer contains an unsent draft/i,
       '网页输入框中有未发送的草稿。请先自行处理草稿，再检查席位。'],
     [/The page is already generating a response/i,
