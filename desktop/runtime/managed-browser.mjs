@@ -27,7 +27,7 @@ const MESSAGES = Object.freeze({
   LOGIN_REQUIRED: 'Sign in manually in the managed browser, return to the chat page, and check the seat.',
   SURFACE_UNAVAILABLE: 'A safe chat composer and send control could not be identified. Sign in manually or check the site layout.',
   AMBIGUOUS_SURFACE: 'The page contains multiple possible chat controls. Automatic sending is paused.',
-  MANUAL_ONLY: 'This site requires manual use. No reviewed automatic chat recipe is available.',
+  MANUAL_ONLY: 'Manual-only seat. This website can be opened and used by you, but ChatChat will not send prompts or count it as an automatic council participant.',
   UNEXPECTED_CHAT: 'The page contains an existing or unexpected conversation. A fresh, empty chat is required.',
   NONEMPTY_COMPOSER: 'The composer contains an unsent draft. Automatic sending is paused.',
   GENERATING: 'The page is already generating a response. Automatic sending is paused.',
@@ -709,7 +709,9 @@ export class ManagedBrowserRuntime {
     } catch (caught) {
       const error = safeError(caught);
       if (['STOPPED', 'TIMEOUT'].includes(error.code)) throw error;
-      return this.#update(seat.id, ['LOGIN_REQUIRED', 'ORIGIN_DRIFT', 'SURFACE_UNAVAILABLE'].includes(error.code) ? 'needs_login' : 'attention', error.message);
+      return this.#update(seat.id, error.code === 'MANUAL_ONLY' ? 'manual'
+        : ['LOGIN_REQUIRED', 'ORIGIN_DRIFT'].includes(error.code)
+          ? 'needs_login' : 'attention', error.message);
     }
   }
 

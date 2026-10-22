@@ -11,7 +11,7 @@ import {
 
 const MODES = new Set(['balanced', 'explore', 'decide', 'verify', 'stress_test']);
 const TERMINAL = new Set(['completed', 'cancelled', 'failed']);
-const STATUSES = new Set(['opening', 'needs_login', 'ready', 'attention', 'closed', 'error']);
+const STATUSES = new Set(['opening', 'needs_login', 'ready', 'manual', 'attention', 'closed', 'error']);
 const ID = /^[a-zA-Z0-9_-]{1,100}$/;
 const MEETING_ID = /^meeting-[0-9a-f-]{36}$/;
 const MAX_FILE_BYTES = 16 * 1024 * 1024;
@@ -180,7 +180,7 @@ async function productionCore() {
  * explicit driver sentinels, NOT CSS selectors or a compatibility assertion.
  * Only runtime.prepareSeat/send operate the browser and own real selectors.
  */
-export function createController({ runtime, dataDir, onChange = () => {}, version = '0.10.4', core } = {}) {
+export function createController({ runtime, dataDir, onChange = () => {}, version = '0.10.5', core } = {}) {
   if (!runtime || typeof dataDir !== 'string' || !dataDir) throw new Error('runtime and dataDir are required.');
   const directory = join(dataDir, 'controller');
   const archiveDirectory = join(directory, 'meetings');
@@ -769,7 +769,11 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
           const outcome = job.kind === 'synthesis' ? job.record.meeting.synthesis : job.record.meeting;
           outcome.error = [outcome.error, errorText(result.reason)].filter(Boolean).join(' ').slice(0, 1200);
         }
-        try { await deadline(() => saveJob(job), { timeoutMs: closeTimeoutMs, label: 'Saving cancelled meeting' }); }
+        // Ensure prior queued archive writes settle before returning cancellation.
+        try { await deadline(() => saveJob(job), {
+          timeoutMs: Math.max(closeTimeoutMs, 5_000),
+          label: 'Saving cancelled meeting',
+        }); }
         catch (error) {
           storageFailed(error);
           const outcome = job.kind === 'synthesis' ? job.record.meeting.synthesis : job.record.meeting;

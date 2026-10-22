@@ -25,3 +25,9 @@ Maintainers may set CHATCHAT_ELECTRON_DIST to an absolute path to electron-v45.0
 ## Opt-in safe archive restore (0.10.4)
 
 Users can now open History → Preview Restore → Confirm Restore. The backup is inspected locally before a separate native Windows confirmation, re-read and SHA-256 checked immediately before commit, and imported only into missing meeting IDs. Existing meetings are never replaced; credentials, cookies, managed browser profiles, and seat bookmarks are not imported. Historical viewing and restore never dispatch Provider prompts. Import uses app-owned temporary files and no-overwrite hard links; a crash may leave some completed entries, and an idempotent retry skips those rather than overwriting them. A checksum is not a digital signature; restore backups only from trusted sources. Native Electron cancellation, post-preview tamper, and successful import are covered by an offline fixture.
+
+## Manual seats and experimental Provider adapters (0.10.5)
+
+MiniMax, Xiaomi MiMo and custom public HTTPS websites can be added with **+** and opened in their own managed browser for human-operated login and chat. They now show an explicit **Manual seat** state; this is not a failed login or an automated READY participant. Manual seats are excluded from automatic council proposals, deliberation, and synthesis. Two separately verified READY experimental seats are enough for a meeting even if other seats are manual or unavailable.
+
+If a website changes its chat layout, ChatChat now reports a layout/adapter issue rather than falsely claiming the user was logged out. Only a known login route is classified as requiring login. A five-Provider Chromium fixture suite verifies the basic adapter DOM contract and the changed-layout failure behavior for ChatGPT, Claude, DeepSeek, Qwen, and Gemini. The fixtures contain NO real Provider account data, do not contact these sites, and are not live compatibility certifications.

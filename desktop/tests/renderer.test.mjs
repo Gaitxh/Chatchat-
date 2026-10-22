@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
-  BRIDGE_METHODS, createSession, emptyState, isState, isRunning, startBlocker,
+  BRIDGE_METHODS, SEAT_STATUS, createSession, emptyState, isState, isRunning, startBlocker,
   reportView, readableError, actorName, formatDate, seatDisplayDetail,
 } from '../renderer/model.mjs';
 
@@ -203,6 +203,16 @@ test('restore bridge refuses malformed preview and never claims a completed impo
   assert.equal(previews.length,0);
   assert.ok(errors.length>0);
   session.dispose();
+});
+
+test('manual provider status remains distinct from readiness and shows actionable seat guidance', () => {
+  assert.deepEqual(SEAT_STATUS.manual, ['手动席位', 'muted']);
+  const state=readyState();
+  state.seats.push({ id:'manual-seat',providerId:'minimax-chat',name:'MiniMax',status:'manual',
+    detail:'Manual-only seat. This website can be opened and used by you, but ChatChat will not send prompts or count it as an automatic council participant.' });
+  assert.equal(state.seats.filter((seat)=>seat.status==='ready').length,2);
+  assert.equal(startBlocker(state,{ proposal:'Test manual observer with two active models' }), '');
+  assert.match(seatDisplayDetail(state.seats.at(-1)),/暂未通过自动协商|手动/);
 });
 
 test('initial getState does not overwrite a newer subscription state', async () => {

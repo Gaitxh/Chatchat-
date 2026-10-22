@@ -8,7 +8,7 @@ export const MODES = [
 
 export const SEAT_STATUS = {
   opening: ['正在打开', 'waiting'], needs_login: ['需要登录', 'warning'],
-  ready: ['已就绪', 'ready'], attention: ['需要处理', 'warning'],
+  ready: ['已就绪', 'ready'], manual: ['手动席位', 'muted'], attention: ['需要处理', 'warning'],
   closed: ['窗口已关闭', 'muted'], error: ['连接出错', 'error'],
 };
 export const MEETING_STATUS = {
@@ -24,7 +24,7 @@ export const EVENT_KINDS = {
 
 export function emptyState() {
   return {
-    version: '0.10.4', runtime: { available: false, label: '桌面连接', message: '正在连接桌面应用…' },
+    version: '0.10.5', runtime: { available: false, label: '桌面连接', message: '正在连接桌面应用…' },
     providers: [], seats: [], meeting: null, history: [], busy: false, synthesisAvailable: false,
     synthesisPlannedRequests: 0,
   };
@@ -64,7 +64,7 @@ export function seatDisplayDetail(seat) {
     ? '页面已连接。正式发送前还会校验会话和输入控件。'
     : '点击「登录 / 打开」进入网站，然后点击「检查」。';
   const cases = [
-    [/No reviewed automatic chat recipe|This site requires manual use/i,
+    [/Manual-only seat|No reviewed automatic chat recipe|This site requires manual use/i,
       '此网站暂未通过自动协商适配验证。你仍可打开网站使用，会议可由其他已就绪席位开始。'],
     [/Sign in manually|Sign in in the managed browser/i,
       '请在应用打开的独立浏览器中自行登录，返回模型聊天页面后点击「检查」。'],

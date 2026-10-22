@@ -102,7 +102,7 @@ const archivedPath = (dataDir, id) => join(dataDir, 'controller', 'meetings', `$
 test('empty startup is honest, detached, and opens no model windows', async (t) => {
   const { controller, runtime } = await fixture(t);
   const state = controller.getState();
-  assert.equal(state.version, '0.10.4');
+  assert.equal(state.version, '0.10.5');
   assert.equal(state.meeting, null);
   assert.deepEqual(state.seats, []);
   assert.equal(state.busy, false);
@@ -962,4 +962,26 @@ test('startup cleans only abandoned app-created restoration staging files and pr
   assert.equal(await readFile(unrelated,'utf8'),'{original corrupted archive evidence}');
   assert.deepEqual(runtime.calls,[]);
   assert.equal(controller.getState().history.length,0);
+});
+
+test('a manual-only Provider never receives a council prompt or counts toward minimum ready seats', async (t) => {
+  const { controller, runtime } = await fixture(t);
+  await ready(controller, 3);
+  const gamma = runtime.list().find((seat)=>seat.providerId==='gamma');
+  assert.ok(gamma);
+  const manual = runtime.seats.get(gamma.id);
+  manual.status='manual';
+  manual.detail='Manual-only seat: no automatic model recipe.';
+  controller.runtimeChanged(manual);
+  const prepared = controller.getState();
+  assert.equal(prepared.seats.find((seat)=>seat.id===gamma.id).status,'manual');
+  assert.equal(prepared.seats.filter((seat)=>seat.status==='ready').length,2);
+  controller.startMeeting(input());
+  const complete = await finished(controller);
+  assert.equal(complete.meeting.status,'completed');
+  assert.equal(complete.meeting.participatingSeatIds.length,2);
+  assert.ok(!complete.meeting.participatingSeatIds.includes(gamma.id));
+  assert.equal(complete.meeting.report.positions.length,2);
+  assert.equal(runtime.calls.filter((call)=>call.method==='send' && call.id===gamma.id).length,0);
+  assert.equal(complete.seats.find((seat)=>seat.id===gamma.id).status,'manual');
 });

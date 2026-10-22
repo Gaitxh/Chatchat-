@@ -344,12 +344,30 @@ test('custom public sites and unreviewed providers stay manual even with plausib
   const f = await fixture(t);
   for (const spec of [{ url: 'https://custom.example/chat' }, { providerId: 'minimax-chat' }, { providerId: 'xiaomi-mimo' }]) {
     const seat = await f.runtime.addSeat(spec);
-    assert.notEqual(seat.status, 'ready');
+    assert.equal(seat.status, 'manual', 'Unreviewed Provider is a usable manual seat, not an automation error');
+    const ownedPage = f.chromium.pages.at(-1);
+    assert.deepEqual(ownedPage.evaluations, [], 'Manual-only sites must never undergo automatic DOM inspection');
+    assert.equal((await f.runtime.checkSeat(seat.id)).status, 'manual');
+    assert.deepEqual(ownedPage.evaluations, []);
     await assert.rejects(f.runtime.prepareSeat(seat.id, { sessionId: 'manual-review' }), code('MANUAL_ONLY'));
     await assert.rejects(send(f.runtime, seat.id), code('NOT_PREPARED'));
   }
   assert.equal(f.runtime.catalog().some((p) => p.id === f.runtime.list()[0].providerId), false);
   assert.equal(f.chromium.clicks.length, 0);
+});
+
+test('manual seat readiness remains explicit across reload and never promotes without an adapter', async (t) => {
+  const f = await fixture(t);
+  const seat = await f.runtime.addSeat({ providerId: 'minimax-chat' });
+  assert.equal(seat.status, 'manual');
+  const firstOpen = f.chromium.pages.at(-1);
+  assert.deepEqual(firstOpen.evaluations, []);
+  const reloaded = await reload(f);
+  assert.equal(reloaded.runtime.list()[0].status, 'closed', 'Restart does not silently reconnect provider tabs');
+  const opened = await reloaded.runtime.openSeat(seat.id);
+  assert.equal(opened.status, 'manual');
+  assert.deepEqual(reloaded.chromium.pages.at(-1).evaluations, []);
+  await assert.rejects(reloaded.runtime.prepareSeat(seat.id, { sessionId:'manual-cannot-send' }),code('MANUAL_ONLY'));
 });
 
 test('HTTP and WebSocket request guards block local destinations without any network access', async (t) => {
@@ -380,7 +398,9 @@ test('readiness inspects real controls, handles missing/ambiguous controls, draf
   assert.equal(seat.status, 'ready');
   const original = page.editor.style;
   page.editor.style = { display: 'none' };
-  assert.equal((await f.runtime.checkSeat(seat.id)).status, 'needs_login');
+  const missingControls = await f.runtime.checkSeat(seat.id);
+  assert.equal(missingControls.status, 'attention', 'Changed DOM is not proof of a logged-out account');
+  assert.match(missingControls.detail, /chat composer/);
   page.editor.style = original;
   const extra = new Element('TEXTAREA', [page.adapter.composer]);
   page.form.append(extra);

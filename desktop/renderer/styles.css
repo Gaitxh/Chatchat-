@@ -333,3 +333,5 @@ select { padding: 7px 24px 7px 8px; min-height: 34px; font-size: 12px; }
 .backup-options button {white-space:nowrap}
 
 .backup-status {width:100%;margin:4px 0 0;padding:8px 11px;background:#edf6f2;color:#155d4b;border-radius:9px;line-height:1.7;font-size:12px}
+
+.seat-manual-hint{font-size:11px;line-height:1.6;color:var(--muted);margin-top:6px}

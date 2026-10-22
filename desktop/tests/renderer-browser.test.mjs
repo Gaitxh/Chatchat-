@@ -8,7 +8,7 @@ import { chromium } from 'playwright-core';
 const browserPath = process.env.CHATCHAT_RENDERER_BROWSER;
 const skip = browserPath ? false : 'Set CHATCHAT_RENDERER_BROWSER to run the isolated, sandboxed browser UI checks.';
 const fixtures = {
-  version: '0.10.4', runtime: { available: true, label: '测试浏览器', message: '隔离测试环境' },
+  version: '0.10.5', runtime: { available: true, label: '测试浏览器', message: '隔离测试环境' },
   providers: [
     { id: 'alpha', name: '测试甲', url: 'https://alpha.example/', automation: 'experimental' },
     { id: 'beta', name: '测试乙', url: 'https://beta.example/', automation: 'experimental' },
@@ -309,5 +309,55 @@ test('restoring a local backup requires preview and explicit confirmation; never
   assert.equal(imports.length,1);
   assert.equal(imports[0][1],'a'.repeat(36));
   assert.ok(!calls.some(([method])=>['startMeeting','openSeat','synthesizeMeeting'].includes(method)));
+  assert.deepEqual(errors,[]);
+});
+
+test('manual models occupy visible seats but cannot masquerade as automatic participants', { skip }, async (t) => {
+  const { page, errors } = await openRenderer(t);
+  const state = await page.evaluate(() => window.chatChat.getState());
+  state.seats = [
+    { id:'alpha', providerId:'openai-chatgpt', name:'ChatGPT',
+      url:'https://chatgpt.com/',status:'ready',detail:'Fixture controls found' },
+    { id:'beta', providerId:'deepseek-chat', name:'DeepSeek',
+      url:'https://chat.deepseek.com/',status:'ready',detail:'Fixture controls found' },
+    { id:'manual',providerId:'minimax-chat',name:'MiniMax',
+      url:'https://chat.minimax.io/',status:'manual',
+      detail:'Manual-only seat. This website can be opened and used by you, but ChatChat will not send prompts or count it as an automatic council participant.' },
+  ];
+  await page.evaluate((next)=>window.fixturePush(next),state);
+  await page.locator('#proposal').fill('Only the two verified-ready models may speak.');
+  assert.equal(await page.locator('#start-meeting').isEnabled(),true);
+  assert.match(await page.locator('#start-help').textContent(), /本次不参与/);
+  const card = page.locator('.seat-card').filter({hasText:'MiniMax'});
+  assert.equal(await card.count(),1);
+  assert.match(await card.textContent(),/手动席位/);
+  assert.match(await card.locator('.seat-detail').textContent(),/暂未通过自动协商/);
+  const before=await page.evaluate(()=>window.fixtureCalls);
+  assert.equal(before.filter(([method])=>method==='startMeeting').length,0);
+  await page.locator('#start-meeting').click();
+  const calls=await page.evaluate(()=>window.fixtureCalls);
+  assert.equal(calls.filter(([method])=>method==='startMeeting').length,1);
+  assert.equal(calls.filter(([method])=>method==='openSeat' || method==='checkSeat').length,0);
+  assert.deepEqual(errors,[]);
+});
+
+
+test('a saved closed manual Provider remains visibly non-automatic before its website is opened', { skip }, async (t) => {
+  const {page, errors} = await openRenderer(t);
+  const state = await page.evaluate(()=>window.chatChat.getState());
+  state.providers = [
+    ...state.providers.filter((entry)=>entry.id !== 'minimax-chat'),
+    {id:'minimax-chat',name:'MiniMax',url:'https://chat.minimax.io/',automation:'manual'},
+  ];
+  state.seats = [
+    {id:'saved-manual',providerId:'minimax-chat',name:'MiniMax',
+      url:'https://chat.minimax.io/',status:'closed',detail:'Saved seat. Open to sign in.'},
+  ];
+  await page.evaluate((updated)=>window.fixturePush(updated),state);
+  const card=page.locator('.seat-card').filter({hasText:'MiniMax'});
+  assert.equal(await card.count(),1);
+  assert.match(await card.locator('.seat-manual-hint').textContent(),/仅手动使用/);
+  assert.match(await card.locator('.seat-manual-hint').textContent(),/不参与自动协商/);
+  assert.equal(await page.locator('#start-meeting').isEnabled(),false);
   assert.deepEqual(errors,[]);
 });

@@ -122,13 +122,22 @@ function makeSeat(seat, index) {
   const detail = node('p', 'seat-detail', seatDisplayDetail(seat) || (seat.status === 'ready' ? '已通过当前连接检查。' : '在浏览器窗口完成登录，再检查状态。'));
   const actions = node('div', 'seat-actions');
   const open = button('登录 / 打开', 'openSeat', seat.id);
-  const check = button('检查', 'checkSeat', seat.id);
+  const check = button(seat.status === 'manual' ? '重新检查' : '检查', 'checkSeat', seat.id);
   const remove = button('移除', 'removeSeat', seat.id, 'button quiet remove-seat');
   open.setAttribute('aria-label', `登录或打开 ${seat.name}`);
   check.setAttribute('aria-label', `检查 ${seat.name} 的就绪状态`);
   remove.setAttribute('aria-label', `移除 ${seat.name} 席位`);
   actions.append(open, check, remove);
   card.append(top, status, detail, actions);
+  // A saved manual Provider may be 'closed' until the user opens its website.
+  // Make its lack of automation explicit even before login/first inspection.
+  const isManualSource = seat.status === 'manual'
+    || String(seat.providerId).startsWith('custom-')
+    || state.providers.some((provider) => provider.id === seat.providerId
+      && provider.automation === 'manual');
+  if (isManualSource && seat.status !== 'manual') {
+    card.append(node('p','seat-manual-hint','仅手动使用 · 不参与自动协商'));
+  }
   if (Array.isArray(state.meeting?.participatingSeatIds)
     && !state.meeting.participatingSeatIds.includes(seat.id)) {
     card.append(pill('本次未参与', 'muted'));
