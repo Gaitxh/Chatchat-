@@ -37,6 +37,11 @@ test('Windows build is one-click, current-user, self-contained and equally harde
  assert.match(workflow,/contents: read/);
  assert.match(workflow,/npm run check/);
  assert.match(workflow,/npm run test:ci/);
+ assert.match(workflow,/Disposable Windows runner install \/ reinstall \/ uninstall acceptance/);
+ assert.match(workflow,/continue-on-error: true/);
+ assert.match(workflow,/Native Electron backup UI diagnostic/);
+ assert.ok(workflow.indexOf('Disposable Windows runner install') < workflow.indexOf('Native Electron backup UI diagnostic'),
+   'Mandatory real installer acceptance must execute before the optional hosted GUI diagnostic');
  assert.match(workflow,/runs-on: windows-latest/);
  assert.match(workflow,/npm run package:win/);
 

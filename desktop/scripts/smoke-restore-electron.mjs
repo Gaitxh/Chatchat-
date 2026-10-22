@@ -32,11 +32,17 @@ await writeFile(backupPath,bytes,'utf8');
 
 let app;
 try {
+ // A GitHub-hosted Windows runner may have no interactive desktop session.
+ // This best-effort CI diagnostic can use Chromium headless mode; the local
+ // Windows release smoke still runs normally with its full window.
+ const ciHeadless = process.env.CHATCHAT_CI_HEADLESS === '1';
+ const electronEnv = { ...process.env, CHATCHAT_TEST_USER_DATA:userData,
+   CHATCHAT_BROWSER_EXECUTABLE:browserPath };
+ delete electronEnv.ELECTRON_RUN_AS_NODE;
  app=await _electron.launch({
   executablePath,
-  args:[root],
-  env:{...process.env, CHATCHAT_TEST_USER_DATA:userData,
-   CHATCHAT_BROWSER_EXECUTABLE:browserPath},
+  args:ciHeadless ? [root,'--headless','--disable-gpu'] : [root],
+  env:electronEnv,
   timeout:30_000,
  });
  const page=await app.firstWindow();
@@ -77,9 +83,20 @@ try {
  await page.locator('#preview-restore').click();
  await page.locator('#restore-preview').waitFor({state:'visible'});
  await page.locator('#confirm-restore').click();
- await page.waitForFunction(async()=> (await window.chatChat.getState()).history.length===1,
-   {},{timeout:12_000});
- const state=await page.evaluate(()=>window.chatChat.getState());
+ // The IPC bridge is async. Page.waitForFunction can observe a truthy
+ // promise before the file transaction has completed on some Electron builds.
+ // Poll completed controller snapshots from the test process, and only
+ // finish after mutation has stopped AND the history entry exists.
+ let state;
+ const commitDeadline=Date.now()+15_000;
+ for (;;) {
+   state=await page.evaluate(()=>window.chatChat.getState());
+   if (state.history.length===1 && state.busy===false) break;
+   if (Date.now()>commitDeadline) {
+     throw new Error('Restore did not finish or persist one meeting before its deadline.');
+   }
+   await new Promise((resolve)=>setTimeout(resolve,60));
+ }
  assert.equal(state.history[0].id,id);
  assert.equal(state.seats.length,0);
  assert.equal(state.meeting,null);
@@ -96,5 +113,5 @@ try {
     providerWindows:allWindows,nativeInstallTested:false}));
 } finally {
  await app?.close();
- await rm(dir,{recursive:true,force:true});
+ await rm(dir,{recursive:true,force:true,maxRetries:30,retryDelay:200});
 }
