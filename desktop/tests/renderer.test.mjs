@@ -29,8 +29,9 @@ function fixture(overrides = {}) {
   const calls = [];
   const bridge = Object.fromEntries(BRIDGE_METHODS.map((method) => [method, async (...args) => {
     calls.push([method, ...args]);
-    if (method === 'exportMeeting') return { saved: true };
+    if (method === 'exportMeeting' || method === 'backupLocalData') return { saved: true };
     if (method === 'openDataFolder') return { opened: true };
+    if (method === 'verifyBackupFile') return { verified: true, meetingCount: 2, seatBookmarkCount: 2, skippedDamagedArchives: 0 };
     return readyState();
   }]));
   bridge.onState = (callback) => { listener = callback; return () => { unsubscribed = true; }; };
@@ -114,6 +115,56 @@ test('all bridge commands forward the exact contract payload and expose pending 
   assert.deepEqual(notices, ['讨论记录已导出。', '已打开本机数据文件夹。']);
   session.dispose();
   assert.equal(source.unsubscribed(), true);
+});
+
+test('full local backup bridge only acknowledges a completed user-selected file', async () => {
+  const source = fixture();
+  const notices = [];
+  const session = createSession({bridge:source.bridge,onNotice:(value)=>notices.push(value)});
+  assert.equal(await session.connect(), true);
+  assert.equal(await session.run('backupLocalData'), true);
+  assert.equal(source.calls.at(-1)[0], 'backupLocalData');
+  assert.match(notices.at(-1), /备份/);
+  assert.match(notices.at(-1), /登录/);
+  session.dispose();
+});
+
+test('cancelled full backup does not claim a file was written', async () => {
+  const source = fixture({ backupLocalData: async () => ({ saved: false }) });
+  const notices = [];
+  const session = createSession({bridge:source.bridge,onNotice:(value)=>notices.push(value)});
+  await session.connect();
+  assert.equal(await session.run('backupLocalData'), true);
+  assert.equal(notices.length, 1);
+  assert.match(notices[0], /取消/);
+  session.dispose();
+});
+
+test('read-only backup verification reports count and cannot import stored sessions', async () => {
+  const source = fixture();
+  const notices = [];
+  const session = createSession({bridge:source.bridge,onNotice:(value)=>notices.push(value)});
+  await session.connect();
+  assert.equal(await session.run('verifyBackupFile'), true);
+  assert.equal(source.calls.at(-1)[0], 'verifyBackupFile');
+  assert.match(notices.at(-1), /2 场会议/);
+  assert.match(notices.at(-1), /未修改本地数据/);
+  session.dispose();
+});
+
+test('backup notice warns when damaged archives cannot be included', async () => {
+  const source = fixture({
+    backupLocalData: async () => ({ saved: true, meetingCount: 1, skippedDamagedArchives: 2 }),
+    verifyBackupFile: async () => ({ verified: true, meetingCount: 1, skippedDamagedArchives: 2 }),
+  });
+  const notices = [];
+  const session = createSession({ bridge: source.bridge, onNotice: (notice) => notices.push(notice) });
+  await session.connect();
+  assert.equal(await session.run('backupLocalData'), true);
+  assert.match(notices.at(-1), /2 份受损历史/);
+  assert.equal(await session.run('verifyBackupFile'), true);
+  assert.match(notices.at(-1), /未包含 2 份受损历史/);
+  session.dispose();
 });
 
 test('initial getState does not overwrite a newer subscription state', async () => {

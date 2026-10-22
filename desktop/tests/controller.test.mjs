@@ -102,7 +102,7 @@ const archivedPath = (dataDir, id) => join(dataDir, 'controller', 'meetings', `$
 test('empty startup is honest, detached, and opens no model windows', async (t) => {
   const { controller, runtime } = await fixture(t);
   const state = controller.getState();
-  assert.equal(state.version, '0.10.2');
+  assert.equal(state.version, '0.10.3');
   assert.equal(state.meeting, null);
   assert.deepEqual(state.seats, []);
   assert.equal(state.busy, false);
@@ -339,7 +339,11 @@ test('structured repair uses the real parser; forged fallback provenance cannot 
 });
 
 test('failed structured repair parks a seat and publishes runtime failure provenance', async (t) => {
-  const { controller, runtime } = await fixture(t);
+  // This test checks parser/fallback provenance, not wall-clock deadlines.
+  // Parallel Chromium/TypeScript CI jobs can stall the 150-ms test defaults.
+  const { controller, runtime } = await fixture(t, {
+    core: { ...core, timeoutMs: 1200, prepareTimeoutMs: 1200 },
+  });
   await ready(controller);
   runtime.sendHook = () => ({ responseText: 'Never a valid JSON envelope.' });
   controller.startMeeting(input());
@@ -760,4 +764,63 @@ test('malformed synthesis archives are quarantined without losing unrelated comp
   assert.ok(name);
   assert.equal(await readFile(join(dir,name),'utf8'),bytes);
   assert.deepEqual(runtime.calls,[]);
+});
+
+test('checking a pending seat after completion never silently removes optional peer review', async (t) => {
+  const { controller, runtime } = await fixture(t);
+  const seats = await ready(controller, 3);
+  const pending = seats.find((seat) => seat.providerId === 'gamma');
+  const parked = runtime.seats.get(pending.id);
+  parked.status = 'needs_login';
+  parked.detail = 'Manual model needs login';
+  controller.runtimeChanged(parked);
+  controller.startMeeting(input());
+  const completed = await finished(controller);
+  assert.equal(completed.meeting.status, 'completed');
+  assert.equal(completed.synthesisAvailable, true);
+  const sentBefore = sent(runtime).length;
+  await controller.checkSeat(pending.id);
+  assert.equal(controller.getState().synthesisAvailable, true,
+    'Checking a parked provider must preserve the just-completed meeting synthesis opportunity');
+  assert.equal(sent(runtime).length, sentBefore);
+  await controller.checkSeat(seats.find((seat) => seat.providerId === 'alpha').id);
+  assert.equal(controller.getState().synthesisAvailable, true);
+  assert.equal(sent(runtime).length, sentBefore);
+});
+
+test('one-click local backup snapshots every valid saved meeting but never browser profiles or login state', async (t) => {
+  const { controller, runtime } = await fixture(t);
+  await ready(controller);
+  const first = controller.startMeeting(input({ proposal:'First confidential proposal' })).meeting.id;
+  await finished(controller);
+  await controller.newMeeting();
+  const second = controller.startMeeting(input({ proposal:'Second proposal' })).meeting.id;
+  await finished(controller);
+  const callsBefore = runtime.calls.length;
+  const { content, meetingCount, skippedDamagedArchives } = await controller.backupData();
+  const decoded = JSON.parse(content);
+  assert.equal(meetingCount, 2);
+  assert.equal(skippedDamagedArchives, 0);
+  assert.equal(decoded.meetingCount, 2);
+  assert.deepEqual(decoded.meetings.map((x) => x.meeting.id).sort(), [first, second].sort());
+  assert.deepEqual(decoded.seats.map((x) => x.providerId), ['alpha','beta']);
+  assert.equal(decoded.containsLoginSessions, false);
+  assert.equal(decoded.containsBrowserProfiles, false);
+  assert.ok(!content.includes('must never reach state'));
+  assert.ok(!content.includes('managed-browser-seats.json'));
+  assert.equal(runtime.calls.length, callsBefore, 'Backup must not access Provider chats');
+  await controller.loadMeeting(first);
+  assert.equal((await controller.backupData()).meetingCount, 2);
+  assert.equal(runtime.calls.length, callsBefore, 'Backup and replay do not dispatch models');
+});
+
+test('unfinished meeting cannot silently produce a partial backup', async (t) => {
+  const { controller } = await fixture(t);
+  await ready(controller);
+  controller.startMeeting(input());
+  await assert.rejects(controller.backupData(), /Stop the current operation/);
+  await controller.stopMeeting();
+  const exported = await controller.backupData();
+  assert.equal(exported.meetingCount, 1);
+  assert.equal(JSON.parse(exported.content).meetings[0].meeting.status, 'cancelled');
 });

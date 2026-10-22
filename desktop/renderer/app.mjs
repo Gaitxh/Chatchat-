@@ -47,6 +47,11 @@ function message(text, error = true) {
   $('feedback-text').setAttribute('role', error ? 'alert' : 'status');
   $('feedback').classList.toggle('is-error', error);
   $('feedback').hidden = false;
+  const backupStatus = $('backup-status');
+  if (backupStatus && $('history-dialog').open && !error && /备份/.test(text)) {
+    backupStatus.textContent = text;
+    backupStatus.hidden = false;
+  }
   for (const name of ['provider', 'history']) {
     const target = $(`${name}-error`);
     target.textContent = error && $(`${name}-dialog`).open ? text : '';
@@ -58,6 +63,8 @@ function clearMessage() {
   $('feedback').hidden = true;
   $('feedback-text').textContent = '';
   for (const name of ['provider', 'history']) $(`${name}-error`).hidden = true;
+  $('backup-status').hidden = true;
+  $('backup-status').textContent = '';
 }
 
 const session = createSession({
@@ -290,9 +297,12 @@ function renderHistory() {
     if (!items.length) fragment.append(node('p', 'history-empty', query ? '没有匹配的提案。' : '还没有历史记录。完成一次讨论后，可以在这里回看。'));
     $('history-list').replaceChildren(fragment);
   }
+  const unavailable = !connected || pending.size > 0 || state.busy || isRunning(state);
   for (const element of $('history-list').querySelectorAll('button')) {
-    element.disabled = !connected || pending.size > 0 || state.busy || isRunning(state);
+    element.disabled = unavailable;
   }
+  $('backup-all').disabled = unavailable || (!state.history.length && !state.seats.length);
+  $('verify-backup').disabled = unavailable;
 }
 
 function renderComposer() {
@@ -410,6 +420,8 @@ $('new-meeting').addEventListener('click', async () => {
 });
 $('add-seat').addEventListener('click', () => openDialog('provider-dialog'));
 $('history-open').addEventListener('click', () => openDialog('history-dialog'));
+$('backup-all').addEventListener('click', () => void command('backupLocalData'));
+$('verify-backup').addEventListener('click', () => void command('verifyBackupFile'));
 $('data-folder').addEventListener('click', () => void command('openDataFolder'));
 $('feedback-dismiss').addEventListener('click', clearMessage);
 $('export-current').addEventListener('click', () => { if (state.meeting) void command('exportMeeting', state.meeting.id); });

@@ -24,7 +24,7 @@ export const EVENT_KINDS = {
 
 export function emptyState() {
   return {
-    version: '0.10.2', runtime: { available: false, label: '桌面连接', message: '正在连接桌面应用…' },
+    version: '0.10.3', runtime: { available: false, label: '桌面连接', message: '正在连接桌面应用…' },
     providers: [], seats: [], meeting: null, history: [], busy: false, synthesisAvailable: false,
     synthesisPlannedRequests: 0,
   };
@@ -149,7 +149,7 @@ export function formatDate(value) {
 
 export const BRIDGE_METHODS = [
   'getState', 'addSeat', 'openSeat', 'checkSeat', 'removeSeat', 'startMeeting', 'synthesizeMeeting',
-  'stopMeeting', 'newMeeting', 'loadMeeting', 'exportMeeting', 'openDataFolder', 'onState',
+  'stopMeeting', 'newMeeting', 'loadMeeting', 'exportMeeting', 'backupLocalData', 'verifyBackupFile', 'openDataFolder', 'onState',
 ];
 
 // A state push is newer than a command's in-flight snapshot. Never paint an old
@@ -206,9 +206,24 @@ export function createSession({ bridge, onChange = () => {}, onError = () => {},
       try {
         const result = argument === undefined ? await bridge[method]() : await bridge[method](argument);
         if (disposed) return false;
-        if (method === 'exportMeeting') {
+        if (method === 'exportMeeting' || method === 'backupLocalData') {
           if (typeof result?.saved !== 'boolean') throw new Error('未能确认导出结果，请重试。');
-          onNotice(result.saved ? '讨论记录已导出。' : '已取消导出。');
+          const omitted = Number.isSafeInteger(result.skippedDamagedArchives)
+            ? result.skippedDamagedArchives : 0;
+          onNotice(result.saved ? (method === 'backupLocalData'
+            ? (omitted > 0
+              ? '已保存备份，但 ' + omitted + ' 份受损历史未被包含；请检查原始归档，勿将此备份视为完整。'
+              : '已保存会议备份。此文件含明文会议内容，请妥善保管；不含网页登录资料。')
+            : '讨论记录已导出。')
+            : '已取消导出。');
+        } else if (method === 'verifyBackupFile') {
+          if (typeof result?.verified !== 'boolean') throw new Error('未取得可靠的备份校验结果。');
+          onNotice(result.verified
+            ? '备份文件校验通过：包含 ' + result.meetingCount + ' 场会议。'
+              + (result.skippedDamagedArchives > 0
+                ? ' 注意：该备份未包含 ' + result.skippedDamagedArchives + ' 份受损历史。' : '')
+              + ' 仅验证文件内容是否完整，未修改本地数据。'
+            : '已取消备份校验。');
         } else if (method === 'openDataFolder') {
           if (result?.opened !== true) throw new Error('未能打开数据文件夹，请重试。');
           onNotice('已打开本机数据文件夹。');

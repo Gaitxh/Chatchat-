@@ -8,7 +8,7 @@ import { chromium } from 'playwright-core';
 const browserPath = process.env.CHATCHAT_RENDERER_BROWSER;
 const skip = browserPath ? false : 'Set CHATCHAT_RENDERER_BROWSER to run the isolated, sandboxed browser UI checks.';
 const fixtures = {
-  version: '0.10.2', runtime: { available: true, label: '测试浏览器', message: '隔离测试环境' },
+  version: '0.10.3', runtime: { available: true, label: '测试浏览器', message: '隔离测试环境' },
   providers: [
     { id: 'alpha', name: '测试甲', url: 'https://alpha.example/', automation: 'experimental' },
     { id: 'beta', name: '测试乙', url: 'https://beta.example/', automation: 'experimental' },
@@ -43,7 +43,7 @@ async function openRenderer(t, { bridge = true, viewport = { width: 1100, height
       onState: (callback) => { listener = callback; return () => { listener = undefined; }; },
       getState: async () => structuredClone(state),
     };
-    for (const method of ['addSeat', 'openSeat', 'checkSeat', 'removeSeat', 'startMeeting', 'synthesizeMeeting', 'stopMeeting', 'newMeeting', 'loadMeeting', 'exportMeeting', 'openDataFolder']) {
+    for (const method of ['addSeat', 'openSeat', 'checkSeat', 'removeSeat', 'startMeeting', 'synthesizeMeeting', 'stopMeeting', 'newMeeting', 'loadMeeting', 'exportMeeting', 'backupLocalData', 'verifyBackupFile', 'openDataFolder']) {
       window.chatChat[method] = async (arg) => {
         window.fixtureCalls.push([method, arg]);
         if (window.fixtureFailure === method) throw new Error('测试错误：请完成网站验证');
@@ -70,8 +70,9 @@ async function openRenderer(t, { bridge = true, viewport = { width: 1100, height
             events: [{ id: 'q1', actorId: 'beta', round: 2, kind: 'challenge', content: '证据来源是什么？' }],
           };
         }
-        if (method === 'exportMeeting') return { saved: !window.fixtureCancelExport };
+        if (method === 'exportMeeting' || method === 'backupLocalData') return { saved: !window.fixtureCancelExport };
         if (method === 'openDataFolder') return { opened: true };
+        if (method === 'verifyBackupFile') return { verified: true, meetingCount: 1, seatBookmarkCount: 0, skippedDamagedArchives: 0 };
         return push();
       };
     }
@@ -249,5 +250,32 @@ test('optional reviewed answer requires an explicit click, links real meeting ev
   await page.getByRole('button', { name:'定位原始会议发言 ref-02' }).click();
   assert.equal(await page.locator('#tab-discussion').getAttribute('aria-selected'), 'true');
   assert.equal(await page.locator('.event-card').filter({hasText:'Wait for additional evidence.'}).count(),1);
+  assert.deepEqual(errors, []);
+});
+
+
+test('history backup is explicit, excludes website logins and never starts Provider requests', { skip }, async (t) => {
+  const { page, errors } = await openRenderer(t);
+  await page.locator('#history-open').click();
+  await page.locator('#history-dialog').waitFor({ state: 'visible' });
+  const backup = page.locator('#backup-all');
+  assert.equal(await backup.count(), 1);
+  assert.equal(await backup.isEnabled(), true);
+  assert.match(await page.locator('.backup-options').innerText(), /不含/);
+  assert.match(await page.locator('.backup-options').innerText(), /Cookie/);
+  const before = await page.evaluate(() => window.fixtureCalls);
+  assert.equal(before.some(([method])=>method==='backupLocalData'),false);
+  await backup.click();
+  const after = await page.evaluate(() => window.fixtureCalls);
+  assert.equal(after.filter(([method])=>method==='backupLocalData').length,1);
+  assert.match(await page.locator('#backup-status').innerText(), /备份/);
+  const verifyButton = page.locator('#verify-backup');
+  assert.equal(await verifyButton.isEnabled(), true);
+  await verifyButton.click();
+  const verifiedCalls = await page.evaluate(() => window.fixtureCalls);
+  assert.equal(verifiedCalls.filter(([method])=>method==='verifyBackupFile').length, 1);
+  assert.match(await page.locator('#backup-status').innerText(), /校验通过/);
+  assert.equal(after.some(([method])=>method==='startMeeting'),false);
+  assert.equal(after.some(([method])=>method==='synthesizeMeeting'),false);
   assert.deepEqual(errors, []);
 });

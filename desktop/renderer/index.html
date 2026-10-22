@@ -77,6 +77,12 @@
       <div class="dialog-heading"><div><p class="eyebrow">SAVED ON THIS DEVICE</p><h2 id="history-title">历史讨论</h2></div><button class="button quiet" type="button" data-close="history-dialog" aria-label="关闭历史记录">关闭</button></div>
       <p class="dialog-intro">查看本机保存的讨论与各方立场。加载记录只会回看，不会重新运行。</p>
       <label class="sr-only" for="history-search">搜索历史提案</label><input id="history-search" type="search" placeholder="搜索提案…" autocomplete="off">
+      <div class="backup-options">
+      <button id="backup-all" class="button secondary-button" type="button">备份全部会议</button>
+      <button id="verify-backup" class="button quiet" type="button">验证备份文件</button>
+      <span class="secondary">保存为可校验的明文 JSON，不含模型网站登录状态或 Cookie。当前仅支持导出和完整性验证，暂不提供自动恢复；备份包含明文会议内容，请妥善保管。</span>
+      </div>
+      <p id="backup-status" class="backup-status" role="status" aria-live="polite" hidden></p>
       <div id="history-list" class="history-list"></div><p id="history-error" class="dialog-error" role="alert" hidden></p>
     </dialog>
     <noscript>此桌面应用需要 JavaScript。请重新打开已安装的 ChatChat 应用。</noscript>

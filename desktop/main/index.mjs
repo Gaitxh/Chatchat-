@@ -1,10 +1,12 @@
 import { app, BrowserWindow, protocol, ipcMain, dialog, shell, session } from 'electron';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { APP_URL, CHANNEL, STATE_CHANNEL, trustedFrame, validateCommand, rendererPath } from './policy.mjs';
 import { ManagedBrowserRuntime } from '../runtime/index.mjs';
 import { createController } from './controller.mjs';
+import { inspectMeetingBackup } from './backup.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 app.setName('ChatChat');
@@ -67,6 +69,47 @@ async function boot(){
    try {
     const {method,args}=validateCommand(input);
     if(method==='openDataFolder') {const error=await shell.openPath(dataDir);if(error)throw new Error('无法打开本地数据目录。');return {ok:true,result:{opened:true}};}
+    if(method==='verifyBackupFile') {
+      const choice=await dialog.showOpenDialog(mainWindow,{
+        title:'验证 ChatChat 会议备份（只读，不会导入）',
+        properties:['openFile'],
+        filters:[{name:'ChatChat JSON 备份',extensions:['json']}],
+      });
+      if(choice.canceled || !choice.filePaths?.length) return {ok:true,result:{verified:false}};
+      const filePath=choice.filePaths[0];
+      const stat=await fs.stat(filePath);
+      if(!stat.isFile() || stat.size>64*1024*1024) throw new Error('Selected backup file is too large or invalid.');
+      const details=inspectMeetingBackup(await fs.readFile(filePath,'utf8'));
+      return {ok:true,result:{verified:true,...details}};
+    }
+    if(method==='backupLocalData') {
+      const backup=await controller.backupData();
+      if(!backup || typeof backup.content!=='string'
+        || Buffer.byteLength(backup.content,'utf8')>64*1024*1024) throw new Error('Local backup exceeds its safety limit.');
+      const choice=await dialog.showSaveDialog(mainWindow,{
+        title:'备份 ChatChat 本地会议（不含网页登录）',
+        defaultPath:'ChatChat-Meetings-Backup-'+new Date().toISOString().slice(0,10)+'.json',
+        filters:[{name:'ChatChat JSON 备份',extensions:['json']}],
+      });
+      if(choice.canceled || !choice.filePath) return {ok:true,result:{saved:false}};
+      // Write to a sibling then atomically replace. An interrupted backup
+      // must not leave the user with a half-written "complete" JSON file.
+      const temporary=choice.filePath+'.'+randomUUID()+'.tmp';
+      let file;
+      try {
+        file=await fs.open(temporary,'wx',0o600);
+        await file.writeFile(backup.content,'utf8');
+        await file.sync();
+        await file.close();
+        file=null;
+        await fs.rename(temporary,choice.filePath);
+      } finally {
+        await file?.close().catch(()=>{});
+        await fs.unlink(temporary).catch(()=>{});
+      }
+      return {ok:true,result:{saved:true,meetingCount:backup.meetingCount,
+        skippedDamagedArchives:backup.skippedDamagedArchives}};
+    }
     if(method==='exportMeeting') {
       const text=await controller.exportData(args);if(typeof text!=='string'||text.length>10000000)throw new Error('Meeting export is unavailable or too large.');
       const choice=await dialog.showSaveDialog(mainWindow,{title:'导出会议记录',defaultPath:`ChatChat-${args.slice(0,60)}.md`,filters:[{name:'Markdown',extensions:['md']}]});

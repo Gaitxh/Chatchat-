@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync 
 import { open, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isIP } from 'node:net';
+import { buildMeetingBackup } from './backup.mjs';
 import {
   authoredReferenceEvents, participatingAuthors, chooseDraftAuthor, draftPrompt, reviewPrompt,
   parseSynthesisDraft, parseSynthesisReview, synthesisStatus,
@@ -179,7 +180,7 @@ async function productionCore() {
  * explicit driver sentinels, NOT CSS selectors or a compatibility assertion.
  * Only runtime.prepareSeat/send operate the browser and own real selectors.
  */
-export function createController({ runtime, dataDir, onChange = () => {}, version = '0.10.2', core } = {}) {
+export function createController({ runtime, dataDir, onChange = () => {}, version = '0.10.3', core } = {}) {
   if (!runtime || typeof dataDir !== 'string' || !dataDir) throw new Error('runtime and dataDir are required.');
   const directory = join(dataDir, 'controller');
   const archiveDirectory = join(directory, 'meetings');
@@ -398,11 +399,12 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
       notify();
     } catch { /* Invalid runtime notifications cannot populate UI/storage. */ }
   }
-  async function seatOperation(action) {
+  async function seatOperation(action, { invalidatesSynthesis = true } = {}) {
     idle();
-    // The user can change the associated model Chat by reopening a seat.
-    // Avoid synthesizing into a conversation whose identity may have changed.
-    synthesisEligibleMeetingId = null;
+    // A seat can change conversation ownership when added/reopened/removed.
+    // Inspecting readiness does not navigate a prepared Chat and must not
+    // remove the completed meeting's optional answer-review opportunity.
+    if (invalidatesSynthesis) synthesisEligibleMeetingId = null;
     mutation = true;
     const operation = { active: true };
     const stillCurrent = () => {
@@ -468,7 +470,7 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
       stillCurrent();
       seatFailures.delete(id);
       acceptSeat(id, actual);
-    });
+    }, { invalidatesSynthesis: false });
   }
   async function removeSeat(id) {
     return seatOperation(async (stillCurrent) => {
@@ -792,6 +794,35 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
     notify();
     return getState();
   }
+  async function backupData() {
+    idle();
+    await writeTail;
+    if (storageError) throw new Error('Local storage is unavailable; a reliable backup cannot be created.');
+    // Saved meeting archives only; never copy login browser profiles, cookies,
+    // managed-browser operation journal, or arbitrary userData files.
+    const records = [];
+    let estimatedBytes = 0;
+    for (const item of archives.values()) {
+      estimatedBytes += statSync(join(archiveDirectory, item.id + '.json')).size;
+      if (estimatedBytes > 48 * 1024 * 1024) {
+        throw new Error('All saved meetings exceed the full-backup limit. Export individual meetings first.');
+      }
+      const saved = readArchive(item.id);
+      if (!TERMINAL.has(saved.meeting.status)) {
+        throw new Error('An unfinished meeting must be resolved before making a full backup.');
+      }
+      records.push(saved);
+    }
+    const excludedDamaged = readdirSync(archiveDirectory)
+      .filter((name) => /^meeting-[0-9a-f-]{36}\.json\.corrupt-/.test(name)).length;
+    const content = buildMeetingBackup({
+      meetings: records, seats: preferences().seats,
+      skippedDamagedArchives: excludedDamaged, createdAt: timestamp(),
+    });
+    return { content, meetingCount: records.length,
+      skippedDamagedArchives: excludedDamaged };
+  }
+
   async function exportData(id) {
     if (!archives.has(id)) throw new Error('Unknown meeting.');
     await writeTail;
@@ -857,5 +888,6 @@ export function createController({ runtime, dataDir, onChange = () => {}, versio
     return closeTask;
   }
   return { getState, addSeat, openSeat, checkSeat, removeSeat,
-    startMeeting, synthesizeMeeting, stopMeeting, newMeeting, loadMeeting, exportData, runtimeChanged, close };
+    startMeeting, synthesizeMeeting, stopMeeting, newMeeting, loadMeeting,
+    exportData, backupData, runtimeChanged, close };
 }

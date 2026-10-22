@@ -25,8 +25,15 @@ try {
  await window.locator('#add-seat').click();await window.locator('#provider-dialog').waitFor({state:'visible'});
  assert((await window.locator('#provider-dialog').innerText()).includes('ChatGPT'));
  await window.keyboard.press('Escape');
+ await window.locator('#history-open').click();
+ await window.locator('#history-dialog').waitFor({state:'visible'});
+ assert.equal(await window.locator('#backup-all').count(),1);
+ assert.equal(await window.locator('#verify-backup').count(),1);
+ assert.equal(await window.evaluate(()=>typeof window.chatChat.backupLocalData),'function');
+ assert.equal(await window.evaluate(()=>typeof window.chatChat.verifyBackupFile),'function');
+ await window.keyboard.press('Escape');
  await window.screenshot({path:path.join(output,'windows-desktop-room-linux-smoke.png'),fullPage:true});
  assert.deepEqual(errors,[]);
- const record={status:'passed',platform:process.platform,checks:['Real Electron desktop booted with local custom-protocol UI','App-owned profile initialized with no provider windows or network calls','All seven catalog sources visible without extension or developer mode','Bundled bridge works; invalid identifiers rejected','Renderer has no Node/process/require access and remains sandboxed','Native provider picker opens and closes with keyboard','No uncaught renderer errors'],providerInferenceTested:false,windowsInstallerExecuted:false};
+ const record={status:'passed',platform:process.platform,checks:['Real Electron desktop booted with local custom-protocol UI','App-owned profile initialized with no provider windows or network calls','All seven catalog sources visible without extension or developer mode','Bundled bridge works; invalid identifiers rejected','Renderer has no Node/process/require access and remains sandboxed','Native provider picker opens and closes with keyboard','History backup and read-only verification available without accessing Provider accounts','No uncaught renderer errors'],providerInferenceTested:false,windowsInstallerExecuted:false};
  await fs.writeFile(path.join(output,'electron-smoke.json'),JSON.stringify(record,null,2));console.log(JSON.stringify(record,null,2));
 }finally{await app?.close();await fs.rm(profile,{recursive:true,force:true});}

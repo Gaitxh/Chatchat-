@@ -11,6 +11,10 @@ test('no generic paths, script execution, credential or unknown command IPC',()=
  for(const input of [{method:'evaluate',args:'evil'},{method:'getState',args:{path:'/etc/passwd'}},{method:'openSeat',args:'../secret'},{method:'addSeat',args:{url:'https://example.com',providerId:'x'}},{method:'startMeeting',args:{proposal:'',mode:'balanced',maxRounds:3}},{method:'startMeeting',args:{proposal:'a',mode:'balanced',maxRounds:999}}])assert.throws(()=>validateCommand(input));
  assert.equal(validateCommand({method:'getState'}).method,'getState');
  assert.equal(validateCommand({method:'synthesizeMeeting'}).method,'synthesizeMeeting');
+ assert.equal(validateCommand({method:'backupLocalData'}).method,'backupLocalData');
+ assert.equal(validateCommand({method:'verifyBackupFile'}).method,'verifyBackupFile');
+ assert.throws(()=>validateCommand({method:'verifyBackupFile',args:{path:'C:/secret'}}));
+ assert.throws(()=>validateCommand({method:'backupLocalData',args:{directory:'C:\\Windows'}}));
  assert.throws(()=>validateCommand({method:'synthesizeMeeting',args:{force:true}}));
  assert.equal(validateCommand({method:'startMeeting',args:{proposal:'test',mode:'balanced',maxRounds:3}}).args.maxRounds,3);
 });
