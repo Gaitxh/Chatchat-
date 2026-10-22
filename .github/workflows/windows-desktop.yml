@@ -50,11 +50,13 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           node scripts/download-browser.mjs
           exit $LASTEXITCODE
-      - name: Desktop tests with isolated sandboxed fixture pages
+      - name: Desktop tests with bounded test worker concurrency
         working-directory: desktop
         run: |
+          # Two test workers avoid overloaded Chromium and spurious 150ms
+          # cross-process scheduling failures on temporary Windows runners.
           $env:CHATCHAT_RENDERER_BROWSER = Join-Path $PWD '.build-cache/browser/chrome-win64/chrome.exe'
-          npm test
+          npm run test:ci
           exit $LASTEXITCODE
       - name: Isolated native Electron backup preview, cancel, tamper and restore
         working-directory: desktop

@@ -11,7 +11,11 @@ import { BrowserConsultationAgent } from '../generated/src/provider-sdk/consulta
 
 const clone = (value) => structuredClone(value);
 const input = (overrides = {}) => ({ proposal: 'Should we adopt this proposal?', mode: 'balanced', maxRounds: 2, ...overrides });
-const core = { CouncilOrchestrator, BrowserConsultationAgent, timeoutMs: 150, prepareTimeoutMs: 150, closeTimeoutMs: 150 };
+// These deterministic parser/provenance tests should never depend on whether
+// another Chromium/TypeScript test saturates the tiny GitHub Windows runner.
+// Explicit timeout tests below still use their own bounded deadline.
+const core = { CouncilOrchestrator, BrowserConsultationAgent,
+  timeoutMs: 5000, prepareTimeoutMs: 5000, closeTimeoutMs: 2000 };
 const providers = [
   { id: 'alpha', name: 'Alpha', url: 'https://alpha.example/', automation: 'experimental' },
   { id: 'beta', name: 'Beta', url: 'https://beta.example/', automation: 'experimental' },
@@ -85,7 +89,7 @@ async function ready(controller, count = 2) {
   for (const provider of providers.slice(0, count)) await controller.addSeat({ providerId: provider.id });
   return controller.getState().seats;
 }
-async function until(predicate, message = 'condition', timeout = 2500) {
+async function until(predicate, message = 'condition', timeout = 12000) {
   const start = Date.now();
   while (!predicate()) {
     if (Date.now() - start > timeout) assert.fail(`Timed out waiting for ${message}`);
@@ -303,7 +307,7 @@ test('all prepare failures produce unavailable finals with zero alignment and no
 });
 
 test('unsettled transport times out, aborts its signal, and is never blindly resent', async (t) => {
-  const { controller, runtime } = await fixture(t, { core: { ...core, timeoutMs: 25 } });
+  const { controller, runtime } = await fixture(t, { core: { ...core, timeoutMs: 1200 } });
   await ready(controller);
   runtime.sendHook = () => new Promise(() => {});
   controller.startMeeting(input());

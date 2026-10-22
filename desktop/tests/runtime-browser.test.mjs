@@ -26,7 +26,8 @@ async function setup(t){
    });return page;};return context;
  }};
  const runtime=new ManagedBrowserRuntime({dataDir,executablePath,chromium:driver,headless:true});
- t.after(async()=>{await runtime.close();await Promise.all(contexts.map(c=>c.close().catch(()=>{})));await fs.rm(dataDir,{recursive:true,force:true});});
+ t.after(async()=>{await runtime.close();await Promise.all(contexts.map(c=>c.close().catch(()=>{})));// Windows can retain an app-owned Chromium lockfile briefly after context.close().
+ await fs.rm(dataDir,{recursive:true,force:true,maxRetries:50,retryDelay:200});});
  return {runtime,dataDir,launches,contexts,driver};
 }
 test('real sandboxed Chromium transports only the new assistant reply and reuses no old chat', {skip},async t=>{

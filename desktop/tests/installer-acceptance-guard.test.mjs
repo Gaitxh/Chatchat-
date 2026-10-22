@@ -29,12 +29,17 @@ test('installer acceptance script refuses to run outside GitHub-hosted CI withou
 }, async () => {
   // Explicitly force a non-CI environment so even on a hosted runner this test
   // cannot execute the installer. This test ONLY checks the very first guard.
-  const result = spawnSync('powershell.exe', [
-    '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', installerScript,
+  // PowerShell 5 cold-start sometimes exceeds 12 s under Windows Actions CPU
+  // contention. GitHub-hosted Windows images ship PowerShell 7 (pwsh), which
+  // is also used for the workflow's real installer-acceptance step.
+  const shell = process.env.GITHUB_ACTIONS === 'true' ? 'pwsh.exe' : 'powershell.exe';
+  const result = spawnSync(shell, [
+    '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', installerScript,
   ], {
     env: { ...process.env, GITHUB_ACTIONS: 'false', CI: 'false', RUNNER_ENVIRONMENT: 'self-hosted' },
-    encoding: 'utf8', windowsHide: true, timeout: 12_000,
+    encoding: 'utf8', windowsHide: true, timeout: 45_000,
   });
+  assert.equal(result.error, undefined, 'PowerShell guard subprocess must exit, not time out');
   assert.notEqual(result.status, 0, 'Guard must reject untrusted launch context.');
   assert.match((result.stderr ?? '') + (result.stdout ?? ''), /ephemeral GitHub-hosted Windows CI runner/);
 });
