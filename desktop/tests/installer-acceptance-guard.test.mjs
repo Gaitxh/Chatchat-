@@ -22,6 +22,16 @@ test('NSIS installation acceptance requires an ephemeral GitHub-hosted Windows r
   assert.doesNotMatch(source, /Start-Process[^\n]*-Wait\b/);
   assert.match(source, /\.ExecutablePath.*\$binary/);
   assert.match(source, /-not \$installPath\.StartsWith\(\$localRoot/);
+  assert.match(source, /Wait-For-UninstallCompletion \$binary 120/);
+  assert.match(source, /Diagnostics\.Stopwatch\]::StartNew\(\)/);
+  assert.match(source, /Start-Sleep -Milliseconds 750/);
+  assert.match(source, /remaining\.Count -eq 0 -and -not \$binaryExists/);
+  assert.match(source, /NSIS uninstall remained incomplete after/);
+  assert.match(source, /Assert-InstalledFilesMatchRelease/);
+  for (const component of ['ChatChat.exe', 'app.asar', 'chrome.exe', 'chrome.dll']) {
+    assert.ok(source.includes(component), 'Installed file byte-parity check missing: ' + component);
+  }
+  assert.match(source, /Get-FileHash -LiteralPath \$installed -Algorithm SHA256/);
 });
 
 test('installer acceptance script refuses to run outside GitHub-hosted CI without side effects', {
