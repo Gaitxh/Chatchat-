@@ -30,8 +30,11 @@ jobs:
 
       - name: Protect existing AI conversations
         run: |
-          grep -q 'automaticTeamLaunchUrl' src/extension/web-room-onboarding.tsx
-          grep -q 'createdByChatChat: true' src/extension/web-room-onboarding.tsx
+          # Source-of-truth moved to explicit fresh-seat planning. Check actual
+          # bound launch origins and the only function that creates owned tabs.
+          grep -q 'automaticTeamLaunchUrl' src/extension/automatic-team.ts
+          grep -q 'createFreshSeat' src/extension/web-room-onboarding.tsx
+          grep -q 'createdByChatChat: true' src/extension/fresh-seat.ts
           grep -q 'never sends' src/extension/automatic-team.ts
           ! grep -q 'findReusableAutomaticTeamTab' src/extension/web-room-onboarding.tsx
           ! grep -q 'findReusableAutomaticTeamTab' src/extension/automatic-team.ts
@@ -69,88 +72,53 @@ jobs:
 
       - name: Capture fresh English Full Room
         run: |
-          URL='http://127.0.0.1:4181/app/app.html?showcase=zero-config&lang=en'
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --hide-scrollbars \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=8000 \
-            --window-size=1440,1800 \
-            --screenshot=artifacts/chatchat-zero-config-en.png \
-            "$URL"
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=8000 \
-            --window-size=1440,1800 \
-            --dump-dom \
-            "$URL" > artifacts/chatchat-zero-config-en.html
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url "http://127.0.0.1:4181/app/app.html?showcase=zero-config&lang=en" \
+            --width 1440 --height 1800 --wait-ms 22000 \
+            --ready-selector 'html[data-chatchat-zero-config-showcase="complete"][data-chatchat-zero-config-no-auto-create="complete"][data-chatchat-zero-config-manual-invite="visible"]' \
+            --screenshot "artifacts/chatchat-zero-config-en.png" \
+            --dom "artifacts/chatchat-zero-config-en.html"
           test -s artifacts/chatchat-zero-config-en.png
+          grep -q 'data-chatchat-zero-config-no-auto-create="complete"' artifacts/chatchat-zero-config-en.html
+          grep -q 'data-chatchat-zero-config-manual-invite="visible"' artifacts/chatchat-zero-config-en.html
           grep -q 'data-chatchat-zero-config-showcase="complete"' artifacts/chatchat-zero-config-en.html
-          grep -q 'ZERO-CONFIG START' artifacts/chatchat-zero-config-en.html
-          grep -q 'Automatic team: ChatGPT · Claude · Gemini' artifacts/chatchat-zero-config-en.html
-          grep -q 'Assemble my AI room' artifacts/chatchat-zero-config-en.html
-          grep -q 'existing conversations stay untouched' artifacts/chatchat-zero-config-en.html
-          grep -q 'Your existing AI conversations stay untouched' artifacts/chatchat-zero-config-en.html
+          grep -q 'CHOOSE YOUR AI TEAM' artifacts/chatchat-zero-config-en.html
+          grep -q 'Optional starter team: ChatGPT · Claude · Gemini' artifacts/chatchat-zero-config-en.html
+          grep -q 'Use suggested starter team' artifacts/chatchat-zero-config-en.html
+          grep -q 'Existing AI tabs only inform suggestions; they never receive setup messages.' artifacts/chatchat-zero-config-en.html
+          grep -q 'New-chat entries and connection checks cannot prove a provider created a fresh conversation.' artifacts/chatchat-zero-config-en.html
           ! grep -q 'Start automatic setup' artifacts/chatchat-zero-config-en.html
 
       - name: Capture fresh Chinese Full Room
         run: |
-          URL='http://127.0.0.1:4181/app/app.html?showcase=zero-config&lang=zh'
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --hide-scrollbars \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=8000 \
-            --window-size=1440,1800 \
-            --screenshot=artifacts/chatchat-zero-config-zh.png \
-            "$URL"
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=8000 \
-            --window-size=1440,1800 \
-            --dump-dom \
-            "$URL" > artifacts/chatchat-zero-config-zh.html
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url "http://127.0.0.1:4181/app/app.html?showcase=zero-config&lang=zh" \
+            --width 1440 --height 1800 --wait-ms 22000 \
+            --ready-selector 'html[data-chatchat-zero-config-showcase="complete"][data-chatchat-zero-config-no-auto-create="complete"][data-chatchat-zero-config-manual-invite="visible"]' \
+            --screenshot "artifacts/chatchat-zero-config-zh.png" \
+            --dom "artifacts/chatchat-zero-config-zh.html"
           test -s artifacts/chatchat-zero-config-zh.png
+          grep -q 'data-chatchat-zero-config-no-auto-create="complete"' artifacts/chatchat-zero-config-zh.html
+          grep -q 'data-chatchat-zero-config-manual-invite="visible"' artifacts/chatchat-zero-config-zh.html
           grep -q 'data-chatchat-zero-config-showcase="complete"' artifacts/chatchat-zero-config-zh.html
-          grep -q '零配置开始' artifacts/chatchat-zero-config-zh.html
-          grep -q '自动团队：ChatGPT · Claude · Gemini' artifacts/chatchat-zero-config-zh.html
-          grep -q '组建我的 AI 会议室' artifacts/chatchat-zero-config-zh.html
-          grep -q '不会往你原来的聊天里塞握手或协商内容' artifacts/chatchat-zero-config-zh.html
-          grep -q '你原来的 AI 对话不会被改动' artifacts/chatchat-zero-config-zh.html
+          grep -q '自选 AI 团队' artifacts/chatchat-zero-config-zh.html
+          grep -q '可选起步团队：ChatGPT' artifacts/chatchat-zero-config-zh.html
+          grep -q '使用建议的起步团队' artifacts/chatchat-zero-config-zh.html
+          grep -q '已有 AI 标签页仅用于建议' artifacts/chatchat-zero-config-zh.html
+          grep -q '打开新对话入口和通过连接检查不能证明网站已创建全新对话' artifacts/chatchat-zero-config-zh.html
           ! grep -q '开始自动配置' artifacts/chatchat-zero-config-zh.html
 
       - name: Prove English room assembles live without reload
         run: |
-          URL='http://127.0.0.1:4181/app/app.html?showcase=zero-config&journey=assemble&lang=en'
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --hide-scrollbars \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=18000 \
-            --window-size=1440,2200 \
-            --screenshot=artifacts/chatchat-zero-config-assembled-en.png \
-            "$URL"
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=18000 \
-            --window-size=1440,2200 \
-            --dump-dom \
-            "$URL" > artifacts/chatchat-zero-config-assembled-en.html
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url "http://127.0.0.1:4181/app/app.html?showcase=zero-config&journey=assemble&lang=en" \
+            --width 1440 --height 2200 --wait-ms 35000 \
+            --ready-selector 'html[data-chatchat-zero-config-assembly="complete"][data-chatchat-zero-config-draft-preserved="complete"]' \
+            --screenshot "artifacts/chatchat-zero-config-assembled-en.png" \
+            --dom "artifacts/chatchat-zero-config-assembled-en.html"
           test -s artifacts/chatchat-zero-config-assembled-en.png
           grep -q 'data-chatchat-zero-config-assembly="complete"' artifacts/chatchat-zero-config-assembled-en.html
           grep -q 'data-chatchat-zero-config-draft-preserved="complete"' artifacts/chatchat-zero-config-assembled-en.html
@@ -161,26 +129,13 @@ jobs:
 
       - name: Prove Chinese room assembles live without reload
         run: |
-          URL='http://127.0.0.1:4181/app/app.html?showcase=zero-config&journey=assemble&lang=zh'
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --hide-scrollbars \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=18000 \
-            --window-size=1440,2200 \
-            --screenshot=artifacts/chatchat-zero-config-assembled-zh.png \
-            "$URL"
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=18000 \
-            --window-size=1440,2200 \
-            --dump-dom \
-            "$URL" > artifacts/chatchat-zero-config-assembled-zh.html
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url "http://127.0.0.1:4181/app/app.html?showcase=zero-config&journey=assemble&lang=zh" \
+            --width 1440 --height 2200 --wait-ms 35000 \
+            --ready-selector 'html[data-chatchat-zero-config-assembly="complete"][data-chatchat-zero-config-draft-preserved="complete"]' \
+            --screenshot "artifacts/chatchat-zero-config-assembled-zh.png" \
+            --dom "artifacts/chatchat-zero-config-assembled-zh.html"
           test -s artifacts/chatchat-zero-config-assembled-zh.png
           grep -q 'data-chatchat-zero-config-assembly="complete"' artifacts/chatchat-zero-config-assembled-zh.html
           grep -q 'data-chatchat-zero-config-draft-preserved="complete"' artifacts/chatchat-zero-config-assembled-zh.html

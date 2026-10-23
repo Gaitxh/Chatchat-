@@ -3,6 +3,11 @@
   if (params.get("showcase") !== "consultation") return;
 
   const locale = params.get("lang") === "en" ? "en" : "zh-CN";
+  // The ordinary simulated council MUST send only to ChatChat-owned fresh
+  // fixtures. A separate explicit authority-proof mode keeps user-owned
+  // fixtures, proving background auto-resume is denied. Never override the
+  // production boundProviderOrigin() gate to make a screenshot pass.
+  const USER_OWNED_AUTHORITY_PROOF = params.get("authority-proof") === "protected";
   const RECIPES_KEY = "chatchat.extension.recipes.v1";
   const PARTICIPANTS_KEY = "chatchat.consultation.participants.v1";
   const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
@@ -24,7 +29,7 @@
       providerId: "openai-chatgpt",
       providerName: "ChatGPT",
       startUrl: "https://chatgpt.com/",
-      createdByChatChat: false,
+      createdByChatChat: !USER_OWNED_AUTHORITY_PROOF,
     },
     {
       seatId: "extension:anthropic-claude:102",
@@ -36,7 +41,7 @@
       providerId: "anthropic-claude",
       providerName: "Claude",
       startUrl: "https://claude.ai/",
-      createdByChatChat: false,
+      createdByChatChat: !USER_OWNED_AUTHORITY_PROOF,
     },
     {
       seatId: "extension:google-gemini:103",
@@ -48,7 +53,7 @@
       providerId: "google-gemini",
       providerName: "Gemini",
       startUrl: "https://gemini.google.com/app",
-      createdByChatChat: false,
+      createdByChatChat: !USER_OWNED_AUTHORITY_PROOF,
     },
   ];
 

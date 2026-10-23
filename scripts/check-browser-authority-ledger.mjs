@@ -11,6 +11,7 @@ const [
   runner,
   workflow,
   showcaseGuard,
+  consultationBootstrap,
   loginWorkflow,
   loginBootstrap,
 ] = (await Promise.all([
@@ -24,6 +25,7 @@ const [
   readFile("scripts/run-test-suite.mjs", "utf8"),
   readFile(".github/workflows/browser-authority-ui.yml", "utf8"),
   readFile("extension-public/browser-authority-showcase-guard.js", "utf8"),
+  readFile("extension-public/consultation-showcase-bootstrap.js", "utf8"),
   readFile(".github/workflows/login-concierge-ui.yml", "utf8"),
   readFile("extension-public/login-concierge-showcase-bootstrap.js", "utf8"),
 ])).map((value) => value.replace(/\r\n/g, "\n"));
@@ -162,6 +164,14 @@ for (const text of [
   '!shouldTrackAutomaticResumeIntent(managedSeat, "recovery", "connecting")',
   'browserAuthorityReasonForRetry("manual") === null',
 ]) requireText(test, text, "adversarial Browser Authority privacy / consumed retry tests");
+
+// A user-owned fixture MUST NOT be used as an automatic speaking participant.
+// Keep a separate adversarial authority proof, and managed clean tabs for the
+// normal consultation demo. Never loosen production tab-ownership enforcement.
+for (const text of [
+  'const USER_OWNED_AUTHORITY_PROOF = params.get("authority-proof") === "protected";',
+  'createdByChatChat: !USER_OWNED_AUTHORITY_PROOF',
+]) requireText(consultationBootstrap, text, "isolated synthetic managed versus user-owned speaking boundaries");
 
 for (const text of [
   'params.get("authority-proof") !== "protected"',

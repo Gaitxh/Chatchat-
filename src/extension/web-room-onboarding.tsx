@@ -77,10 +77,12 @@ async function mount() {
   const guideRoot = document.getElementById("first-run-guide-root");
   if (!root) return;
   const onboardingRoot = root;
-  const locale: Locale = document.documentElement.lang.toLowerCase().startsWith("zh")
-    || navigator.language?.toLowerCase().startsWith("zh")
-    ? "zh-CN"
-    : "en";
+  // An explicit page locale wins over the operating system language. Using
+  // navigator.language as an OR condition forced Chinese onboarding on an
+  // English page whenever the host/browser was configured in Chinese.
+  const pageLanguage = document.documentElement.lang.trim().toLowerCase();
+  const preferredLanguage = pageLanguage || navigator.language?.toLowerCase() || "en";
+  const locale: Locale = preferredLanguage.startsWith("zh") ? "zh-CN" : "en";
   const strings = COPY[locale];
   const session = chrome.storage.session ?? chrome.storage.local;
   const stored = await session.get(PARTICIPANTS_KEY);

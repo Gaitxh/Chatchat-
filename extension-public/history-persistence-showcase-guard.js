@@ -1,6 +1,19 @@
 (() => {
   const params = new URLSearchParams(location.search);
   if (params.get("showcase") !== "consultation") return;
+  // The explicit protected-tab authority proof intentionally denies every
+  // Provider send. It cannot have transport-backed meeting history and should
+  // never be confused with the separately verified normal council proof.
+  if (params.get("authority-proof") === "protected") {
+    for (const key of [
+      "chatchatExecutionHistoryPersistenceShowcase",
+      "chatchatExecutionHistoryReplayShowcase",
+      "chatchatProviderMemoryHistoryReplayShowcase",
+      "chatchatProviderPayloadHistoryReplayShowcase",
+      "chatchatHistoryPersistenceShowcase",
+    ]) document.documentElement.dataset[key] = "not-applicable";
+    return;
+  }
 
   const HISTORY_UPDATED_EVENT = "chatchat:consultation-history-updated";
   const DB_NAME = "chatchat-consultation-history-v1";
@@ -124,7 +137,13 @@
       document.documentElement.dataset.chatchatProviderMemoryHistoryReplayShowcase = "complete";
       document.documentElement.dataset.chatchatProviderPayloadHistoryReplayShowcase = "complete";
       document.documentElement.dataset.chatchatHistoryPersistenceShowcase = "complete";
-    } catch {
+    } catch (error) {
+      // Synthetic showcase only. Record the exact failed verification gate,
+      // never silently promote an archive error to a "complete" proof.
+      const detail = error instanceof Error ? error.message : String(error);
+      document.documentElement.dataset.chatchatHistoryProofFailureReason =
+        detail.slice(0, 180).replace(/[\r\n]/g, " ");
+      console.error("[ChatChat synthetic-history proof]", detail);
       document.documentElement.dataset.chatchatExecutionHistoryPersistenceShowcase = "failed";
       document.documentElement.dataset.chatchatExecutionHistoryReplayShowcase = "failed";
       document.documentElement.dataset.chatchatProviderMemoryHistoryReplayShowcase = "failed";
