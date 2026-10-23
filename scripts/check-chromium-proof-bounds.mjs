@@ -5,6 +5,9 @@ const workflow = fs.readFileSync(".github/workflows/ci.yml", "utf8");
 
 for (const claim of [
   "cdpCallTimeoutMs",
+  "cdpHeavyTimeoutMs = Math.min(20000,",
+  'method === "Runtime.evaluate" || method === "Page.captureScreenshot"',
+  "}, rpcDeadlineMs)",
   "CDP ${method} timed out",
   "clearTimeout(waiter.timer)",
   "Chromium exited before exposing a DevTools page target",

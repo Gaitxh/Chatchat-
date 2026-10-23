@@ -133,4 +133,4 @@ if ((Get-Content -LiteralPath $sentinel -Raw) -notmatch 'Do not erase saved meet
   throw "Uninstall changed the local history sentinel."
 }
 Write-Output "PASS: silent per-user install, SAME-VERSION reinstall and uninstall with local data preserved."
-Write-Output "Not verified by this job: a real cross-version upgrade, manual UI setup, code signing or real Provider logins."
+Write-Output "This step verifies same-version installation only; cross-version upgrade has a separate mandatory CI gate. Manual UI setup, signing and real Provider logins remain unverified."
