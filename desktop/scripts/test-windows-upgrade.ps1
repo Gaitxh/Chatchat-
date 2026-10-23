@@ -44,9 +44,22 @@ function Wait-InstalledVersion([string]$version, [int]$timeoutSeconds = 120) {
     $entries=@(Find-ChatChatUninstallEntries)
     if ($entries.Count -eq 1 -and [string]$entries[0].DisplayVersion -eq $version) {
       $root=[string]$entries[0].InstallLocation
-      if ([string]::IsNullOrWhiteSpace($root) -or -not (Test-Path -LiteralPath $root -PathType Container)) {
-        $candidate=Join-Path $env:LOCALAPPDATA 'Programs\ChatChat'
-        if (Test-Path -LiteralPath $candidate -PathType Container) { $root=$candidate }
+      # NSIS may leave InstallLocation empty, and electron-builder may use
+      # "chatchat-desktop" rather than "ChatChat" under Programs. Discover
+      # the actual binary exactly as the previously-passed install gate does.
+      $hasPayload = -not [string]::IsNullOrWhiteSpace($root) -and
+        (Test-Path -LiteralPath (Join-Path $root 'ChatChat.exe') -PathType Leaf) -and
+        (Test-Path -LiteralPath (Join-Path $root 'resources\app.asar') -PathType Leaf)
+      if (-not $hasPayload) {
+        $programs=Join-Path $env:LOCALAPPDATA 'Programs'
+        $candidates=@()
+        if (Test-Path -LiteralPath $programs -PathType Container) {
+          $candidates=@(Get-ChildItem -LiteralPath $programs -Filter 'ChatChat.exe' -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match 'ChatChat|chatchat-desktop' -and
+              (Test-Path -LiteralPath (Join-Path $_.DirectoryName 'resources\app.asar') -PathType Leaf) })
+        }
+        if ($candidates.Count -gt 1) { throw "Ambiguous ChatChat installation roots on the disposable runner." }
+        if ($candidates.Count -eq 1) { $root=$candidates[0].DirectoryName }
       }
       if (-not [string]::IsNullOrWhiteSpace($root) -and
           (Test-Path -LiteralPath (Join-Path $root 'ChatChat.exe') -PathType Leaf) -and

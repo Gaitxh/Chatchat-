@@ -62,6 +62,7 @@ test('cross-version upgrade acceptance is restricted to GitHub-hosted CI and che
     "0.10.6", "0.10.7", 'Wait-InstalledVersion', 'Wait-Removed',
     'Get-FileHash -LiteralPath $installed -Algorithm SHA256',
     'Stop-OwnChatChat', "ci-cross-version-history.txt", 'sentinelHash',
+    'Get-ChildItem -LiteralPath $programs', 'Ambiguous ChatChat installation roots',
     'version-to-version upgrade', '120',
   ];
   for (const token of required) assert.ok(source.includes(token),
