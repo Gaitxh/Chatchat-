@@ -1,5 +1,5 @@
 import { pendingDirectRequestEventIds } from "../consultation/direct-response-receipts.js";
-import { Blackboard } from "./blackboard.js";
+import { Blackboard, immutableCopy, isRuntimeFallbackContribution, runtimeFallbackContribution } from "./blackboard.js";
 import { createId } from "./ids.js";
 import type {
   CouncilAgent,
@@ -55,7 +55,8 @@ export class CouncilOrchestrator {
       debateRoundsCompleted: 0,
       minimumDebateRounds: minDebateRounds,
     });
-    const sealedFacts = await this.#facts(options, "sealed", 1, []);
+    const sealedSnapshot: readonly CouncilEvent[] = Object.freeze([]);
+    const sealedFacts = await this.#facts(options, "sealed", 1, sealedSnapshot);
     const sealed = await Promise.all(this.#agents.map(async (agent) => ({
       agent,
       contributions: await this.#respond(
@@ -68,7 +69,7 @@ export class CouncilOrchestrator {
           mode,
           "sealed",
           1,
-          [],
+          sealedSnapshot,
           sealedFacts,
           researchLaneAssignments[agent.participant.id],
         ),
@@ -107,7 +108,7 @@ export class CouncilOrchestrator {
         debateRoundsCompleted,
         minimumDebateRounds: minDebateRounds,
       });
-      const snapshot = [...blackboard.events];
+      const snapshot = blackboard.events;
       const facts = await this.#facts(options, "debate", round, snapshot);
       const turns = await Promise.all(this.#agents.map(async (agent) => ({
         agent,
@@ -156,7 +157,7 @@ export class CouncilOrchestrator {
       debateRoundsCompleted: Math.max(0, lastRound - 1),
       minimumDebateRounds: minDebateRounds,
     });
-    const finalSnapshot = [...blackboard.events];
+    const finalSnapshot = blackboard.events;
     const finalFacts = await this.#facts(options, "final", finalRound, finalSnapshot);
     const finalTurns = await Promise.all(this.#agents.map(async (agent) => ({
       agent,
@@ -206,18 +207,18 @@ export class CouncilOrchestrator {
     toolFacts: readonly CouncilToolFact[],
     researchLane?: CouncilResearchLane,
   ): CouncilContext {
-    return {
+    return Object.freeze({
       sessionId,
       question,
       mode,
       phase,
       round,
       ...(researchLane ? { researchLane } : {}),
-      participant: agent.participant,
+      participant: immutableCopy(agent.participant),
       publicEvents,
       ownEvents: blackboard.forActor(agent.participant.id),
       ...(toolFacts.length ? { toolFacts } : {}),
-    };
+    });
   }
 
   async #respond(
@@ -233,14 +234,18 @@ export class CouncilOrchestrator {
       ...(context.researchLane ? { researchLane: context.researchLane } : {}),
     });
     try {
-      const contributions = await agent.respond(context);
+      // Capture the response before callbacks or slower peers can mutate any
+      // retained inputs. Preserve the runtime-only identity marker when copying.
+      const contributions = Object.freeze((await agent.respond(context)).map((item) =>
+        isRuntimeFallbackContribution(item) ? runtimeFallbackContribution(item) : immutableCopy(item)));
+      const failed = contributions.some(isRuntimeFallbackContribution);
       await options.onParticipantTurn?.({
         phase: context.phase,
         round: context.round,
         participant: agent.participant,
-        state: "completed",
+        state: failed ? "failed" : "completed",
         ...(context.researchLane ? { researchLane: context.researchLane } : {}),
-        contributionKinds: contributions.map((item) => item.kind),
+        ...(!failed ? { contributionKinds: contributions.map((item) => item.kind) } : {}),
       });
       return contributions;
     } catch (error) {
@@ -261,23 +266,28 @@ export class CouncilOrchestrator {
     round: number,
     publicEvents: readonly CouncilEvent[],
   ): Promise<readonly CouncilToolFact[]> {
-    if (!options.toolFactsProvider) return [];
+    if (!options.toolFactsProvider) return Object.freeze([]);
     try {
-      return [...await options.toolFactsProvider({ phase, round, publicEvents })];
+      return immutableCopy(await options.toolFactsProvider(Object.freeze({ phase, round, publicEvents })));
     } catch (error) {
       await options.onToolError?.(error);
-      return [];
+      return Object.freeze([]);
     }
   }
 
   #materialize(sessionId: string, round: number, actorId: string, contribution: CouncilContribution): CouncilEvent {
-    return { ...contribution, id: createId("event"), sessionId, round, actorId, createdAt: new Date().toISOString() } as CouncilEvent;
+    const event = { ...contribution, id: createId("event"), sessionId, round, actorId, createdAt: new Date().toISOString() } as CouncilEvent;
+    // Strip lookalike fields even from custom agents; only runtime-marked
+    // contributions may acquire persisted failure provenance.
+    delete event.provenance;
+    if (isRuntimeFallbackContribution(contribution)) event.provenance = { source: "runtime_fallback" };
+    return event;
   }
 
   async #publish(blackboard: Blackboard, events: readonly CouncilEvent[], options: CouncilRunOptions) {
     for (const event of events) {
-      blackboard.publish(event);
-      await options.onEvent?.(event);
+      const published = blackboard.publish(event);
+      await options.onEvent?.(published);
     }
   }
 
@@ -350,6 +360,7 @@ export class CouncilOrchestrator {
     const positions = blackboard.finalPositions(this.#agents.map((agent) => agent.participant));
     const groups = new Map<string, typeof positions>();
     for (const position of positions) {
+      if (position.provenance?.source === "runtime_fallback") continue;
       const key = normalizeStance(position.stance);
       const current = groups.get(key) ?? [];
       current.push(position);
@@ -393,7 +404,8 @@ export class CouncilOrchestrator {
       confidence: winnerPositions.reduce((sum, position) => sum + position.confidence, 0) / winnerPositions.length,
       rounds,
       positions,
-      disagreements: positions.filter((position) => normalizeStance(position.stance) !== winnerKey),
+      disagreements: positions.filter((position) => position.provenance?.source !== "runtime_fallback"
+        && normalizeStance(position.stance) !== winnerKey),
       eventCount: blackboard.events.length,
     };
   }

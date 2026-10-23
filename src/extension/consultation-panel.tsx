@@ -16,7 +16,6 @@ import type {
 } from "../core/types.js";
 import {
   MAX_CONSULTATION_PARTICIPANTS,
-  canJoinConsultation,
   deriveConsultationOutcome,
   equalParticipantDisplayName,
   type ConsultationParticipantIdentity,
@@ -56,6 +55,14 @@ import {
   mayAutomaticallyResumeProviderTab,
 } from "./provider-tab-boundary.js";
 import { createSerializedRecordMutation } from "./serialized-record-mutation.js";
+import {
+  createFreshSeat,
+  FreshSeatError,
+  planFreshSeat,
+  waitForFreshSeatTab,
+  withFreshSeatLock,
+  type FreshSeatPlan,
+} from "./fresh-seat.js";
 import "./consultation-panel.css";
 import "./consultation-live.css";
 
@@ -68,6 +75,7 @@ const CONNECTIONS_KEY = "chatchat.consultation.connections.v1";
 const PROPOSAL_DRAFT_KEY = "chatchat.consultation.proposal-draft.v1";
 const LOCALE_KEY = "chatchat.locale.v1";
 const CONNECTION_TOKEN = "CHATCHAT_READY";
+const connectingSeats = new Set<string>();
 
 interface BrowserTab {
   id?: number;
@@ -153,6 +161,7 @@ function ConsultationApp() {
   const [connections, setConnections] = useState<Record<string, ParticipantConnection>>({});
   const [candidateTabs, setCandidateTabs] = useState<BrowserTab[]>([]);
   const [urlDraft, setUrlDraft] = useState("https://chatgpt.com/");
+  const [confirmedCustomUrl, setConfirmedCustomUrl] = useState<string | undefined>();
   const [stage, setStage] = useState<ConsultationStage>("idle");
   const [events, setEvents] = useState<CouncilEvent[]>([]);
   const [report, setReport] = useState<CouncilReport | null>(null);
@@ -206,6 +215,10 @@ function ConsultationApp() {
     () => uniqueCandidateTabs(candidateTabs, participants),
     [candidateTabs, participants],
   );
+  const customUrlDraft = useMemo(() => {
+    try { return detectProviderUrl(urlDraft).kind === "custom"; }
+    catch { return false; }
+  }, [urlDraft]);
 
   async function hydrate() {
     try {
@@ -214,25 +227,29 @@ function ConsultationApp() {
       setRecipes(storedRecipes);
       if (stored[LOCALE_KEY]) setLocale(normalizeLocale(stored[LOCALE_KEY]));
 
-      const sessionStore = chrome.storage.session ?? chrome.storage.local;
-      const session = await sessionStore.get([PARTICIPANTS_KEY, CONNECTIONS_KEY, PROPOSAL_DRAFT_KEY]);
+      const { session, nextParticipants } = await withFreshSeatLock(async () => {
+        const sessionStore = chrome.storage.session ?? chrome.storage.local;
+        const session = await sessionStore.get([PARTICIPANTS_KEY, CONNECTIONS_KEY, PROPOSAL_DRAFT_KEY]);
+        const restored = Array.isArray(session[PARTICIPANTS_KEY])
+          ? (session[PARTICIPANTS_KEY] as ExtensionParticipant[])
+          : [];
+        const alive: ExtensionParticipant[] = [];
+        for (const participant of restored) {
+          try {
+            const tab = await chrome.tabs.get(participant.tabId);
+            if (tab?.id && tab?.url) alive.push({ ...participant, url: tab.url });
+          } catch {
+            // Browser tab ids are runtime-local; stale participants disappear.
+          }
+        }
+        const nextParticipants = dedupeByOrigin(alive);
+        await persistParticipants(nextParticipants);
+        return { session, nextParticipants };
+      });
       if (typeof session[PROPOSAL_DRAFT_KEY] === "string") {
         setProposal(session[PROPOSAL_DRAFT_KEY] as string);
       }
-      const restored = Array.isArray(session[PARTICIPANTS_KEY])
-        ? (session[PARTICIPANTS_KEY] as ExtensionParticipant[])
-        : [];
       const storedConnections = (session[CONNECTIONS_KEY] ?? {}) as Record<string, ParticipantConnection>;
-      const alive: ExtensionParticipant[] = [];
-      for (const participant of restored) {
-        try {
-          const tab = await chrome.tabs.get(participant.tabId);
-          if (tab?.id && tab?.url) alive.push({ ...participant, url: tab.url });
-        } catch {
-          // Browser tab ids are runtime-local; stale participants disappear.
-        }
-      }
-      const nextParticipants = dedupeByOrigin(alive);
       const nextConnections = Object.fromEntries(
         nextParticipants.map((participant) => [
           participant.seatId,
@@ -248,8 +265,6 @@ function ConsultationApp() {
         ]),
       ) as Record<string, ParticipantConnection>;
       setConnections(hydratedConnections);
-      await persistParticipants(nextParticipants);
-
       for (const participant of nextParticipants) {
         const connection = hydratedConnections[participant.seatId];
         const recipe = storedRecipes[participant.origin];
@@ -298,126 +313,106 @@ function ConsultationApp() {
       setError(tr("invalidTab"));
       return;
     }
-    await attachTab(tab, false);
+    await attachTab(tab);
   }
 
   async function attachDiscoveredAIs() {
-    const candidates = availableCandidates.slice(
-      0,
-      Math.max(0, MAX_CONSULTATION_PARTICIPANTS - participants.length),
-    );
-    if (!candidates.length) return;
-    setBusy("attach-all");
-    setError(null);
-    try {
-      const detections = candidates.map((tab) => ({ tab, detection: detectProviderUrl(tab.url!) }));
-      await requestOriginPermissions(detections.map((item) => item.detection.origin), locale);
-
-      const current = [...participants];
-      const added: ExtensionParticipant[] = [];
-      for (const { tab, detection } of detections) {
-        if (!tab.id) continue;
-        const candidate = candidateIdentity(tab.id, detection);
-        const join = canJoinConsultation(current, candidate);
-        if (!join.ok) continue;
-        await ensureBridge(tab.id);
-        const participant = participantFromDetection(tab.id, detection, false);
-        current.push(participant);
-        added.push(participant);
-      }
-
-      setParticipants(current);
-      await persistParticipants(current);
-      const seededConnections = await connectionRecordMutation.merge(Object.fromEntries(
-        added.map((participant) => [participant.seatId, { state: "connecting", automatic: true }]),
-      ) as Record<string, ParticipantConnection>);
-      setConnections(seededConnections);
-      await refreshCandidateTabs();
-      for (const participant of added) void autoConnectParticipant(participant, recipes[participant.origin]);
-    } catch (caught) {
-      setError(message(caught));
-    } finally {
-      setBusy(null);
-    }
+    const plans = availableCandidates.slice(
+      0, Math.max(0, MAX_CONSULTATION_PARTICIPANTS - participants.length),
+    ).map((tab) => planFreshSeat(tab.url!, { sourceTabId: tab.id }));
+    if (!plans.length) return;
+    await addFreshSeats(plans);
   }
 
-  async function attachTab(tab: BrowserTab, createdByChatChat: boolean) {
+  async function attachTab(tab: BrowserTab) {
     if (!tab.id || !tab.url) return;
-    if (!/^https?:/i.test(tab.url)) {
-      setError(tr("httpOnly"));
-      return;
-    }
-    if (participants.some((item) => item.tabId === tab.id)) return;
-
-    setBusy(`attach:${tab.id}`);
-    setError(null);
     try {
-      const detection = detectProviderUrl(tab.url);
-      const candidate = candidateIdentity(tab.id, detection);
-      const join = canJoinConsultation(participants, candidate);
-      if (!join.ok) {
-        throw new Error(
-          join.reason === "duplicate-origin"
-            ? tr("duplicateParticipant")
-            : tr("maxParticipants", { count: MAX_CONSULTATION_PARTICIPANTS }),
-        );
-      }
-      await requestOriginPermissions([detection.origin], locale);
-      await ensureBridge(tab.id);
-      const participant = participantFromDetection(tab.id, detection, createdByChatChat);
-      const nextParticipants = [...participants, participant];
-      setParticipants(nextParticipants);
-      await persistParticipants(nextParticipants);
-      await setConnection(participant.seatId, { state: "connecting", automatic: true });
-      await refreshCandidateTabs();
-      void autoConnectParticipant(participant, recipes[participant.origin]);
+      const plan = planFreshSeat(tab.url, { sourceTabId: tab.id });
+      await addFreshSeats([plan]);
     } catch (caught) {
-      setError(message(caught));
-    } finally {
-      setBusy(null);
+      // Custom tabs need an explicit new-chat URL confirmation in the invite UI.
+      setUrlDraft(tab.url);
+      setConfirmedCustomUrl(undefined);
+      setError(freshSeatMessage(caught));
     }
   }
 
   async function openUrl() {
     const draft = urlDraft.trim();
     if (!draft) return;
-    setBusy("open-url");
-    setError(null);
     try {
-      const detection = detectProviderUrl(draft);
-      await requestOriginPermissions([detection.origin], locale);
-      const tab = await chrome.tabs.create({ url: detection.normalizedUrl, active: true });
-      await waitForTabComplete(tab.id, 35_000);
-      await attachTab(tab, true);
+      await addFreshSeats([planFreshSeat(draft, { confirmedCustomUrl })]);
     } catch (caught) {
-      setError(message(caught));
-    } finally {
-      setBusy(null);
+      setError(freshSeatMessage(caught));
     }
   }
 
   async function quickOpenAndConnect(url: string) {
     setUrlDraft(url);
-    setBusy("quick-open");
+    setConfirmedCustomUrl(undefined);
+    try {
+      await addFreshSeats([planFreshSeat(url)]);
+    } catch (caught) {
+      setError(freshSeatMessage(caught));
+    }
+  }
+
+  async function addFreshSeats(plans: readonly FreshSeatPlan[]) {
+    setBusy("fresh-seat");
     setError(null);
     try {
-      const detection = detectProviderUrl(url);
-      await requestOriginPermissions([detection.origin], locale);
-      const tab = await chrome.tabs.create({ url: detection.normalizedUrl, active: true });
-      await waitForTabComplete(tab.id, 35_000);
-      await attachTab(tab, true);
+      // Request source AND canonical destination permissions together (aliases may differ).
+      await requestOriginPermissions(plans.flatMap((plan) => plan.permissionOrigins), locale);
+      for (const plan of plans) {
+        const result = await createFreshSeat(plan, {
+          readParticipants,
+          writeParticipants: persistParticipants,
+          requestPermissions: async (origins) => {
+            const granted = await chrome.permissions.contains({ origins: origins.map((origin) => `${origin}/*`) });
+            if (!granted) throw new Error(tr("permissionDenied", { origin: origins.join(", ") }));
+          },
+          createTab: (url) => chrome.tabs.create({ url, active: true }),
+          waitForTab: (tabId) => waitForTabComplete(tabId, 35_000),
+          getTab: (tabId) => chrome.tabs.get(tabId),
+          removeTab: (tabId) => chrome.tabs.remove(tabId),
+        });
+        setParticipants(result.participants);
+        void autoConnectParticipant(result.participant, recipes[result.participant.origin]);
+      }
+      await refreshCandidateTabs();
     } catch (caught) {
-      setError(message(caught));
+      setError(freshSeatMessage(caught));
     } finally {
       setBusy(null);
     }
   }
 
+  function freshSeatMessage(caught: unknown): string {
+    if (!(caught instanceof FreshSeatError)) return message(caught);
+    if (caught.code === "duplicate-origin") return tr("duplicateParticipant");
+    if (caught.code === "capacity") return tr("maxParticipants", { count: MAX_CONSULTATION_PARTICIPANTS });
+    if (caught.code === "custom-confirmation-required") return tr("customNewChatRequired");
+    if (caught.code === "invalid-url") return tr("invalidSeatUrl");
+    if (caught.code === "unexpected-destination") return tr("freshSeatRedirected");
+    if (caught.code === "cleanup-failed") return tr("freshSeatCleanupFailed");
+    return tr("freshSeatCreateFailed");
+  }
+
+  async function readParticipants(): Promise<ExtensionParticipant[]> {
+    const store = chrome.storage.session ?? chrome.storage.local;
+    const stored = await store.get(PARTICIPANTS_KEY);
+    return Array.isArray(stored[PARTICIPANTS_KEY]) ? stored[PARTICIPANTS_KEY] : [];
+  }
+
   async function removeParticipant(seatId: string) {
-    const participant = participants.find((item) => item.seatId === seatId);
-    const nextParticipants = participants.filter((item) => item.seatId !== seatId);
-    setParticipants(nextParticipants);
-    await persistParticipants(nextParticipants);
+    const participant = await withFreshSeatLock(async () => {
+      const current = await readParticipants();
+      const participant = current.find((item) => item.seatId === seatId);
+      const next = current.filter((item) => item.seatId !== seatId);
+      await persistParticipants(next);
+      setParticipants(next);
+      return participant;
+    });
     const nextConnections = await connectionRecordMutation.remove(seatId);
     setConnections(nextConnections);
     if (participant?.createdByChatChat) {
@@ -429,13 +424,18 @@ function ConsultationApp() {
     participant: ExtensionParticipant,
     recipeHint?: AdapterRecipe,
   ) {
-    await setConnection(participant.seatId, {
-      state: "connecting",
-      automatic: true,
-      detail: tr("autoConnectingDetail"),
-    });
-
+    if (!mayAutomaticallyResumeProviderTab(participant) || connectingSeats.has(participant.seatId)) return;
+    connectingSeats.add(participant.seatId);
     try {
+      await setConnection(participant.seatId, {
+        state: "connecting",
+        automatic: true,
+        detail: tr("autoConnectingDetail"),
+      });
+      const tab = await chrome.tabs.get(participant.tabId);
+      if (!tab.url || detectProviderUrl(tab.url).origin !== participant.origin) {
+        throw new Error(tr("freshSeatRedirected"));
+      }
       await ensureBridge(participant.tabId);
       let recipe = recipeHint;
       let connected = false;
@@ -449,8 +449,10 @@ function ConsultationApp() {
             timeoutMs: 75_000,
           });
           connected = speech.responseText.toLocaleUpperCase().includes(CONNECTION_TOKEN);
-        } catch {
-          connected = false;
+        } catch (error) {
+          // A failed acknowledgement may follow a successful send. Never turn
+          // that ambiguity into another automatic setup submission.
+          throw error;
         }
       }
 
@@ -485,6 +487,8 @@ function ConsultationApp() {
         automatic: true,
         detail: message(caught),
       });
+    } finally {
+      connectingSeats.delete(participant.seatId);
     }
   }
 
@@ -659,19 +663,32 @@ function ConsultationApp() {
           <button className="secondary-soft" type="button" onClick={() => void refreshCandidateTabs()} disabled={Boolean(busy)}>{tr("refreshTabs")}</button>
         </div>
 
-        <div className="url-opener">
+        <div className="url-opener" data-chatchat-invite-ai="true">
           <label htmlFor="consultation-url">{tr("addByUrl")}</label>
           <div>
-            <input id="consultation-url" value={urlDraft} onChange={(event) => setUrlDraft(event.target.value)} placeholder={tr("addByUrlPlaceholder")} />
-            <button type="button" onClick={() => void openUrl()} disabled={Boolean(busy) || !urlDraft.trim()}>{tr("openAndAttach")}</button>
+            <input id="consultation-url" value={urlDraft} onChange={(event) => { setUrlDraft(event.target.value); setConfirmedCustomUrl(undefined); }} placeholder={tr("addByUrlPlaceholder")} />
+            <button type="button" onClick={() => void openUrl()} disabled={Boolean(busy) || !urlDraft.trim() || (customUrlDraft && confirmedCustomUrl !== urlDraft)}>{tr("openAndAttach")}</button>
           </div>
+          {customUrlDraft ? (
+            <p className="custom-fresh-notice">
+              {tr("customFreshUnverified")}
+              <label className="custom-fresh-confirmation">
+                <input type="checkbox" style={{ width: "auto" }} checked={confirmedCustomUrl === urlDraft} onChange={(event) => setConfirmedCustomUrl(event.target.checked ? urlDraft : undefined)} />
+                {tr("confirmCustomNewChat")}
+              </label>
+            </p>
+          ) : <p className="fresh-seat-notice">{tr("freshSeatHint")}</p>}
+          <details className="fresh-provider-choices">
+            <summary>{tr("chooseProvider")}</summary>
+            <div>{BUILT_IN_PROVIDER_MANIFESTS.map((provider) => <button type="button" key={provider.id} disabled={Boolean(busy)} onClick={() => void quickOpenAndConnect(provider.defaultUrl)}>{provider.displayName}</button>)}</div>
+          </details>
         </div>
 
         {availableCandidates.length ? (
           <div className="discovered-section">
             <span className="eyebrow">{tr("discoveredTabs")}</span>
             {availableCandidates.slice(0, 6).map((tab) => (
-              <button type="button" className="discovered-tab" key={tab.id} onClick={() => void attachTab(tab, false)}>
+              <button type="button" className="discovered-tab" key={tab.id} disabled={Boolean(busy)} onClick={() => void attachTab(tab)}>
                 <span>{tab.title || tab.url}</span><b>{tr("attach")}</b>
               </button>
             ))}
@@ -773,10 +790,6 @@ function ConsultationApp() {
         </div>
       </details>
 
-      {!participants.length ? (
-        <section className="quick-open"><span>{tr("quickOpen")}</span><div>{BUILT_IN_PROVIDER_MANIFESTS.map((provider) => <button type="button" key={provider.id} onClick={() => void quickOpenAndConnect(provider.defaultUrl)}>{provider.displayName}</button>)}</div></section>
-      ) : null}
-
       <section className="privacy-card"><strong>{tr("privacyTitle")}</strong><p>{tr("privacyBody")}</p></section>
       <footer className="consultation-footer"><span>ChatChat {__CHATCHAT_VERSION__}</span><span>{tr("footerPrivacy")}</span></footer>
     </div>
@@ -829,32 +842,6 @@ function LiveRoom({
 
 function Phase({ label, active, done }: { label: string; active: boolean; done: boolean }) {
   return <div className={`phase-item ${active ? "is-active" : ""} ${done ? "is-done" : ""}`}><span>{done ? "✓" : active ? "•" : ""}</span><b>{label}</b></div>;
-}
-
-function candidateIdentity(tabId: number, detection: ReturnType<typeof detectProviderUrl>): ConsultationParticipantIdentity {
-  return {
-    participantId: `extension:${detection.providerId}:${tabId}`,
-    providerId: detection.providerId,
-    providerName: detection.displayName,
-    origin: detection.origin,
-    tabId,
-  };
-}
-
-function participantFromDetection(
-  tabId: number,
-  detection: ReturnType<typeof detectProviderUrl>,
-  createdByChatChat: boolean,
-): ExtensionParticipant {
-  const candidate = candidateIdentity(tabId, detection);
-  return {
-    ...candidate,
-    seatId: candidate.participantId,
-    url: detection.normalizedUrl,
-    hostname: detection.hostname,
-    startUrl: detection.manifest?.defaultUrl ?? `${detection.origin}/`,
-    createdByChatChat,
-  };
 }
 
 function createTabConsultationAgent(participant: ExtensionParticipant, recipe: AdapterRecipe): CouncilAgent {
@@ -936,7 +923,21 @@ function isParticipantReady(
   return Boolean(adapterRecipeComplete(recipes[participant.origin]) && connections[participant.seatId]?.state === "ready");
 }
 
+async function boundProviderOrigin(tabId: number): Promise<string> {
+  const store = chrome.storage.session ?? chrome.storage.local;
+  const saved = await store.get(PARTICIPANTS_KEY);
+  const seats: ExtensionParticipant[] = Array.isArray(saved[PARTICIPANTS_KEY]) ? saved[PARTICIPANTS_KEY] : [];
+  const seat = seats.find((item) => item.tabId === tabId);
+  const tab = await chrome.tabs.get(tabId);
+  const currentUrl = tab.pendingUrl || tab.url;
+  if (!seat?.createdByChatChat || !currentUrl || new URL(currentUrl).origin !== seat.origin) {
+    throw new Error("Provider tab no longer matches its managed seat. Add a fresh seat. / 模型页面已变化，请重新添加席位。");
+  }
+  return seat.origin;
+}
+
 async function ensureBridge(tabId: number) {
+  await boundProviderOrigin(tabId);
   try {
     await sendBridge(tabId, { type: "PING" });
   } catch {
@@ -947,8 +948,12 @@ async function ensureBridge(tabId: number) {
 }
 
 async function sendBridge<T = unknown>(tabId: number, payload: Record<string, unknown>): Promise<T> {
-  const response = (await chrome.tabs.sendMessage(tabId, { __chatchat: true, ...payload })) as BridgeResponse<T>;
+  const expectedOrigin = await boundProviderOrigin(tabId);
+  const response = (await chrome.tabs.sendMessage(tabId, { __chatchat: true, ...payload, expectedOrigin })) as BridgeResponse<T>;
   if (!response?.ok) throw new Error(response?.error || "Provider tab did not answer ChatChat.");
+  if (payload.type === "RUN_SPEECH" && (response.result as { truncatedByTimeout?: boolean })?.truncatedByTimeout) {
+    throw new Error("Provider response was incomplete at timeout; no completed answer was verified.");
+  }
   return response.result as T;
 }
 
@@ -956,27 +961,12 @@ async function requestOriginPermissions(origins: readonly string[], locale: Loca
   const unique = [...new Set(origins)].map((origin) => `${origin}/*`);
   if (!unique.length) return;
   const descriptor = { origins: unique };
-  if (await chrome.permissions.contains(descriptor)) return;
   const granted = await chrome.permissions.request(descriptor);
   if (!granted) throw new Error(translate(locale, "permissionDenied", { origin: origins.join(", ") }));
 }
 
 async function waitForTabComplete(tabId: number, timeoutMs: number) {
-  const current = await chrome.tabs.get(tabId);
-  if (current.status === "complete") return;
-  await new Promise<void>((resolve, reject) => {
-    const timeout = window.setTimeout(() => {
-      chrome.tabs.onUpdated.removeListener(listener);
-      reject(new Error("Timed out waiting for the AI tab to load."));
-    }, timeoutMs);
-    const listener = (updatedId: number, changeInfo: { status?: string }) => {
-      if (updatedId !== tabId || changeInfo.status !== "complete") return;
-      window.clearTimeout(timeout);
-      chrome.tabs.onUpdated.removeListener(listener);
-      resolve();
-    };
-    chrome.tabs.onUpdated.addListener(listener);
-  });
+  await waitForFreshSeatTab(tabId, (id) => chrome.tabs.get(id), timeoutMs);
 }
 
 function uniqueCandidateTabs(
@@ -1013,17 +1003,17 @@ function liveAlignment(participants: readonly ExtensionParticipant[], events: re
   if (!stances.length) return 0;
   const counts = new Map<string, number>();
   for (const stance of stances) {
-    const key = stance.trim().toLocaleLowerCase().replace(/\s+/g, " ");
+    const key = stance.trim().toLocaleLowerCase();
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  return Math.round((Math.max(...counts.values()) / stances.length) * 100);
+  return Math.round((Math.max(...counts.values()) / participants.length) * 100);
 }
 
 function latestPosition(actorId: string, events: readonly CouncilEvent[]): string | null {
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];
     if (event?.actorId !== actorId) continue;
-    if (event.kind === "argument" || event.kind === "revision" || event.kind === "final_position") return event.stance;
+    if (event.kind === "argument" || event.kind === "revision" || event.kind === "final_position") return event.provenance?.source === "runtime_fallback" ? null : event.stance;
   }
   return null;
 }

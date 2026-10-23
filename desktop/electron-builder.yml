@@ -1,0 +1,43 @@
+appId: com.gaitxh.chatchat.desktop
+productName: ChatChat
+copyright: Copyright © 2026 Gaitxh
+asar: true
+npmRebuild: false
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+directories:
+  output: release
+files:
+  - main/**
+  - runtime/**
+  - runtime-lock.json
+  - renderer/**
+  - generated/src/**
+  - package.json
+  - node_modules/playwright-core/**
+extraResources:
+  - from: .build-cache/browser
+    to: browser
+win:
+  icon: assets/chatchat.ico
+  target:
+    - target: nsis
+      arch: [x64]
+  executableName: ChatChat
+  requestedExecutionLevel: asInvoker
+nsis:
+  installerIcon: assets/chatchat.ico
+  uninstallerIcon: assets/chatchat.ico
+  oneClick: true
+  perMachine: false
+  allowElevation: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  deleteAppDataOnUninstall: false
+  runAfterFinish: true
+  artifactName: ChatChat-Setup-${version}-${arch}.exe
+publish: null

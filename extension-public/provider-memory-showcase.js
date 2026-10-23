@@ -83,7 +83,10 @@
         stance: "Web + Extension",
         content: `${RESOLVER_MARKER}: I now support the Web Room plus an invisible bridge because the public recovery constraints give the authentication failure mode an explicit bounded path.`,
         confidence: 0.84,
-        causedBy: [cause.id],
+        // Closing the old explicit uncertainty requires a direct provenance
+        // edge to its event ID, not merely an unrelated R2 argument. Retain
+        // both actual causes so canonical Open Issues can verify closure.
+        causedBy: [oldRisk.id, cause.id],
       });
       return withEnvelope(response, envelope);
     }

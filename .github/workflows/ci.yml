@@ -64,10 +64,8 @@ jobs:
           path: dist-extension
 
       - name: Install CJK screenshot fonts
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
-          fc-cache -f
+        timeout-minutes: 4
+        run: bash scripts/install-ci-cjk-fonts.sh
 
       - name: Locate Chromium browser
         run: |

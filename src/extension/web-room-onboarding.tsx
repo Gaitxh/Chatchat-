@@ -1,11 +1,10 @@
 import { MAX_CONSULTATION_PARTICIPANTS } from "../consultation/equality.js";
 import { detectProviderUrl } from "../provider-sdk/catalog.js";
 import {
-  automaticTeamLaunchUrl,
-  automaticTeamPermissionDescriptor,
   buildAutomaticTeamPlan,
   type AutomaticTeamDetection,
 } from "./automatic-team.js";
+import { createFreshSeat, FreshSeatError, planFreshSeat, waitForFreshSeatTab } from "./fresh-seat.js";
 import { announceAutomaticTeamAssembled } from "./automatic-team-wire.js";
 import { requestConnectionRetry } from "./connection-retry-wire.js";
 import "./web-room-onboarding.css";
@@ -37,32 +36,34 @@ interface ParticipantConnectionSnapshot {
 
 const COPY = {
   en: {
-    kicker: "ZERO-CONFIG START",
-    title: "Open ChatChat. The room assembles itself.",
-    body: "ChatChat notices the AI sites already open in your browser to choose a useful team, then opens clean consultation tabs so your existing conversations stay untouched. Page recognition, connection checks, and consultation readiness continue automatically.",
-    button: "Assemble my AI room",
-    none: "No AI tabs are open yet. ChatChat can open a small starter team for you — no setup forms or technical configuration.",
+    kicker: "CHOOSE YOUR AI TEAM",
+    title: "Choose who joins your room.",
+    body: "Use + Invite AI below to choose providers one at a time. If you prefer, explicitly assemble the suggested starter team instead. Existing AI tabs only inform suggestions; they never receive setup messages.",
+    button: "Use suggested starter team",
+    none: "No AI tabs found. Choose your own providers below, or use the optional starter team.",
     found: (count: number) => `${count} AI source${count === 1 ? "" : "s"} already found`,
-    plan: (names: string) => `Automatic team: ${names}`,
-    working: "Preparing clean consultation tabs without touching your existing AI chats…",
+    plan: (names: string) => `Optional starter team: ${names}`,
+    working: "Opening new-chat entries in separate tabs without touching your existing AI chats…",
     done: "The room is assembled. Automatic connection is taking over…",
-    privacy: "Your existing AI conversations stay untouched. The only unavoidable first-run step is the browser's own site-permission confirmation; Provider login remains with each AI site.",
+    privacy: "Site access is requested only for your chosen sites. New-chat entries and connection checks cannot prove a provider created a fresh conversation. Login stays with each AI site.",
     denied: "Site access was not granted. ChatChat cannot connect those AI pages without the browser's permission.",
-    failed: "ChatChat could not assemble at least two AI participants.",
+    failed: "Starter assembly could not finish. Any seats already added remain available; you can invite the rest yourself.",
+    cleanupFailed: "Setup failed and a new tab could not be closed. Close it manually before retrying.",
   },
   "zh-CN": {
-    kicker: "零配置开始",
-    title: "打开 ChatChat，会议室自己组起来。",
-    body: "ChatChat 会识别浏览器里已经打开的 AI，用它们决定这次会议的团队；真正开会时会另开干净的专用会话，不会往你原来的聊天里塞握手或协商内容。页面识别、连接检查和协商就绪验证都会自动继续。",
-    button: "组建我的 AI 会议室",
-    none: "现在还没有打开 AI 标签页。ChatChat 可以直接替你打开一组起步 AI——不用填配置表，也不用理解任何技术设置。",
+    kicker: "自选 AI 团队",
+    title: "选择谁来加入你的会议。",
+    body: "通过下方“＋ 邀请 AI”逐个选择网站。你也可以明确选择使用建议的起步团队。已有 AI 标签页仅用于建议，不会收到连接消息。",
+    button: "使用建议的起步团队",
+    none: "尚未发现 AI 标签页。请在下方自选网站，或选择可选的起步团队。",
     found: (count: number) => `已经发现 ${count} 个 AI 来源`,
-    plan: (names: string) => `自动团队：${names}`,
-    working: "正在准备干净的会议专用会话，不会改动你原来的 AI 聊天……",
+    plan: (names: string) => `可选起步团队：${names}`,
+    working: "正在另开标签页访问新对话入口，不会改动你原来的 AI 聊天……",
     done: "会议室已经组好，自动连接流程正在接管……",
-    privacy: "你原来的 AI 对话不会被改动。第一次唯一无法省掉的是浏览器自己的站点权限确认；各 AI 的登录状态仍然只留在各自网站。",
+    privacy: "仅为你选择的网站请求访问权限。打开新对话入口和通过连接检查不能证明网站已创建全新对话。登录仍由各 AI 网站管理。",
     denied: "没有获得站点权限。浏览器不允许 ChatChat 在未授权时连接这些 AI 页面。",
-    failed: "ChatChat 没能组建出至少两位 AI 参与者。",
+    failed: "起步团队未能全部加入。已经加入的席位仍可使用，你可以自行邀请其余 AI。",
+    cleanupFailed: "连接失败，且无法关闭新标签页。请先手动关闭该标签页，再重试。",
   },
 } as const;
 
@@ -76,10 +77,12 @@ async function mount() {
   const guideRoot = document.getElementById("first-run-guide-root");
   if (!root) return;
   const onboardingRoot = root;
-  const locale: Locale = document.documentElement.lang.toLowerCase().startsWith("zh")
-    || navigator.language?.toLowerCase().startsWith("zh")
-    ? "zh-CN"
-    : "en";
+  // An explicit page locale wins over the operating system language. Using
+  // navigator.language as an OR condition forced Chinese onboarding on an
+  // English page whenever the host/browser was configured in Chinese.
+  const pageLanguage = document.documentElement.lang.trim().toLowerCase();
+  const preferredLanguage = pageLanguage || navigator.language?.toLowerCase() || "en";
+  const locale: Locale = preferredLanguage.startsWith("zh") ? "zh-CN" : "en";
   const strings = COPY[locale];
   const session = chrome.storage.session ?? chrome.storage.local;
   const stored = await session.get(PARTICIPANTS_KEY);
@@ -123,7 +126,6 @@ async function mount() {
 
   let discovered: AutomaticTeamDetection[] = [];
   let plan: AutomaticTeamDetection[] = [];
-  let permissionReady = false;
   let starting = false;
   let scan: number | undefined;
 
@@ -141,42 +143,37 @@ async function mount() {
     button.disabled = true;
     status.textContent = strings.working;
     try {
-      let granted = permissionReady;
-      if (!granted) {
-        granted = await chrome.permissions.request(automaticTeamPermissionDescriptor(plan));
-      }
+      const selected = [...plan];
+      const descriptor = {
+        origins: [...new Set(selected.flatMap((item) => planFreshSeat(item.normalizedUrl).permissionOrigins)
+          .map((origin) => `${origin}/*`))],
+      };
+      const granted = await chrome.permissions.request(descriptor);
       if (!granted) throw new Error(strings.denied);
-      await assemble(plan, strings.failed);
+      await assemble(selected, strings.failed, descriptor.origins);
       completeAssembly();
     } catch (error) {
       starting = false;
       button.disabled = false;
-      status.textContent = error instanceof Error ? error.message : String(error);
+      status.textContent = error instanceof FreshSeatError && error.code === "cleanup-failed"
+        ? strings.cleanupFailed
+        : error instanceof Error ? error.message : String(error);
     }
   });
 
   async function refreshPlan() {
+    const current = await session.get(PARTICIPANTS_KEY);
+    if (Array.isArray(current[PARTICIPANTS_KEY]) && current[PARTICIPANTS_KEY].length > 0) {
+      clearScan();
+      finishOnboarding();
+      return;
+    }
     discovered = await discover();
     plan = buildAutomaticTeamPlan(discovered, MAX_CONSULTATION_PARTICIPANTS);
-    permissionReady = plan.length > 0
-      && await chrome.permissions.contains(automaticTeamPermissionDescriptor(plan));
     found.textContent = discovered.length ? strings.found(discovered.length) : strings.none;
     status.textContent = plan.length ? strings.plan(plan.map((item) => item.displayName).join(" · ")) : "";
     button.disabled = starting || plan.length < 2;
-
-    if (permissionReady && plan.length >= 2 && !starting) {
-      starting = true;
-      button.disabled = true;
-      status.textContent = strings.working;
-      try {
-        await assemble(plan, strings.failed);
-        completeAssembly();
-      } catch (error) {
-        starting = false;
-        button.disabled = false;
-        status.textContent = error instanceof Error ? error.message : String(error);
-      }
-    }
+    // Existing permissions are capability, never consent to choose a team.
   }
 
   function completeAssembly() {
@@ -241,39 +238,32 @@ async function discover(): Promise<AutomaticTeamDetection[]> {
   return [...byOrigin.values()].slice(0, MAX_CONSULTATION_PARTICIPANTS);
 }
 
-async function assemble(plan: readonly AutomaticTeamDetection[], failureMessage: string) {
-  const participants: ParticipantRecord[] = [];
-  const connections: Record<string, { state: "idle"; automatic: true }> = {};
-
-  for (const detection of plan) {
-    const startUrl = automaticTeamLaunchUrl(detection);
-    const fresh = await createAutomaticTeamTab(startUrl);
-    if (!fresh?.id) continue;
-
-    const seatId = `extension:${detection.providerId}:${fresh.id}`;
-    participants.push({
-      seatId,
-      participantId: seatId,
-      tabId: fresh.id,
-      providerId: detection.providerId,
-      providerName: detection.displayName,
-      origin: detection.origin,
-      url: fresh.url ?? startUrl,
-      hostname: detection.hostname,
-      startUrl,
-      createdByChatChat: true,
-    });
-    connections[seatId] = { state: "idle", automatic: true };
-  }
-  if (participants.length < 2) throw new Error(failureMessage);
+async function assemble(plan: readonly AutomaticTeamDetection[], failureMessage: string, grantedPatterns: readonly string[]) {
   const session = chrome.storage.session ?? chrome.storage.local;
-  await session.set({ [PARTICIPANTS_KEY]: participants, [CONNECTIONS_KEY]: connections });
-}
-
-async function createAutomaticTeamTab(startUrl: string): Promise<{ id?: number; url?: string }> {
-  const fresh = await chrome.tabs.create({ url: startUrl, active: false });
-  return {
-    id: fresh?.id,
-    url: fresh?.url ?? startUrl,
-  };
+  for (const detection of plan) {
+    try {
+      await createFreshSeat(planFreshSeat(detection.normalizedUrl), {
+        readParticipants: async () => {
+          const stored = await session.get(PARTICIPANTS_KEY);
+          return Array.isArray(stored[PARTICIPANTS_KEY]) ? stored[PARTICIPANTS_KEY] : [];
+        },
+        writeParticipants: (participants) => session.set({ [PARTICIPANTS_KEY]: participants }),
+        requestPermissions: async (origins) => {
+          if (origins.some((origin) => !grantedPatterns.includes(`${origin}/*`))) {
+            throw new Error(failureMessage);
+          }
+        },
+        createTab: (url) => chrome.tabs.create({ url, active: false }),
+        waitForTab: (tabId) => waitForFreshSeatTab(tabId, (id) => chrome.tabs.get(id)),
+        getTab: (tabId) => chrome.tabs.get(tabId),
+        removeTab: (tabId) => chrome.tabs.remove(tabId),
+      });
+    } catch (error) {
+      if (error instanceof FreshSeatError && error.code === "duplicate-origin") continue;
+      // Keep successfully committed seats; a failed new tab is cleaned up by createFreshSeat.
+      announceAutomaticTeamAssembled();
+      if (error instanceof FreshSeatError && error.code === "cleanup-failed") throw error;
+      throw new Error(failureMessage);
+    }
+  }
 }

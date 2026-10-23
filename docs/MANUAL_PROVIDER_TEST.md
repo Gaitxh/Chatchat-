@@ -1,300 +1,60 @@
-# Real Provider Manual Validation · v0.9
+# Real Provider Manual Validation — browser-backed local preview
 
-ChatChat CI can compile and test the Browser Council Bridge, but CI cannot sign into a user's external AI account or operate a private live Provider UI.
+This is the acceptance checklist for the current browser extension and independent meeting window. Historical desktop/WebView instructions are archived in [MANUAL_PROVIDER_TEST_DESKTOP_0_9.md](archive/MANUAL_PROVIDER_TEST_DESKTOP_0_9.md). There is no current `tauri:dev` installation step.
 
-That creates two distinct quality gates:
+## Evidence boundaries
 
-```text
-Gate A — automated CI
-TypeScript + parser tests + Vite production build
-+ real built UI screenshot + Rust/Tauri compile
+Automated type checks, deterministic tests, packaged extension loading and synthetic UI demonstrations are distinct from actual model inference. A site is not runtime-validated because its URL is recognized, its login is visible, or a synthetic scenario passes. Record a dated configuration only after a real consultation succeeds.
 
-Gate B — user-local Provider validation
-real login
-→ DOM probe
-→ Teach Recipe 3/3
-→ explicit Test Speech
-→ Council Gate
-→ Take a Seat
-→ real Council turn(s)
-```
+Use the [local installation guide](LOCAL_INSTALL.md) ([中文](LOCAL_INSTALL.zh-CN.md)). Load the prebuilt `extension/` folder in the browser profile holding the intended model login. Do not copy cookies, change enterprise policies, disable browser protections or enter provider passwords into ChatChat.
 
-A Provider should not be described as runtime-validated until both gates pass for a recorded configuration.
+## 1. Installation and entry
 
-## Before testing
+Open ChatChat from the toolbar. A separate meeting window should open. Repeat the action: the same live room should be focused without a second room or reset. A previously opened synthetic demo must not be reused as the live meeting. Help should remain available from extension details. Update/startup must not unexpectedly open AI websites.
 
-Run the Tauri desktop app:
+Record OS, browser/version, extension version and source revision. Do not record account identifiers or private sidebar contents.
 
-```bash
-npm install
-npm run tauri:dev
-```
+## 2. Choose seats and permissions
 
-Use a test account or an account whose visible screen content you are comfortable handling locally. Do not record or post private sidebars/account data.
+Choose two different providers with the add-seat control. Decline one site permission initially: no prompt should be sent and the error should explain the next action. Then grant only the intended site from an explicit user action. A provider alias must not create a second seat or request permission for the wrong destination.
 
-For Custom Providers, invite a URL that lands on a clean/new chat surface when possible. ChatChat uses that URL as the fresh-session start page.
+Existing tabs may be used to discover a provider, not as permission to write into an existing personal conversation. For custom websites, explicitly identify and confirm a new-chat entry; this is not a compatibility certification.
 
----
+## 3. Normal login and clean-chat boundary
 
-# Gate B checklist
+Complete login/MFA normally on the provider website when needed. Confirm that already authenticated sessions in the same browser profile do not ask for an unnecessary second login. Other profiles' logins must not be imported or exposed.
 
-## 1. Invite
+Keep an old conversation open with a harmless sentinel. Add the provider and run connection checks. The old conversation must receive zero injected prompts, sends, navigations or new messages. Inspect the dedicated consultation chat on the actual website: a new tab or homepage navigation alone does not prove a new conversation. A website that restores the old thread fails this check.
 
-1. Click `+ INVITE AI`.
-2. Enter the Provider URL.
-3. Confirm the detection card shows either a known catalog provider or `Custom AI / custom.browser`.
-4. Confirm the profile appears on the local Advisor Roster.
+Repeat for a second consultation: prior meeting context must not silently leak into the new one.
 
-Pass condition:
+## 4. Verify page controls and real responses
 
-```text
-Provider profile exists locally
-```
+Where automatic connection succeeds, inspect what was actually sent and received. Where a manual recipe is needed, use only the intended composer, Send control and assistant-response region. Never accept a password field, a broad `main`/body scrape, an unrelated Send button or the echoed user prompt as an AI response.
 
-## 2. Isolated login WebView
+READY requires the actual consultation handshake, not merely a logged-in homepage. Record completion/timeout explicitly. A partial/truncated reply, expired session, CAPTCHA or rate limit must remain visible and must not be represented by a fabricated successful turn. Respect provider restrictions; do not bypass challenges or limits.
 
-1. Click `LOGIN`.
-2. Sign in directly in the Provider WebView.
-3. Complete OAuth/MFA on the Provider's own pages if needed.
-4. Return to the Provider's chat surface.
+## 5. Run a real two-provider consultation
 
-Pass condition:
+Use a non-sensitive, bounded task. Confirm:
 
-```text
-WEBVIEW OPEN
-```
+- independent first views are not delivered to peers until the first batch closes;
+- subsequent discussion references actual public events;
+- claimed revisions identify the participant-authored event that changed the position;
+- unavailable providers do not become agreement votes;
+- unresolved questions and uncertainty remain visible;
+- the final output corresponds to real captured contributions, not synthetic fixtures.
 
-Important: ChatChat must never ask the user to paste a password, cookie or access token into its own UI.
+A test need not force disagreement or a revision. Use a separately labeled deterministic fixture to cover rare protocol paths, never to claim a real model was persuaded.
 
-## 3. 御前试音 / DOM probe
+## 6. Failure and recovery
 
-Click `御前试音`.
+Close one dedicated provider tab, navigate another to an unexpected origin, interrupt network access and expire a login in separate controlled runs. No prompt may be sent to an unrelated origin. Other seats must not be silently marked as having answered. A lost send acknowledgement must not cause an automatic duplicate submission. Record any unsupported cancellation/resume behavior as a failed acceptance item rather than assuming exactly-once delivery.
 
-Confirm the metadata-only probe finds plausible composer/action candidates without reading chat body text or credential values.
+Check the two-UI case (Full Room plus Side Panel), repeated clicks and browser restart. Existing private tabs remain untouched. Save/export local meeting history before update or uninstall; record what the current implementation actually restores.
 
-Pass condition:
+## 7. Retained evidence
 
-```text
-DOM PROBED
-```
+Keep only privacy-reviewed evidence: date, software versions, provider display/model label as visible (or unknown), test case, pass/fail, redacted receipts and unresolved defects. Do not publish passwords, tokens, cookies, account emails, full private chat URLs, private transcripts or account sidebars.
 
-## 4. Teach Recipe
-
-Teach all three roles:
-
-```text
-✍️ Composer
-➤ Send
-💬 Response
-```
-
-For each role:
-
-1. Click `教我` in ChatChat.
-2. Click the intended element in the Provider window.
-3. Return to ChatChat and confirm the selector appears.
-
-Pass condition:
-
-```text
-RECIPE 3/3
-```
-
-Reject any recipe that targets a password field.
-
-## 5. Test Speech
-
-1. Review the visible test message.
-2. Click `试奏`.
-3. Watch the Provider window.
-4. Confirm:
-   - the text goes into the intended composer;
-   - the intended send control activates;
-   - a new model response is produced;
-   - ChatChat displays the response captured from the taught response surface;
-   - capture stops after stable output rather than arbitrary page scraping.
-
-Pass condition:
-
-```text
-TEST PASSED
-```
-
-This still does **not** mean READY.
-
-## 6. Council Gate
-
-Click:
-
-```text
-OPEN COUNCIL GATE
-```
-
-ChatChat sends a real sealed-phase protocol handshake through the taught browser surfaces.
-
-The Provider must return a valid structured response that parses into legal `CouncilContribution[]` and includes the required READY stance.
-
-Pass condition:
-
-```text
-COUNCIL GATE ✓
-COUNCIL READY
-```
-
-If the first response has only a formatting error, ChatChat performs one structured repair attempt. A second parser failure is a Gate failure.
-
-## 7. Take a Seat
-
-Click:
-
-```text
-TAKE A SEAT
-```
-
-Confirm:
-
-- the Provider profile displays `SEATED`;
-- the round table displays the advisor as `LIVE WEB`;
-- with exactly one real seat, the chamber is clearly labelled `HYBRID REHEARSAL`.
-
-Pass condition:
-
-```text
-🪑 SEATED
-```
-
-## 8. First real Council turn
-
-With one live advisor, run a Hybrid rehearsal.
-
-Confirm the real advisor:
-
-1. prepares a fresh Provider start page for the new Council session;
-2. finds the taught composer again;
-3. receives a sealed-phase prompt;
-4. produces a structured sealed contribution;
-5. appears in the Blackboard with its real Provider profile id;
-6. participates in later debate/final phases rather than only Test Speech.
-
-If fresh-session preparation fails, ChatChat should emit uncertainty with confidence 0 rather than silently reusing stale chat context.
-
-## 9. LIVE COUNCIL
-
-Validate a second Provider using the same process and seat it.
-
-Pass condition:
-
-```text
-🔥 LIVE COUNCIL
-```
-
-Now run one King's Command and verify the Council contains **real web advisors only**.
-
-Confirm:
-
-- Round 1 is sealed;
-- both providers independently answer;
-- Round 2 starts automatically;
-- peer event references are real Blackboard ids;
-- at least one legal debate event is produced;
-- final phase produces one final position per advisor;
-- the final report retains disagreement/minority opinion if present;
-- the Court Chronicle stores the resulting structured event stream locally.
-
----
-
-# Failure taxonomy
-
-When a Provider fails, report the narrowest stage.
-
-### Login / navigation
-
-- provider WebView cannot load;
-- authentication redirect never returns to the Provider host;
-- fresh-session navigation returns to login;
-- root/new-chat page is incompatible with the stored recipe.
-
-### Recipe drift
-
-- composer selector no longer resolves;
-- send selector missing/disabled;
-- response selector no longer matches new answers;
-- a site update changes roles/DOM hierarchy.
-
-### Input execution
-
-- text visually appears but the Provider framework does not recognize it;
-- input/change events are insufficient for the framework;
-- the generic click path cannot activate send.
-
-### Generation detection
-
-- response does not change from baseline;
-- response streaming never stabilizes under the generic heuristic;
-- the selected response surface represents multiple conversations incorrectly;
-- response exceeds the bounded capture path.
-
-### Council protocol
-
-- model refuses the machine-readable envelope;
-- response contains invalid JSON twice;
-- contribution kind is illegal for the phase;
-- model invents event ids;
-- model tries to revise another advisor's event;
-- final phase returns zero or multiple final positions;
-- Council prompt grows beyond the transport safety budget.
-
-A recurring generic-bridge failure is evidence for a provider-specific adapter operation—not a reason to make the generic bridge read more of the page.
-
----
-
-# Compatibility report template
-
-Use this format in an issue/PR:
-
-```text
-Provider: <name>
-Host: <host only>
-ChatChat: v0.9.x
-OS: <Windows/macOS/Linux + version>
-Provider UI date tested: YYYY-MM-DD
-
-Invite: PASS/FAIL
-Login WebView: PASS/FAIL
-DOM Probe: PASS/FAIL
-Recipe 3/3: PASS/FAIL
-Test Speech: PASS/FAIL
-Council Gate: PASS/FAIL
-Fresh Session: PASS/FAIL
-Hybrid Turn: PASS/FAIL
-Live Council with second provider: PASS/FAIL/NOT TESTED
-
-Notes:
-- selector drift or special framework behavior
-- error messages with private data removed
-```
-
-Do not post:
-
-- passwords;
-- cookies;
-- access/refresh tokens;
-- private conversation text;
-- account email/phone;
-- screenshots containing sensitive sidebars or profile details;
-- selectors that embed private user/account identifiers.
-
----
-
-# What “supported” should mean
-
-Use precise language:
-
-- **recognized**: URL maps to a catalog entry;
-- **teachable**: user can create a 3/3 recipe;
-- **test-passed**: one explicit message round-trip works;
-- **council-ready**: structured Council Gate passes;
-- **runtime-validated**: a real sealed/debate/final run was manually tested on a specific environment;
-- **officially supported**: maintainers choose to document/maintain that compatibility target.
-
-This vocabulary prevents a cool demo from turning into accidental compatibility promises.
+Passing these checks for a specific provider/browser/date does not prove permanent compatibility with all websites or replace a provider's terms and account limits. Stable support requires maintained adapters and repeatable live evidence.

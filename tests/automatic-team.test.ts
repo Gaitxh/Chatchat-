@@ -113,3 +113,13 @@ console.log("✓ Hydration defaults cannot downgrade a newer persisted provider 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+// A marketing-domain alias must not become a second seat for one chat origin.
+const qwenAliases = [detectProviderUrl("https://qwen.ai/"), detectProviderUrl("https://chat.qwen.ai/c/existing")];
+const aliasPlan = buildAutomaticTeamPlan(qwenAliases, 8);
+assert(aliasPlan.filter((item) => item.providerId === "qwen-chat").length === 1, "Provider aliases must collapse to one destination seat.");
+assert(new Set(aliasPlan.map(automaticTeamLaunchUrl)).size === aliasPlan.length, "Every planned seat must have a unique launch destination.");
+const aliasPermission = automaticTeamPermissionDescriptor(qwenAliases);
+assert(aliasPermission.origins.join(",") === "https://chat.qwen.ai/*", "Permissions must cover the actual launch origin, not the discovery alias.");
+assert(aliasPlan.find((item) => item.providerId === "qwen-chat")?.origin === "https://chat.qwen.ai", "Persisted plan identity must match the destination origin.");
+console.log("✓ Provider aliases cannot duplicate seats or request the wrong destination permission");

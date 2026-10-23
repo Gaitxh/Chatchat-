@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ChatChat Help · 使用指南</title>
+    <link rel="stylesheet" href="welcome.css">
+    <script type="module" src="welcome.js"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="brand">ChatChat <span class="preview">Build preview · <span lang="zh-CN">构建预览</span></span></p>
+        <h1>Your AI meeting room<br><span lang="zh-CN">你的 AI 会议室</span></h1>
+        <p>One proposal. Independent AIs, equal seats.<br><span lang="zh-CN">一个议题，多个 AI 独立思考、平等讨论。</span></p>
+        <button id="open-meeting-room" type="button" aria-describedby="launch-note">Open meeting room · <span lang="zh-CN">打开会议室</span></button>
+        <p id="launch-note" class="hint">Opens a separate window in this browser profile, or focuses your existing room. Uses a tab if windows are unavailable.<br><span lang="zh-CN">在当前浏览器配置中打开独立窗口；已有会议室时直接切回。不支持独立窗口时使用标签页。</span></p>
+        <p id="launch-status" role="status" aria-live="polite" aria-atomic="true"></p>
+        <noscript>Use the ChatChat extension icon to open the room. <span lang="zh-CN">请点击 ChatChat 扩展图标打开会议室。</span></noscript>
+      </header>
+
+      <div class="guides">
+        <section lang="en" aria-labelledby="guide-en">
+          <h2 id="guide-en">Get started</h2>
+          <ol>
+            <li><strong>Click “+” to add a model.</strong> Choose a provider and approve access to that specific site when asked.</li>
+            <li><strong>Sign in normally if needed.</strong> Use the provider’s own browser tab in this profile. Enter your password only on the provider’s site.</li>
+            <li><strong>Use one dedicated new chat per seat, for every meeting.</strong> Keep personal chats separate. Each AI participates as an equal peer.</li>
+          </ol>
+          <h2>Local room, online providers</h2>
+          <p>Meeting history is stored locally in this browser. Provider tabs stay online: proposals and shared discussion sent to them are handled under each provider’s policies. Local history does not delete provider chat history.</p>
+          <h2>Preview status</h2>
+          <p>This is a browser extension preview, not a signed desktop app. Provider compatibility still needs verification. Synthetic demos are separate from live meetings and do not prove provider support.</p>
+          <h2>Find this help again</h2>
+          <p>Open your browser’s Extensions → ChatChat → Details → Extension options. The ChatChat toolbar icon also opens or returns to your meeting room.</p>
+        </section>
+
+        <section lang="zh-CN" aria-labelledby="guide-zh">
+          <h2 id="guide-zh">开始使用</h2>
+          <ol>
+            <li><strong>点击“+”添加模型。</strong>选择服务商；需要权限时，只授权你选择的具体网站。</li>
+            <li><strong>如需登录，按平常方式登录。</strong>使用当前浏览器配置中的服务商标签页，只在服务商网站输入密码。</li>
+            <li><strong>每场会议的每个席位都使用一个专用的新对话。</strong>与个人聊天分开，每个 AI 都是平等参与者。</li>
+          </ol>
+          <h2>本地会议室，在线 AI 服务</h2>
+          <p>会议历史保存在当前浏览器本地。服务商标签页仍需联网；发送给它们的议题和共享讨论受各自的数据政策约束。本地历史操作不会删除服务商的聊天记录。</p>
+          <h2>预览状态</h2>
+          <p>这是浏览器扩展构建预览，并非已签名的桌面应用。服务商兼容性仍需验证。合成演示与真实会议分开，不能证明服务商支持情况。</p>
+          <h2>再次打开本指南</h2>
+          <p>在浏览器中打开：扩展程序 → ChatChat → 详情 → 扩展程序选项。点击 ChatChat 工具栏图标也能打开或返回会议室。</p>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

@@ -29,7 +29,10 @@ export function buildAutomaticTeamPlan(
   for (const item of discovered) {
     if (byOrigin.size >= safeMax) break;
     if (item.kind !== "known") continue;
-    if (!byOrigin.has(item.origin)) byOrigin.set(item.origin, item);
+    // Discovery aliases are suggestions, not identities. Bind the plan to the
+    // actual launch origin before deduplication, permission grants or storage.
+    const launch = detectProviderUrl(automaticTeamLaunchUrl(item));
+    if (!byOrigin.has(launch.origin)) byOrigin.set(launch.origin, launch);
   }
 
   if (byOrigin.size >= 2) return [...byOrigin.values()];
@@ -58,6 +61,6 @@ export function automaticTeamPermissionDescriptor(
   plan: readonly AutomaticTeamDetection[],
 ): { origins: string[] } {
   return {
-    origins: [...new Set(plan.map((detection) => `${detection.origin}/*`))],
+    origins: [...new Set(plan.map((detection) => `${new URL(automaticTeamLaunchUrl(detection)).origin}/*`))],
   };
 }

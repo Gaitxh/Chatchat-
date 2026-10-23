@@ -4,6 +4,7 @@ import type {
   CouncilAgent,
   CouncilContext,
   CouncilContribution,
+  CouncilEvent,
   CouncilPhaseUpdate,
 } from "../src/core/types.js";
 
@@ -168,5 +169,44 @@ assert(
   budgetReport.stopReason === "round_budget",
   "Exhausting the mode round ceiling while fresh signals remain must be distinguished from stable convergence.",
 );
+
+const immutableBoard = new Blackboard();
+const retained: Extract<CouncilEvent, { kind: "revision" }> = {
+  id: "immutable-revision", sessionId: "immutable-session", actorId: "a", round: 2,
+  createdAt: "2026-01-01T00:00:00.000Z", kind: "revision", previousEventId: "original",
+  stance: "Dissent", content: "A specific objection remains.", confidence: 0.7, causedBy: ["exact-cause"],
+};
+immutableBoard.publish(retained);
+retained.stance = "Tampered input";
+retained.causedBy!.push("invented-cause");
+const published = immutableBoard.find(retained.id);
+assert(published?.kind === "revision" && published.stance === "Dissent", "Publishing must detach retained caller inputs.");
+assert(published.causedBy?.join(",") === "exact-cause", "Publishing must detach nested caller arrays.");
+function attemptMutation(mutate: () => void): void {
+  try { mutate(); } catch (error) { if (!(error instanceof TypeError)) throw error; }
+}
+const snapshot = immutableBoard.events;
+attemptMutation(() => { (snapshot as CouncilEvent[]).pop(); });
+attemptMutation(() => { published.stance = "Tampered getter"; });
+attemptMutation(() => { published.causedBy!.push("invented-getter-cause"); });
+attemptMutation(() => { (immutableBoard.forActor("a") as CouncilEvent[]).splice(0); });
+attemptMutation(() => { immutableBoard.latestPositionEvent("a")!.content = "Tampered latest"; });
+assert(immutableBoard.events.length === 1, "Getter mutations must not erase published events.");
+assert(immutableBoard.latestPositionEvent("a")?.stance === "Dissent" && published.content === "A specific objection remains.", "Find, actor and latest getters must protect the published record.");
+assert(published.causedBy?.join(",") === "exact-cause", "Nested getter mutations must not change provenance.");
+const retainedFinal: Extract<CouncilEvent, { kind: "final_position" }> = {
+  ...retained, id: "immutable-final", kind: "final_position", stance: "Dissent", caveats: ["Open risk"],
+};
+immutableBoard.publish(retainedFinal);
+retainedFinal.caveats!.push("invented-caveat");
+const final = immutableBoard.find(retainedFinal.id);
+assert(final?.kind === "final_position", "The final record must remain readable.");
+attemptMutation(() => { final.caveats!.splice(0); });
+assert(final.caveats?.join(",") === "Open risk", "Final caveats must be copied and frozen.");
+const projected = immutableBoard.finalPositions([{ id: "a", name: "A", provider: "test" }]);
+attemptMutation(() => { projected[0]!.caveats.push("report-mutation"); });
+assert(final.caveats?.join(",") === "Open risk", "Report projection mutations must not alter Blackboard caveats.");
+assert(snapshot.length === 1 && snapshot[0]?.id === retained.id, "A retained getter must stay a snapshot after later publication.");
+assert(immutableBoard.events.map((event) => event.id).join(",") === "immutable-revision,immutable-final", "Freezing must preserve event ids and append order.");
 
 console.log("✓ ChatChat council-core tests passed");

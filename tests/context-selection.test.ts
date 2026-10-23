@@ -49,7 +49,7 @@ const answeredEvents = events.concat([
   event({ id: "answer-q-old", round: 7, actorId: "b", kind: "argument", stance: "B2", content: "Explicitly answers the old direct question.", confidence: .82, replyToEventId: "q-old" }),
   event({ id: "answer-challenge-old", round: 7, actorId: "a", kind: "defense", targetEventId: "challenge-old", content: "Explicitly answers the old challenge." }),
   event({ id: "answer-evidence-old", round: 7, actorId: "a", kind: "argument", stance: "A2", content: "Addresses the targeted old evidence.", confidence: .84, replyToEventId: "evidence-old" }),
-  event({ id: "final-c", round: 7, actorId: "c", kind: "final_position", stance: "C resolved", content: "My uncertainty is resolved.", confidence: .9, caveats: [] }),
+  event({ id: "resolve-c", round: 7, actorId: "c", kind: "revision", previousEventId: "uncertain-old", stance: "C resolved", content: "My specific uncertainty is resolved by the cited response.", confidence: .9, causedBy: ["uncertain-old", "answer-q-old"] }),
 ]);
 const answeredSelection = selectProviderContextEvents(answeredEvents);
 assert(!answeredSelection.pinnedIssueSourceEventIds.includes("q-old"), "Answered old question must stop consuming pinned conflict memory.");

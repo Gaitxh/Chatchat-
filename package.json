@@ -1,6 +1,6 @@
 {
   "name": "chatchat",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "type": "module",
   "description": "Browser-first local multi-AI consultation: you propose, independent AIs consult as equals.",
@@ -18,7 +18,11 @@
     "demo": "npm run build:core && node dist/src/demo.js",
     "test": "npm run build:core && node scripts/run-test-suite.mjs",
     "preview": "vite preview --port 1420",
-    "preview:extension": "vite preview --config vite.extension.config.ts"
+    "preview:extension": "vite preview --config vite.extension.config.ts",
+    "package:local": "npm run build:extension && npm run package:extension",
+    "package:extension": "node scripts/validate-extension.mjs && node scripts/package-extension.mjs",
+    "check:package": "node scripts/validate-extension.mjs && node scripts/package-extension.mjs --check",
+    "test:package": "node --test tests/package-extension.test.mjs"
   },
   "dependencies": {
     "react": "^19.2.0",

@@ -1,0 +1,107 @@
+{
+  "date": "2026-10-21",
+  "version": "0.9.1-local-preview.1",
+  "baseCommit": "ff3a43a6f7c7d44eca63eda52918b45fe6acde20",
+  "typecheckAndProductContracts": "passed",
+  "deterministicTestPrograms": 65,
+  "controlledDomSafetyTests": 66,
+  "launcherAndWelcomeTests": 26,
+  "packagingTests": 6,
+  "productionWebBuild": "passed",
+  "productionExtensionBuild": "passed",
+  "browser": {
+    "status": "passed",
+    "browser": "Chrome/153.0.8010.36",
+    "checks": [
+      "production extension loaded in a fresh isolated browser profile",
+      "first installation opened local welcome page",
+      "no provider host permissions granted on installation",
+      "empty meeting window exposes seat selection",
+      "meeting is a real browser popup window, not an embedded provider webview",
+      "rapid toolbar actions reuse one live meeting without resetting it",
+      "installation and room entry opened no third-party provider website",
+      "welcome and empty room had no uncaught page exceptions"
+    ],
+    "syntheticChecks": [
+      "known invitation UI completed with an explicitly labeled fixture",
+      "custom invitation UI completed with an explicitly labeled fixture"
+    ],
+    "providerInferenceTested": false,
+    "profile": "fresh isolated temporary profile; removed after test"
+  },
+  "agents": [
+    {
+      "task": "core-reliability",
+      "model": "gpt-6.1-sol",
+      "reasoningEffort": "max",
+      "exitCode": 0,
+      "finalReport": true
+    },
+    {
+      "task": "implement-bridge-safety",
+      "model": "gpt-6.1-sol",
+      "reasoningEffort": "xhigh",
+      "exitCode": 0,
+      "finalReport": true
+    },
+    {
+      "task": "implement-distribution",
+      "model": "gpt-6.1-sol",
+      "reasoningEffort": "xhigh",
+      "exitCode": -15,
+      "finalReport": false
+    },
+    {
+      "task": "implement-protocol-integrity",
+      "model": "gpt-6-astra",
+      "reasoningEffort": "max",
+      "exitCode": 0,
+      "finalReport": true
+    },
+    {
+      "task": "implement-room-entry",
+      "model": "gpt-6-astra",
+      "reasoningEffort": "xhigh",
+      "exitCode": 0,
+      "finalReport": true
+    },
+    {
+      "task": "implement-seat-isolation",
+      "model": "gpt-6.1-sol",
+      "reasoningEffort": "xhigh",
+      "exitCode": -15,
+      "finalReport": false
+    },
+    {
+      "task": "installation-ux",
+      "model": "gpt-6.1-sol",
+      "reasoningEffort": "xhigh",
+      "exitCode": 0,
+      "finalReport": true
+    },
+    {
+      "task": "round2-install-review",
+      "model": "gpt-6-astra",
+      "reasoningEffort": "xhigh",
+      "exitCode": 0,
+      "finalReport": true
+    },
+    {
+      "task": "round2-seat-protocol-review",
+      "model": "gpt-6.1-sol",
+      "reasoningEffort": "xhigh",
+      "exitCode": 0,
+      "finalReport": true
+    },
+    {
+      "task": "runtime-security",
+      "model": "gpt-6-astra",
+      "reasoningEffort": "xhigh",
+      "exitCode": 0,
+      "finalReport": true
+    }
+  ],
+  "nativeInstallerTested": false,
+  "windowsEdgeTested": false,
+  "liveProviderInferenceTested": false
+}

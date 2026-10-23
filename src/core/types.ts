@@ -43,6 +43,11 @@ export interface CouncilParticipant {
   committeeTask?: string;
 }
 
+/** Runtime-owned failure provenance. Absence does not establish live Provider execution. */
+export interface CouncilEventProvenance {
+  source: "runtime_fallback";
+}
+
 interface CouncilEventBase {
   id: string;
   sessionId: string;
@@ -50,6 +55,8 @@ interface CouncilEventBase {
   actorId: string;
   kind: CouncilEventKind;
   createdAt: string;
+  /** Optional for old archives; never populated from model-supplied fields. */
+  provenance?: CouncilEventProvenance;
 }
 
 /** Optional only on speech kinds that otherwise have no exact peer-event target. Old archives remain valid without it. */
@@ -98,7 +105,7 @@ export interface CouncilToolFact {
   note: string;
 }
 
-type CouncilEventMetadataKey = "id" | "sessionId" | "round" | "actorId" | "createdAt";
+type CouncilEventMetadataKey = "id" | "sessionId" | "round" | "actorId" | "createdAt" | "provenance";
 
 export type CouncilContribution =
   | Omit<ArgumentEvent, CouncilEventMetadataKey>
@@ -138,6 +145,8 @@ export interface CouncilPosition {
   content: string;
   confidence: number;
   caveats: string[];
+  /** Unavailable seats remain visible but do not contribute to authored stance counts. */
+  provenance?: CouncilEventProvenance;
 }
 
 export interface CouncilReport {

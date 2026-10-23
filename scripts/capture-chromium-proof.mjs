@@ -17,6 +17,10 @@ const waitMs = positiveInteger(args.waitMs ?? "26000", "--wait-ms");
 // a smaller ceiling so a wedged Page.navigate / Runtime.evaluate / screenshot
 // cannot consume the entire GitHub Actions job without an actionable failure.
 const cdpCallTimeoutMs = Math.min(8000, Math.max(2500, Math.floor(waitMs / 2)));
+// Heavy DOM evaluation and headless raster capture are the two observed
+// stalls on hosted Linux runners. Keep each RPC bounded, but permit the
+// expensive operations up to 80% of the requested readiness budget.
+const cdpHeavyTimeoutMs = Math.min(20000, Math.max(cdpCallTimeoutMs, Math.floor(waitMs * 0.8)));
 // GitHub-hosted Chromium has repeatedly wedged one Runtime.evaluate or
 // Page.captureScreenshot call on otherwise healthy, already-proved pages.
 // Preserve the exact same product selectors and assertions, but allow only one
@@ -79,7 +83,7 @@ async function captureProofAttempt(attempt) {
       () => browser?.exitCode ?? null,
       () => stderrTail(stderrChunks),
     );
-    const cdp = connectCdp(target.webSocketDebuggerUrl, cdpCallTimeoutMs);
+    const cdp = connectCdp(target.webSocketDebuggerUrl, cdpCallTimeoutMs, cdpHeavyTimeoutMs);
     try {
       await cdp.call("Page.enable");
       await cdp.call("Runtime.enable");
@@ -112,9 +116,13 @@ async function captureProofAttempt(attempt) {
       await fs.mkdir(path.dirname(domPath), { recursive: true });
       await fs.writeFile(domPath, `<!doctype html>\n${dom}\n`, "utf8");
 
+      // Keep all DOM/selector/semantic assertions identical. On a transient
+      // headless compositor stall, the ONE existing fresh-browser retry uses
+      // Chromium's alternate non-surface capture path. It is still a real
+      // screenshot from the same verified page, never a placeholder.
       const shot = await cdp.call("Page.captureScreenshot", {
         format: "png",
-        fromSurface: true,
+        fromSurface: attempt === 1,
         captureBeyondViewport: false,
       });
       if (!shot?.data) throw new Error("Chromium did not return screenshot bytes.");
@@ -202,7 +210,7 @@ async function waitForPageTarget(port, timeoutMs, exitCode, diagnostics) {
   throw new Error(`Chromium DevTools endpoint did not expose a page target on port ${port}${tail ? `. stderr: ${singleLine(tail)}` : "."}`);
 }
 
-function connectCdp(wsUrl, callTimeoutMs) {
+function connectCdp(wsUrl, callTimeoutMs, heavyTimeoutMs) {
   const socket = new WebSocket(wsUrl);
   let nextId = 1;
   const pending = new Map();
@@ -232,13 +240,15 @@ function connectCdp(wsUrl, callTimeoutMs) {
     async call(method, params = {}) {
       await withDeadline(opened, callTimeoutMs, `CDP WebSocket open timed out before ${method}.`);
       const id = nextId++;
+      const rpcDeadlineMs = (method === "Runtime.evaluate" || method === "Page.captureScreenshot")
+        ? heavyTimeoutMs : callTimeoutMs;
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
           const waiter = pending.get(id);
           if (!waiter) return;
           pending.delete(id);
-          reject(new Error(`CDP ${method} timed out after ${callTimeoutMs} ms.`));
-        }, callTimeoutMs);
+          reject(new Error(`CDP ${method} timed out after ${rpcDeadlineMs} ms.`));
+        }, rpcDeadlineMs);
         pending.set(id, { resolve, reject, method, timer });
         try {
           socket.send(JSON.stringify({ id, method, params }));

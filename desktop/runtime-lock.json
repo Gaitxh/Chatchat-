@@ -1,0 +1,53 @@
+{
+    "electron":  "45.0.0",
+    "playwright":  "1.64.1",
+    "chromium":  "156.0.8078.4",
+    "downloads":  [
+                      {
+                          "name":  "electron-win.zip",
+                          "url":  "https://github.com/electron/electron/releases/download/v45.0.0/electron-v45.0.0-win32-x64.zip",
+                          "sha256":  "ae53887a23bb640369c93dbd38c408a2af5c0deb86f2fa76c6c244cb444b7f47",
+                          "bytes":  158223852
+                      },
+                      {
+                          "name":  "electron-linux.zip",
+                          "url":  "https://github.com/electron/electron/releases/download/v45.0.0/electron-v45.0.0-linux-x64.zip",
+                          "sha256":  "22f6a10bd3f7fef987ddbb379d3375ce664ad0c98a9a50f80c89f1718a0c3e3a",
+                          "bytes":  123909792
+                      },
+                      {
+                          "name":  "chromium-win.zip",
+                          "url":  "https://cdn.playwright.dev/builds/cft/156.0.8078.4/win64/chrome-win64.zip",
+                          "sha256":  "220021ecfdad08c116fc71a153e65e3861ba841c531afc4f7acc7bd5d44b41db",
+                          "bytes":  207073013
+                      },
+                      {
+                          "name":  "electron-shasums.txt",
+                          "url":  "https://github.com/electron/electron/releases/download/v45.0.0/SHASUMS256.txt",
+                          "sha256":  "5882ee4d3f943f567cdb6df9bf86e78de9c369e41d9093daaa2e3acaa630093b",
+                          "bytes":  6740
+                      }
+                  ],
+    "browserRuntimeFiles":  [
+                                {
+                                    "sha256":  "7f08161bbeb2853ffe1780a9ded4985087f52efb9725d7d8207aabdd42f7cfb9",
+                                    "name":  "chrome.exe",
+                                    "bytes":  4578816
+                                },
+                                {
+                                    "sha256":  "40a2c35f157d2c2ab02f6d53b890c656c725fd1640f1ca57085edadf90d39eea",
+                                    "name":  "chrome.dll",
+                                    "bytes":  302858752
+                                },
+                                {
+                                    "sha256":  "b9280429a2829b34f5753b2653ae2c294700a587bb0a1565152d0c99a1ca1dd4",
+                                    "name":  "resources.pak",
+                                    "bytes":  24627771
+                                },
+                                {
+                                    "sha256":  "319501bd0fdf9c9cb9926c0d0fd64ed95961118af700fbb4342981f088e73e8c",
+                                    "name":  "icudtl.dat",
+                                    "bytes":  10822000
+                                }
+                            ]
+}

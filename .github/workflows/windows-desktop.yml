@@ -1,0 +1,167 @@
+name: Windows standalone desktop candidate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/windows-desktop.yml'
+
+# Only temporary GitHub-hosted Windows runners; PRs never receive write
+# permissions, codesigning keys, or production browser login profiles.
+concurrency:
+  group: windows-desktop-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 55
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          # Include the exact reviewed 0.10.6 source revision for real
+          # cross-version upgrade; no third-party installer is trusted.
+          fetch-depth: 25
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install build dependencies only on CI
+        run: |
+          npm ci
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm ci --prefix desktop
+          exit $LASTEXITCODE
+      - name: Check the shared council core, policy and regression tests
+        run: |
+          npm run check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm test
+          exit $LASTEXITCODE
+      - name: Compile shared core and verify bundled browser
+        working-directory: desktop
+        run: |
+          npm run build:core
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/download-browser.mjs
+          exit $LASTEXITCODE
+      - name: Desktop tests with bounded test worker concurrency
+        working-directory: desktop
+        run: |
+          # Two test workers avoid overloaded Chromium and spurious 150ms
+          # cross-process scheduling failures on temporary Windows runners.
+          $env:CHATCHAT_RENDERER_BROWSER = Join-Path $PWD '.build-cache/browser/chrome-win64/chrome.exe'
+          npm run test:ci
+          exit $LASTEXITCODE
+      - name: Build one-click per-user installer (unsigned without signing credentials)
+        working-directory: desktop
+        run: |
+          npm run package:win
+          exit $LASTEXITCODE
+      - name: Disposable Windows runner install / reinstall / uninstall acceptance
+        run: |
+          & ./desktop/scripts/test-windows-installer.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Verify packaged installer checksum
+        run: |
+          $line = Get-Content desktop/release/SHA256SUMS.txt -TotalCount 1
+          if ($line -notmatch '^([0-9a-f]{64})  (ChatChat-Setup-.+\.exe)$') { throw 'Malformed checksum file' }
+          $actual = (Get-FileHash (Join-Path desktop/release $Matches[2]) -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $Matches[1]) { throw 'Installer checksum mismatch' }
+      - name: Build reviewed 0.10.6 baseline in temporary Windows source tree
+        timeout-minutes: 15
+        run: |
+          $baselineSha = 'de4dbd9b63a7e14d20e9d9ad674624ba955b9a6f'
+          git cat-file -e "$baselineSha^{commit}"
+          if ($LASTEXITCODE) { throw 'Reviewed 0.10.6 baseline source commit not present in PR history.' }
+          $oldRoot = Join-Path $env:RUNNER_TEMP 'chatchat-0106-upgrade-baseline'
+          if (Test-Path -LiteralPath $oldRoot) { throw 'Temporary upgrade source directory is not empty.' }
+          New-Item -ItemType Directory -Path $oldRoot | Out-Null
+          $sourceZip = Join-Path $env:RUNNER_TEMP 'chatchat-0106-pinned-source.zip'
+          git archive --format=zip "--output=$sourceZip" $baselineSha
+          if ($LASTEXITCODE) { throw 'Failed to archive pinned previous-version source.' }
+          Expand-Archive -LiteralPath $sourceZip -DestinationPath $oldRoot -ErrorAction Stop
+          $oldDesktop = Join-Path $oldRoot 'desktop'
+          if ((Get-Content (Join-Path $oldDesktop 'package.json') -Raw | ConvertFrom-Json).version -ne '0.10.6') {
+            throw 'Pinned historical baseline is not ChatChat desktop 0.10.6.'
+          }
+          npm ci --prefix $oldRoot
+          if ($LASTEXITCODE) { throw 'Old root dependencies failed to install.' }
+          npm ci --prefix $oldDesktop
+          if ($LASTEXITCODE) { throw 'Old desktop dependencies failed to install.' }
+          $browser = Join-Path $PWD 'desktop/.build-cache/browser'
+          if (!(Test-Path (Join-Path $browser 'chrome-win64/chrome.exe'))) {
+            throw 'Current already-verified pinned Chromium bundle is missing.'
+          }
+          New-Item -ItemType Directory -Path (Join-Path $oldDesktop '.build-cache') -Force | Out-Null
+          # Exactly the same pinned browser bytes; the old release packager
+          # rechecks file hashes and does not reuse the user's Chrome profile.
+          Copy-Item -LiteralPath $browser -Destination (Join-Path $oldDesktop '.build-cache/browser') -Recurse -Force
+          Push-Location $oldDesktop
+          try {
+            npm run package:win
+            if ($LASTEXITCODE) { throw 'Historical 0.10.6 Setup.exe build or payload parity failed.' }
+          } finally { Pop-Location }
+          if (!(Test-Path (Join-Path $oldDesktop 'release/ChatChat-Setup-0.10.6-x64.exe'))) {
+            throw 'Reviewed 0.10.6 installer was not built.'
+          }
+          "CHATCHAT_PREVIOUS_DESKTOP=$oldDesktop" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Output 'PASS: exact historical source revision built a reviewed 0.10.6 NSIS installer on this disposable runner.'
+
+      - name: Real 0.10.6 to 0.10.7 upgrade with meeting data preserved
+        timeout-minutes: 10
+        run: |
+          & ./desktop/scripts/test-windows-upgrade.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      # Headed Electron GUI creation is not always supported in the service
+      # session of GitHub-hosted Windows Actions. Its diagnostic outcome is
+      # visible, but MUST NOT hide failures of actual installer acceptance.
+      - name: Native Electron backup UI diagnostic (headless runner, non-gating)
+        working-directory: desktop
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          $env:CHATCHAT_ELECTRON_EXECUTABLE = Join-Path $PWD 'node_modules/electron/dist/electron.exe'
+          $env:CHATCHAT_SMOKE_BROWSER = Join-Path $PWD '.build-cache/browser/chrome-win64/chrome.exe'
+          $env:CHATCHAT_CI_HEADLESS = '1'
+          if (!(Test-Path $env:CHATCHAT_ELECTRON_EXECUTABLE -PathType Leaf)) {
+            # npm's supported install-script policy may have left the
+            # development Electron executable unmaterialized. This is only
+            # the NON-GATING diagnostic, after real installer acceptance.
+            $bootstrap = Join-Path $PWD 'node_modules/electron/install.js'
+            if (!(Test-Path $bootstrap -PathType Leaf)) {
+              throw 'The pinned Electron npm package has no bootstrap script.'
+            }
+            node $bootstrap
+            if ($LASTEXITCODE) {
+              throw 'Optional pinned development Electron bootstrap failed.'
+            }
+          }
+          if (!(Test-Path $env:CHATCHAT_ELECTRON_EXECUTABLE -PathType Leaf)) {
+            throw 'The pinned development Electron executable remains unavailable.'
+          }
+          node scripts/smoke-restore-electron.mjs
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChatChat-Windows-desktop-candidate
+          path: |
+            desktop/release/*.exe
+            desktop/release/SHA256SUMS.txt
+            desktop/release/NSIS-PAYLOAD-VERIFICATION.json
+            desktop/release/CROSS-VERSION-ACCEPTANCE.json
+            desktop/SECURITY.zh-CN.md
+            desktop/README.zh-CN.md
+          if-no-files-found: error
+          retention-days: 14
+# Silent install/reinstall/uninstall verification is restricted to the ephemeral CI runner.
+# This does not establish consumer-machine UI/login acceptance or code signing.

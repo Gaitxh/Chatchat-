@@ -47,7 +47,7 @@ const r3: CouncilEvent[] = [
     stance: "A guarded",
     content: "I now add the rollout guardrail.",
     confidence: .82,
-    causedBy: ["r2-10"],
+    causedBy: ["u1", "r2-10"],
     createdAt: "2026-08-15T01:01:00.000Z",
   },
   ...Array.from({ length: 8 }, (_, index) => ({

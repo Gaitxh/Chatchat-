@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>ChatChat · Start here / 从这里开始</title>
+  <link rel="stylesheet" href="start-here.css">
+</head>
+<body>
+  <a class="skip" href="#english">Skip to installation instructions</a>
+  <header>
+    <p class="eyebrow">ChatChat · Local preview / 本地预览</p>
+    <h1>One proposal. Equal AI peers.<br><span lang="zh-CN">一个提案，平等的 AI 同席协商。</span></h1>
+    <p class="notice"><strong>Unsigned developer preview · 未签名开发者预览版</strong><br>
+      Prebuilt browser extension. Manual installation required. / <span lang="zh-CN">已预构建的浏览器扩展，需要手动安装。</span></p>
+    <nav aria-label="Languages / 语言"><a href="#english">English</a><a href="#chinese" lang="zh-CN">简体中文</a></nav>
+  </header>
+  <main>
+    <section id="english" aria-labelledby="en-title">
+      <h2 id="en-title">Install in Chrome or Edge</h2>
+      <p>You need a desktop Chrome or Edge browser and your own provider accounts. You do not need Node, Git, Rust, or a terminal. This page works offline; live AI consultations need the internet.</p>
+      <ol>
+        <li><strong>Unzip everything to a stable folder.</strong> Keep this guide, <code>extension/</code> and the other files together. Avoid temporary folders. Do not try to load the ZIP itself.</li>
+        <li><strong>Open the extension manager.</strong> In the browser profile you use for AI websites, paste <code>chrome://extensions</code> (Chrome) or <code>edge://extensions</code> (Edge) into the address bar. Turn on <strong>Developer mode</strong>, choose <strong>Load unpacked</strong>, and select the extracted <strong><code>extension/</code></strong> folder containing <code>manifest.json</code>.</li>
+        <li><strong>Pin ChatChat.</strong> Open the browser’s Extensions menu (puzzle icon), pin ChatChat, then click its icon to open the consultation room. The room is a browser-backed standalone window; Chrome/Edge still supplies its runtime and profile.</li>
+        <li><strong>Choose seats and sign in yourself.</strong> Choose the AI sources you want as equal participants. Sign in on each provider’s own website in the <strong>same browser profile</strong>. Give explicit site permission only to origins you choose when ChatChat asks. Account sign-in, site permission and connection readiness are separate steps; a recognized logo or open tab proves none of them.</li>
+        <li><strong>Send one proposal.</strong> Use fresh provider chats for each meeting; existing private conversations are not meeting inputs. Check each seat’s connection state, resolve any requested manual login or connection step, then send your proposal. Choose at least two distinct AI sources for a peer consultation. Each source has equal standing; there is no privileged chair.</li>
+      </ol>
+      <h3>What “local” means</h3>
+      <p>ChatChat coordinates the meeting and keeps its history locally in this browser profile. The chosen AI websites receive prompts and perform cloud inference under their own terms. This package does not provide offline AI models or provider accounts. Arbitrary websites are not guaranteed to work; recognition, a taught recipe and synthetic demos do not prove live compatibility.</p>
+      <p>Keep synthetic demonstration sessions separate from live provider sessions. A demo, packaging check or successful window launch is not evidence of a signed-in or ready provider.</p>
+      <h3>Update, back up, or remove</h3>
+      <p><strong>Export important meeting records before updating or uninstalling.</strong> Use the room’s available record/receipt export or copy controls and save the result yourself. Export is a record, not a promise of full restore. History belongs to the current browser profile and extension ID; it is not an automatic backup.</p>
+      <p>Close ChatChat meeting windows and keep the extension installed. Replace the <em>contents</em> of the existing <code>extension/</code> folder with the new version, remove obsolete files, and click <strong>Reload</strong> in the extension manager. Keep the same folder path and browser profile to preserve the unpacked extension ID and its associated history. A different path/profile or removing and reinstalling can lose that continuity.</p>
+      <p>To remove it, export first, then use <strong>Remove</strong> in the extension manager. If Developer mode or Load unpacked is unavailable on a managed browser, ask your administrator or wait for store distribution. This package does not change enterprise policies or silently install anything.</p>
+      <p>More: <a href="docs/LOCAL_INSTALL.md">English installation notes</a> · <a href="RELEASE-METADATA.json">Version and commit metadata</a> · <a href="SHA256SUMS">File checksums</a>. Checksums detect changed bytes; they do not authenticate the publisher.</p>
+    </section>
+    <section id="chinese" lang="zh-CN" aria-labelledby="zh-title">
+      <h2 id="zh-title">在 Chrome 或 Edge 中安装</h2>
+      <p>需要桌面版 Chrome 或 Edge，以及你自己的 AI 网站账号。无需 Node、Git、Rust 或命令行。本指南可离线阅读；真实 AI 协商需要联网。</p>
+      <ol>
+        <li><strong>将整个压缩包解压到固定目录。</strong>保留本指南、<code>extension/</code> 和其他文件。不要放在临时目录，也不要直接加载 ZIP。</li>
+        <li><strong>打开扩展管理页面。</strong>在你登录 AI 网站的同一浏览器个人资料中，在地址栏输入 Chrome 的 <code>chrome://extensions</code> 或 Edge 的 <code>edge://extensions</code>。打开<strong>开发者模式</strong>，选择<strong>加载已解压的扩展程序</strong>，选择解压后包含 <code>manifest.json</code> 的 <strong><code>extension/</code></strong> 文件夹。</li>
+        <li><strong>固定 ChatChat 图标。</strong>打开浏览器的扩展菜单（拼图图标），固定 ChatChat，点击图标打开协商室。独立协商窗口由浏览器承载，仍依赖 Chrome/Edge 及当前个人资料。</li>
+        <li><strong>选择席位并自行登录。</strong>选择要平等参与的 AI 来源，在<strong>同一浏览器个人资料</strong>中打开各提供方网站并亲自登录。仅在 ChatChat 请求时，明确授权你选择的网站。账号登录、站点权限和连接就绪是不同状态；识别到图标或打开标签页不代表已完成任何一项。</li>
+        <li><strong>发送一个提案。</strong>每场会议使用新的提供方聊天，不把已有私人会话作为会议输入。确认各席位连接状态，完成界面要求的手动登录或连接步骤，再发送提案。平等协商至少选择两个不同 AI 来源；每个来源地位相同，没有特权主持人。</li>
+      </ol>
+      <h3>“本地”的含义</h3>
+      <p>ChatChat 在本地协调会议，并在当前浏览器个人资料中保存历史。选中的 AI 网站会收到提示词，并按各自条款在云端推理。本包不包含离线模型或 AI 账号。不保证任意网站都可用；识别网站、教学配方或合成演示均不能证明真实兼容性。</p>
+      <p>合成演示与真实提供方会话应保持分离。演示、打包检查或成功打开窗口，都不能证明提供方已经登录或就绪。</p>
+      <h3>更新、备份与卸载</h3>
+      <p><strong>更新或卸载前，先导出重要会议记录。</strong>使用协商室当前提供的记录、回执导出或复制功能，自行保存文件。导出的记录不等于完整恢复能力。历史与当前浏览器个人资料及扩展 ID 关联，不是自动备份。</p>
+      <p>关闭 ChatChat 会议窗口，保留已安装的扩展。将新版本文件替换到<strong>原来同一路径</strong>的 <code>extension/</code> 文件夹中，清除旧版多余文件，然后在扩展管理页面点击<strong>重新加载</strong>。使用同一文件夹路径和浏览器个人资料，才能保留已解压扩展 ID 及其关联历史；移动目录、更换个人资料或卸载重装可能导致历史无法延续。</p>
+      <p>卸载时，先导出，再在扩展管理页面选择<strong>移除</strong>。如果受管理浏览器禁用了开发者模式或加载已解压扩展，请联系管理员或等待商店发行。本包不会更改企业策略，也不会静默安装。</p>
+      <p>更多说明：<a href="docs/LOCAL_INSTALL.zh-CN.md">中文安装说明</a> · <a href="RELEASE-METADATA.json">版本与提交信息</a> · <a href="SHA256SUMS">文件校验和</a>。校验和可发现文件变化，不能认证发布者身份。</p>
+    </section>
+  </main>
+  <footer>Unsigned developer preview. No native installer or store distribution in this package.<br><span lang="zh-CN">未签名开发者预览版。本包不包含原生安装器或商店发行版本。</span></footer>
+</body>
+</html>

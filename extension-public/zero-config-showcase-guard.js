@@ -10,52 +10,31 @@
       const card = document.querySelector(".zero-touch-card");
       const button = card?.querySelector(".zero-touch-action button");
       const proposal = document.querySelector(".proposal-card");
+      const invite = document.querySelector('.participants-card > .url-opener[data-chatchat-invite-ai="true"]');
       const text = card?.textContent ?? "";
       const teamVisible = /ChatGPT/.test(text) && /Claude/.test(text) && /Gemini/.test(text);
-      const manualSelectors = [
-        ".participants-card > .connect-all-button",
-        ".participants-card > .participant-actions",
-        ".participants-card > .url-opener",
-        ".participants-card > .discovered-section",
-        ".quick-open",
-      ];
-      const focusSelectors = [
-        "#spectator-mode-root",
-        ".consultation-header",
-        ".participants-card",
-        "#consultation-history-root",
-        ".setup-card",
-        ".team-settings-disclosure",
-      ];
-      const manualHidden = manualSelectors.every(isVisuallyAbsent);
-      const firstRunNoiseHidden = focusSelectors.every(isVisuallyAbsent);
-      const proposalRect = proposal instanceof HTMLElement ? proposal.getBoundingClientRect() : null;
-      const proposalIsWide = Boolean(proposalRect && proposalRect.width >= window.innerWidth * 0.75);
-      const proposalIsHigh = Boolean(proposalRect && proposalRect.top <= window.innerHeight * 0.42);
       const buttonEnabled = button instanceof HTMLButtonElement && !button.disabled;
+      const inviteVisible = invite instanceof HTMLElement && !isVisuallyAbsentElement(invite);
+      const proposalVisible = proposal instanceof HTMLElement && !isVisuallyAbsentElement(proposal);
+      const noParticipants = document.querySelectorAll(".participant-row").length === 0;
+      const layout = proposal instanceof HTMLElement ? proposal.getBoundingClientRect() : null;
       recordStaticDiagnostics({
-        card: Boolean(card),
-        buttonEnabled,
-        teamVisible,
-        manualHidden,
-        firstRunNoiseHidden,
-        proposalIsWide,
-        proposalIsHigh,
-        proposalTop: Math.round(proposalRect?.top ?? -1),
-        proposalWidth: Math.round(proposalRect?.width ?? -1),
-        viewportHeight: window.innerHeight,
-        viewportWidth: window.innerWidth,
+        card: Boolean(card), buttonEnabled, teamVisible, inviteVisible,
+        proposalVisible, noParticipants,
+        proposalTop: Math.round(layout?.top ?? -1), proposalWidth: Math.round(layout?.width ?? -1),
       });
 
-      if (
-        card &&
-        buttonEnabled &&
-        teamVisible &&
-        manualHidden &&
-        firstRunNoiseHidden &&
-        proposalIsWide &&
-        proposalIsHigh
-      ) {
+      // Current product entry is user choice first: Invite AI must be visible,
+      // and a suggested starter team must remain strictly opt-in. Do NOT hide
+      // the user's manual choices just to satisfy a legacy fullscreen proof.
+      if (card && buttonEnabled && teamVisible && inviteVisible
+        && proposalVisible && noParticipants) {
+        const providerTabs = await window.chrome.tabs.query({});
+        if (providerTabs.length !== 0) throw new Error(
+          "Zero-config showcase contacted or created Provider tabs before consent."
+        );
+        document.documentElement.dataset.chatchatZeroConfigManualInvite = "visible";
+        document.documentElement.dataset.chatchatZeroConfigNoAutoCreate = "complete";
         document.documentElement.dataset.chatchatZeroConfigShowcase = "complete";
         return;
       }

@@ -22,7 +22,7 @@ const events: CouncilEvent[] = [
   { ...base, id: "u1", round: 2, actorId: "b", kind: "uncertain", content: "I am unsure about rollout risk.", confidence: .35 },
   { ...base, id: "ans1", round: 3, actorId: "a", kind: "argument", stance: "Plan A", content: "The failure bound is 5% under the stated constraint.", confidence: .75, replyToEventId: "q1" },
   { ...base, id: "evReply", round: 3, actorId: "a", kind: "argument", stance: "Plan A", content: "The benchmark comparison needs a narrower scope.", confidence: .8, replyToEventId: "ev1" },
-  { ...base, id: "b2", round: 3, actorId: "b", kind: "revision", previousEventId: "b1", stance: "Plan A with guardrails", content: "The new evidence changes my rollout view.", confidence: .68, causedBy: ["ev1"] },
+  { ...base, id: "b2", round: 3, actorId: "b", kind: "revision", previousEventId: "b1", stance: "Plan A with guardrails", content: "The new evidence resolves my rollout uncertainty and changes my view.", confidence: .68, causedBy: ["ev1", "u1"] },
   { ...base, id: "f1", round: 4, actorId: "a", kind: "final_position", stance: "Plan A", content: "Final.", confidence: .8 },
   { ...base, id: "f2", round: 4, actorId: "b", kind: "final_position", stance: "Plan A with guardrails", content: "Final.", confidence: .75 },
   { ...base, id: "f3", round: 4, actorId: "c", kind: "final_position", stance: "Plan B", content: "Final.", confidence: .72 },
@@ -44,7 +44,7 @@ const evidence = ledger.obligations.find((item) => item.sourceEventId === "ev1")
 assert(evidence?.state === "resolved" && evidence.resolvedByEventId === "evReply", "Targeted evidence must close only through exact structured response provenance.");
 
 const uncertainty = ledger.obligations.find((item) => item.sourceEventId === "u1");
-assert(uncertainty?.state === "resolved" && uncertainty.resolvedByEventId === "b2", "Higher-confidence own revision caused by another event should resolve explicit uncertainty.");
+assert(uncertainty?.state === "resolved" && uncertainty.resolvedByEventId === "b2", "Higher-confidence own revision citing the exact uncertainty should resolve it.");
 
 assert(ledger.openCount === 1, "Exactly the unanswered challenge should remain open.");
 assert(ledger.resolvedCount === 3, "Question, evidence and uncertainty should have exact closure receipts.");
@@ -97,5 +97,26 @@ assert(
   JSON.stringify(strictOpenIssueIds) === JSON.stringify(strictOpenLedgerIds),
   "Canonical resolver consistency must survive anti-prose-inference cases too.",
 );
+
+const twoRisks: CouncilEvent[] = [
+  events[1]!,
+  { ...base, id: "data-loss", round: 2, actorId: "b", kind: "uncertain", content: "Data loss remains possible.", confidence: 0 },
+  { ...base, id: "cost", round: 2, actorId: "b", kind: "uncertain", content: "Cost remains unknown.", confidence: .2 },
+  { ...base, id: "color", round: 2, actorId: "a", kind: "argument", stance: "Blue", content: "Use a blue UI.", confidence: .8 },
+  { ...base, id: "color-revision", round: 3, actorId: "b", kind: "revision", previousEventId: "b1", stance: "Blue UI", content: "I agree about UI color.", confidence: .9, causedBy: ["color"] },
+  { ...base, id: "risk-final", round: 4, actorId: "b", kind: "final_position", stance: "Ship", content: "Proceed while acknowledging these risks.", confidence: .95, caveats: ["Data loss remains possible.", "Cost remains unknown."] },
+];
+function assertRemainingRisks(history: CouncilEvent[], expected: string): void {
+  const riskLedger = deriveConflictResolutionLedger(participants, history);
+  const ledgerIds = riskLedger.obligations.filter((item) => item.state === "open").map((item) => item.sourceEventId).sort().join(",");
+  const issueIds = deriveOpenMeetingIssueProvenance(history).map((item) => item.sourceEventId).sort().join(",");
+  assert(ledgerIds === expected && issueIds === expected, "Both derived views must retain exactly the unresolved uncertainty ids.");
+}
+assertRemainingRisks(twoRisks, "cost,data-loss");
+const exactRiskRevision: CouncilEvent = { ...base, id: "data-loss-revision", round: 3, actorId: "b", kind: "revision", previousEventId: "b1", stance: "Ship with backups", content: "The backup test resolves the data-loss concern.", confidence: .8, causedBy: ["data-loss"] };
+const oneResolved = [...twoRisks.slice(0, -1), exactRiskRevision, twoRisks.at(-1)!];
+assertRemainingRisks(oneResolved, "cost");
+assert(deriveConflictResolutionLedger(participants, oneResolved).obligations.find((item) => item.sourceEventId === "data-loss")?.resolvedByEventId === "data-loss-revision", "A closure receipt must name the exact cause-bearing revision, not the unrelated revision or Final.");
+assertRemainingRisks([...twoRisks, { ...exactRiskRevision, actorId: "a" }], "cost,data-loss");
 
 console.log("✓ Conflict Resolution Ledger preserves exact closure provenance, round trajectory and Open Issues consistency");

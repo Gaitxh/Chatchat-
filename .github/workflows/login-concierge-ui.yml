@@ -40,10 +40,8 @@ jobs:
           ! grep -q 'retry.click' src/extension/web-room-onboarding.tsx
 
       - name: Install CJK screenshot fonts
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
-          fc-cache -f
+        timeout-minutes: 4
+        run: bash scripts/install-ci-cjk-fonts.sh
 
       - name: Locate Chromium browser
         run: |
@@ -65,25 +63,13 @@ jobs:
 
       - name: Capture English Login Concierge
         run: |
-          URL='http://127.0.0.1:4182/app/app.html?showcase=login-concierge&lang=en'
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --hide-scrollbars \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=10000 \
-            --window-size=1440,1800 \
-            --screenshot=artifacts/chatchat-login-concierge-en.png \
-            "$URL"
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=10000 \
-            --dump-dom \
-            "$URL" > artifacts/chatchat-login-concierge-en.html
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url "http://127.0.0.1:4182/app/app.html?showcase=login-concierge&lang=en" \
+            --width 1440 --height 1800 --wait-ms 22000 \
+            --ready-selector 'html[data-chatchat-login-concierge-showcase="complete"]' \
+            --screenshot "artifacts/chatchat-login-concierge-en.png" \
+            --dom "artifacts/chatchat-login-concierge-en.html"
           test -s artifacts/chatchat-login-concierge-en.png
           grep -q 'data-chatchat-login-concierge-showcase="complete"' artifacts/chatchat-login-concierge-en.html
           grep -q 'Sign in to Claude' artifacts/chatchat-login-concierge-en.html
@@ -92,25 +78,13 @@ jobs:
 
       - name: Capture Chinese Login Concierge
         run: |
-          URL='http://127.0.0.1:4182/app/app.html?showcase=login-concierge&lang=zh'
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --hide-scrollbars \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=10000 \
-            --window-size=1440,1800 \
-            --screenshot=artifacts/chatchat-login-concierge-zh.png \
-            "$URL"
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=10000 \
-            --dump-dom \
-            "$URL" > artifacts/chatchat-login-concierge-zh.html
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url "http://127.0.0.1:4182/app/app.html?showcase=login-concierge&lang=zh" \
+            --width 1440 --height 1800 --wait-ms 22000 \
+            --ready-selector 'html[data-chatchat-login-concierge-showcase="complete"]' \
+            --screenshot "artifacts/chatchat-login-concierge-zh.png" \
+            --dom "artifacts/chatchat-login-concierge-zh.html"
           test -s artifacts/chatchat-login-concierge-zh.png
           grep -q 'data-chatchat-login-concierge-showcase="complete"' artifacts/chatchat-login-concierge-zh.html
           grep -q '去 Claude 完成登录' artifacts/chatchat-login-concierge-zh.html
@@ -119,25 +93,13 @@ jobs:
 
       - name: Prove English login resumes to READY without retry click
         run: |
-          URL='http://127.0.0.1:4182/app/app.html?showcase=login-concierge&journey=resume&lang=en'
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --hide-scrollbars \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=16000 \
-            --window-size=1440,1800 \
-            --screenshot=artifacts/chatchat-login-resumed-en.png \
-            "$URL"
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=16000 \
-            --dump-dom \
-            "$URL" > artifacts/chatchat-login-resumed-en.html
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url "http://127.0.0.1:4182/app/app.html?showcase=login-concierge&journey=resume&lang=en" \
+            --width 1440 --height 1800 --wait-ms 32000 \
+            --ready-selector 'html[data-chatchat-login-resume-showcase="complete"][data-chatchat-login-journey-prompt="complete"][data-chatchat-login-journey-connecting="complete"]' \
+            --screenshot "artifacts/chatchat-login-resumed-en.png" \
+            --dom "artifacts/chatchat-login-resumed-en.html"
           test -s artifacts/chatchat-login-resumed-en.png
           grep -q 'data-chatchat-login-journey-prompt="complete"' artifacts/chatchat-login-resumed-en.html
           grep -q 'data-chatchat-login-journey-connecting="complete"' artifacts/chatchat-login-resumed-en.html
@@ -152,25 +114,13 @@ jobs:
 
       - name: Prove Chinese login resumes to READY without retry click
         run: |
-          URL='http://127.0.0.1:4182/app/app.html?showcase=login-concierge&journey=resume&lang=zh'
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --hide-scrollbars \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=16000 \
-            --window-size=1440,1800 \
-            --screenshot=artifacts/chatchat-login-resumed-zh.png \
-            "$URL"
-          "$CHROME_BIN" \
-            --headless=new \
-            --no-sandbox \
-            --disable-gpu \
-            --run-all-compositor-stages-before-draw \
-            --virtual-time-budget=16000 \
-            --dump-dom \
-            "$URL" > artifacts/chatchat-login-resumed-zh.html
+          node scripts/capture-chromium-proof.mjs \
+            --chrome "$CHROME_BIN" \
+            --url "http://127.0.0.1:4182/app/app.html?showcase=login-concierge&journey=resume&lang=zh" \
+            --width 1440 --height 1800 --wait-ms 32000 \
+            --ready-selector 'html[data-chatchat-login-resume-showcase="complete"][data-chatchat-login-journey-prompt="complete"][data-chatchat-login-journey-connecting="complete"]' \
+            --screenshot "artifacts/chatchat-login-resumed-zh.png" \
+            --dom "artifacts/chatchat-login-resumed-zh.html"
           test -s artifacts/chatchat-login-resumed-zh.png
           grep -q 'data-chatchat-login-journey-prompt="complete"' artifacts/chatchat-login-resumed-zh.html
           grep -q 'data-chatchat-login-journey-connecting="complete"' artifacts/chatchat-login-resumed-zh.html

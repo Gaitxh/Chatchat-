@@ -3,6 +3,7 @@ import type {
   CouncilContext,
   CouncilContribution,
 } from "../core/types.js";
+import { runtimeFallbackContribution } from "../core/blackboard.js";
 import { attachExplicitPeerReplies } from "../consultation/reply-provenance.js";
 import { providerVisibleConsultationContext } from "./context-selection.js";
 import {
@@ -176,21 +177,21 @@ function fallbackContribution(
   const reason = truncate(errorMessage(caught), 600);
   if (context.phase === "final") {
     return [
-      {
+      runtimeFallbackContribution({
         kind: "final_position",
-        stance: "Uncertain",
+        stance: "Unavailable",
         content: `This participant could not complete its structured consultation turn. ${reason}`,
         confidence: 0,
         caveats: ["Transport, page state, or structured parsing failed for this participant."],
-      },
+      }),
     ];
   }
   return [
-    {
+    runtimeFallbackContribution({
       kind: "uncertain",
       content: `This participant could not complete its structured consultation turn. ${reason}`,
       confidence: 0,
-    },
+    }),
   ];
 }
 

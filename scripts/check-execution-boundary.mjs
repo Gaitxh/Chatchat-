@@ -57,7 +57,8 @@ for (const claim of [
   'type: "RUN_SPEECH"',
   'prompt,',
   'timeoutMs: 120_000',
-  'chrome.tabs.sendMessage(tabId, { __chatchat: true, ...payload })',
+  'chrome.tabs.sendMessage(tabId, { __chatchat: true, ...payload, expectedOrigin })',
+  'await boundProviderOrigin(tabId)',
 ]) {
   assert(panel.includes(claim), `Live provider transport path disappeared: ${claim}`);
 }

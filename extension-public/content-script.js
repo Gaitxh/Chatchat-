@@ -6,33 +6,38 @@
   const STABLE_MS = 1_400;
   const AUTO_STABLE_MS = 850;
   let teachCleanup = null;
+  let speechTail = Promise.resolve();
+  // Document-local only: reload/navigation loses this ledger. Callers without an
+  // operation ID still get serialization, but cannot get duplicate detection.
+  const speechOperationIds = new Set();
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (!message || message.__chatchat !== true) return undefined;
 
     const run = async () => {
+      assertExpectedOrigin(message);
       switch (message.type) {
         case "PING":
           return pageInfo();
         case "PROBE":
           return probePage();
         case "AUTO_SETUP":
-          return autoSetup(
+          return serializeSpeech(message, () => autoSetup(
             String(message.profileId ?? location.origin),
             String(message.prompt ?? ""),
             String(message.expectedText ?? "CHATCHAT_READY"),
             message.timeoutMs ?? 90_000,
-          );
+          ));
         case "TEACH":
           return teach(message.role);
         case "AWAIT_RECIPE":
           return awaitRecipe(message.recipe, message.timeoutMs ?? 35_000);
         case "RUN_SPEECH":
-          return runSpeech(
+          return serializeSpeech(message, () => runSpeech(
             message.recipe,
             String(message.prompt ?? ""),
             message.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-          );
+          ));
         default:
           throw new Error(`Unknown ChatChat extension message: ${String(message.type)}`);
       }
@@ -48,6 +53,35 @@
       );
     return true;
   });
+
+  function assertExpectedOrigin(message) {
+    if (message.expectedOrigin !== undefined &&
+        (typeof message.expectedOrigin !== "string" || message.expectedOrigin !== location.origin)) {
+      throw new Error("Provider origin changed; no page operation was performed.");
+    }
+  }
+
+  function serializeSpeech(message, run) {
+    if (message.operationId !== undefined && message.requestId !== undefined &&
+        message.operationId !== message.requestId) {
+      throw new Error("Conflicting speech operation IDs.");
+    }
+    const id = message.operationId !== undefined ? message.operationId : message.requestId;
+    if (id !== undefined) {
+      if (typeof id !== "string" || !id.trim() || id.length > 256) {
+        throw new Error("Invalid speech operation ID.");
+      }
+      if (speechOperationIds.has(id)) {
+        throw new Error("Duplicate speech operation ID in this document; delivery will not be retried.");
+      }
+      // Never evict IDs and silently permit a repeat in the same document.
+      if (speechOperationIds.size >= 1024) throw new Error("Speech operation ID ledger is full.");
+      speechOperationIds.add(id);
+    }
+    const operation = speechTail.then(() => { assertExpectedOrigin(message); return run(); });
+    speechTail = operation.catch(() => {});
+    return operation;
+  }
 
   function pageInfo() {
     return {
@@ -85,27 +119,20 @@
     }
 
     const startedAt = new Date().toISOString();
-    const baselineExpectedCount = countTextOccurrences(document.body?.innerText ?? "", expectedText);
-    fillComposer(composer, prompt);
+    const sendSelector = selectorFor(initialSend.element);
+    const discoveredRecipe = { composerSelector, sendSelector };
+    configuredSpeechTargets(discoveredRecipe, false, composer);
+    const baseline = new Map(assistantResponseCandidates().map((element) => [element, visibleText(element)]));
+    fillComposer(composer, prompt, () => configuredSpeechTargets(discoveredRecipe, false, composer));
     await sleep(140);
-
-    const sendMatch = bestSendButton(composer) ?? initialSend;
-    const send = sendMatch.element;
-    if (!isClickable(send)) {
-      await sleep(320);
-    }
-    if (!isClickable(send)) {
+    if (!isClickable(configuredSpeechTargets(discoveredRecipe, false, composer).send)) await sleep(320);
+    if (!isClickable(configuredSpeechTargets(discoveredRecipe, false, composer).send)) {
       throw new Error("The detected send button did not become clickable after ChatChat filled the message box.");
     }
-    const sendSelector = selectorFor(send);
+    const { send } = configuredSpeechTargets(discoveredRecipe, true, composer);
     send.click();
 
-    const response = await waitForExpectedResponse(
-      expectedText,
-      composer,
-      baselineExpectedCount,
-      timeoutMs,
-    );
+    const response = await waitForExpectedResponse(expectedText, composer, baseline, timeoutMs, prompt);
     const responseSelector = inferResponseSelector(response.element, composer);
     const now = new Date().toISOString();
 
@@ -123,7 +150,7 @@
       diagnostics: {
         mode: "automatic",
         composerScore: composerMatch.score,
-        sendScore: sendMatch.score,
+        sendScore: initialSend.score,
         responseStrategy: responseSelector,
       },
     };
@@ -171,6 +198,10 @@
 
     for (const element of unique) {
       if (!(element instanceof HTMLElement) || !isVisible(element)) continue;
+      const composerForm = "form" in composer ? composer.form : composer.closest("form");
+      const candidateForm = "form" in element ? element.form : element.closest("form");
+      const region = "dialog,[role='dialog'],main,[role='main'],section,[role='region']";
+      if (composerForm !== candidateForm || (!composerForm && composer.closest(region) !== element.closest(region))) continue;
       const label = searchableLabel(element);
       if (/attach|upload|image|photo|voice|microphone|record|stop|cancel|menu|more|附件|上传|图片|语音|麦克风|停止|取消|菜单/i.test(label)) {
         continue;
@@ -213,51 +244,36 @@
     );
   }
 
-  async function waitForExpectedResponse(expectedText, composer, baselineCount, timeoutMs) {
+  function assistantResponseCandidates() {
+    // Automatic READY cannot be established from body/main text or the user's
+    // echo. Sites without assistant identity markers need an explicit recipe.
+    return safeQueryAll("[data-message-author-role='assistant'],[data-role='assistant'],[data-role='model'],[data-testid='assistant-message'],[data-testid='assistant-turn']")
+      .filter((element) => element instanceof HTMLElement && isVisible(element));
+  }
+
+  async function waitForExpectedResponse(expectedText, composer, baseline, timeoutMs, prompt) {
     const started = Date.now();
     let candidate = null;
     let candidateText = "";
     let stableSince = 0;
-
     while (Date.now() - started < timeoutMs) {
-      const bodyText = document.body?.innerText ?? "";
-      if (countTextOccurrences(bodyText, expectedText) > baselineCount) {
-        const element = findSmallestExpectedElement(expectedText, composer);
-        if (element) {
-          const text = visibleText(element);
-          if (element !== candidate || text !== candidateText) {
-            candidate = element;
-            candidateText = text;
-            stableSince = Date.now();
-          } else if (Date.now() - stableSince >= AUTO_STABLE_MS) {
-            return {
-              element,
-              text: expectedText,
-              elapsedMs: Date.now() - started,
-            };
-          }
+      const element = assistantResponseCandidates().filter((item) => {
+        const text = visibleText(item);
+        return item !== composer && !item.contains(composer) && !composer.contains(item)
+          && text !== baseline.get(item) && text.includes(expectedText)
+          && text.trim() !== prompt.trim() && !text.includes(prompt);
+      }).at(-1);
+      if (element) {
+        const text = visibleText(element);
+        if (element !== candidate || text !== candidateText) {
+          candidate = element; candidateText = text; stableSince = Date.now();
+        } else if (Date.now() - stableSince >= AUTO_STABLE_MS) {
+          return { element, text, elapsedMs: Date.now() - started };
         }
-      }
+      } else { candidate = null; candidateText = ""; stableSince = 0; }
       await sleep(300);
     }
-    throw new Error("The AI page did not return the automatic ChatChat connection reply in time.");
-  }
-
-  function findSmallestExpectedElement(expectedText, composer) {
-    const all = [...document.querySelectorAll("main *,[role='main'] *,article,[role='article'],body *")];
-    let best = null;
-    let bestLength = Number.POSITIVE_INFINITY;
-    for (const element of all) {
-      if (!(element instanceof HTMLElement) || !isVisible(element)) continue;
-      if (element === composer || element.contains(composer) || composer.contains(element)) continue;
-      const text = visibleText(element);
-      if (!text.includes(expectedText)) continue;
-      if (text.length < bestLength) {
-        best = element;
-        bestLength = text.length;
-      }
-    }
-    return best;
+    throw new Error("No new assistant-authored connection reply was verified. Teach the response area before retrying.");
   }
 
   function inferResponseSelector(element, composer) {
@@ -533,19 +549,17 @@
 
   async function runSpeech(recipe, prompt, timeoutMs) {
     if (!prompt.trim()) throw new Error("ChatChat cannot send an empty consultation prompt.");
-    const composer = requiredQuery(recipe?.composerSelector, "composer");
     const responseSelector = requiredSelector(recipe?.responseSelector, "response");
+    const { composer } = configuredSpeechTargets(recipe, false);
 
     const baseline = responseSnapshot(responseSelector);
     const baselineSignal = responseSignal(baseline.lastText, prompt, "");
-    fillComposer(composer, prompt);
+    fillComposer(composer, prompt, () => configuredSpeechTargets(recipe, false, composer));
     await sleep(100);
 
-    const refreshedSend = bestSendButton(composer)?.element;
-    const send = refreshedSend && isClickable(refreshedSend)
-      ? refreshedSend
-      : requiredQuery(recipe?.sendSelector, "send");
-    if (!isClickable(send)) throw new Error("Configured send button is currently unavailable.");
+    // Empty composers often disable Send until input arrives. Validate its exact
+    // selector/scope before filling, then require enabled state before clicking.
+    const { send } = configuredSpeechTargets(recipe, true, composer);
     send.click();
 
     const started = Date.now();
@@ -593,6 +607,7 @@
 
   function responseSignal(text, prompt, baselineText) {
     const source = String(text ?? "");
+    if (!source.trim() || source.trim() === prompt.trim()) return "";
     const open = "<CHATCHAT_COUNCIL_JSON>";
     const close = "</CHATCHAT_COUNCIL_JSON>";
     const start = source.lastIndexOf(open);
@@ -611,8 +626,80 @@
     return source.trim();
   }
 
-  function fillComposer(element, text) {
+  function configuredSpeechTargets(recipe, requireEnabledSend, expectedComposer) {
+    const composer = requiredQuery(recipe?.composerSelector, "composer");
+    if (expectedComposer && composer !== expectedComposer) {
+      throw new Error("Configured composer changed before submission; repair the recipe before retrying.");
+    }
+    validateComposer(composer);
+    const send = requiredQuery(recipe?.sendSelector, "send");
+    const isSendControl = send instanceof HTMLInputElement
+      ? ["button", "submit", "image"].includes(send.type)
+      : send instanceof HTMLButtonElement
+        ? send.type !== "reset"
+        : send.getAttribute("role") === "button";
+    if (!isSendControl || send.isContentEditable || send === composer ||
+        send.contains(composer) || composer.contains(send)) {
+      throw new Error("Configured send selector is not a send control.");
+    }
+    validateAvailable(send, "send", requireEnabledSend);
+
+    // Honor native form ownership, including controls linked with form="...".
+    // For formless editors, reject mismatched semantic page regions. Do not
+    // invent a replacement control when the taught pair drifts out of scope.
+    const composerForm = "form" in composer ? composer.form : composer.closest("form");
+    const sendForm = "form" in send ? send.form : send.closest("form");
+    const region = "dialog,[role='dialog'],main,[role='main'],section,[role='region']";
+    if (composerForm !== sendForm || (!composerForm && composer.closest(region) !== send.closest(region))) {
+      throw new Error("Configured send control is outside the composer's scope.");
+    }
+    return { composer, send };
+  }
+
+  function validateAvailable(element, label, requireEnabled = true) {
+    if (!(element instanceof HTMLElement) || element.ownerDocument !== document ||
+        !element.isConnected || !isVisible(element)) {
+      throw new Error(`Configured ${label} is not visible in this document.`);
+    }
+    for (let ancestor = element; ancestor; ancestor = ancestor.parentElement) {
+      const style = getComputedStyle(ancestor);
+      if (ancestor.hasAttribute("hidden") || ancestor.hasAttribute("inert") ||
+          style.display === "none" || ["hidden", "collapse"].includes(style.visibility) ||
+          Number(style.opacity || "1") <= 0.01) {
+        throw new Error(`Configured ${label} is hidden or inert.`);
+      }
+      if (requireEnabled && ancestor.getAttribute("aria-disabled") === "true") {
+        throw new Error(`Configured ${label} is disabled.`);
+      }
+    }
+    if (requireEnabled && (element.matches(":disabled") || element.hasAttribute("disabled"))) {
+      throw new Error(`Configured ${label} is disabled.`);
+    }
+  }
+
+  function validateComposer(element) {
+    // Check input type first: contenteditable must never make a password or
+    // another non-text input eligible for writing.
+    if (element instanceof HTMLInputElement && element.type !== "text") {
+      throw new Error("Configured composer must be a text input, never a password or other input type.");
+    }
+    if (!(element instanceof HTMLTextAreaElement) && !(element instanceof HTMLInputElement) &&
+        (!(element instanceof HTMLElement) || !element.isContentEditable ||
+         element === document.body || element === document.documentElement)) {
+      throw new Error("Configured composer is no longer an editable element.");
+    }
+    validateAvailable(element, "composer");
+    if (element.readOnly || element.getAttribute("aria-readonly") === "true") {
+      throw new Error("Configured composer is read-only.");
+    }
+  }
+
+  function fillComposer(element, text, beforeWrite = () => validateComposer(element)) {
+    validateComposer(element);
     element.focus();
+    // Focus handlers can replace/disable the taught controls or change an input
+    // to type=password. Re-resolve and revalidate before writing any prompt.
+    beforeWrite();
     if (element instanceof HTMLTextAreaElement) {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
       setter?.call(element, text);
@@ -652,9 +739,10 @@
 
   function requiredQuery(selector, label) {
     const value = requiredSelector(selector, label);
-    const element = safeQuery(value);
-    if (!element) throw new Error(`Configured ${label} selector no longer matches the Provider page.`);
-    return element;
+    const elements = safeQueryAll(value);
+    if (!elements.length) throw new Error(`Configured ${label} selector no longer matches the Provider page.`);
+    if (elements.length !== 1) throw new Error(`Configured ${label} selector is ambiguous; repair the recipe.`);
+    return elements[0];
   }
 
   function requiredSelector(selector, label) {
