@@ -357,6 +357,15 @@
   }
 
   async function driveShowcase() {
+    if (USER_OWNED_AUTHORITY_PROOF) {
+      // This adversarial proof intentionally contains ONLY user-owned tabs.
+      // Its dedicated guard explicitly requests a background retry and proves
+      // that the production authority gate rejects it. Never start a council
+      // here: all Provider sends must remain forbidden, and the otherwise
+      // unnecessary meeting loop can keep a headless renderer busy at capture.
+      document.documentElement.dataset.chatchatConsultationShowcase = "not-applicable";
+      return;
+    }
     for (let attempt = 0; attempt < 120; attempt += 1) {
       const start = document.querySelector(".start-button");
       if (start instanceof HTMLButtonElement && !start.disabled) {

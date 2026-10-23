@@ -171,6 +171,8 @@ for (const text of [
 for (const text of [
   'const USER_OWNED_AUTHORITY_PROOF = params.get("authority-proof") === "protected";',
   'createdByChatChat: !USER_OWNED_AUTHORITY_PROOF',
+  'if (USER_OWNED_AUTHORITY_PROOF) {',
+  'document.documentElement.dataset.chatchatConsultationShowcase = "not-applicable";',
 ]) requireText(consultationBootstrap, text, "isolated synthetic managed versus user-owned speaking boundaries");
 
 for (const text of [
