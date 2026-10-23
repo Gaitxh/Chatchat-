@@ -53,3 +53,37 @@ test('installer acceptance script refuses to run outside GitHub-hosted CI withou
   assert.notEqual(result.status, 0, 'Guard must reject untrusted launch context.');
   assert.match((result.stderr ?? '') + (result.stdout ?? ''), /ephemeral GitHub-hosted Windows CI runner/);
 });
+
+test('cross-version upgrade acceptance is restricted to GitHub-hosted CI and checks actual bytes plus history preservation', async () => {
+  const source = await readFile(fileURLToPath(new URL('../scripts/test-windows-upgrade.ps1', import.meta.url)), 'utf8');
+  const required = [
+    '$env:GITHUB_ACTIONS', '$env:RUNNER_OS', '$env:RUNNER_ENVIRONMENT',
+    '$env:RUNNER_TEMP', '$env:CHATCHAT_PREVIOUS_DESKTOP',
+    "0.10.6", "0.10.7", 'Wait-InstalledVersion', 'Wait-Removed',
+    'Get-FileHash -LiteralPath $installed -Algorithm SHA256',
+    'Stop-OwnChatChat', "ci-cross-version-history.txt", 'sentinelHash',
+    'version-to-version upgrade', '120',
+  ];
+  for (const token of required) assert.ok(source.includes(token),
+    'Cross-version acceptance missing its fail-closed contract: ' + token);
+  assert.doesNotMatch(source, /Start-Process[^\n]*-Wait\b/);
+  assert.match(source, /Cross-version runner is not clean/);
+  assert.match(source, /Previous version must be built only under the disposable runner/);
+  assert.match(source, /PASS: actual 0\.10\.6 -> 0\.10\.7 NSIS upgrade preserves/);
+});
+
+test('cross-version upgrade script refuses to run on a non-CI Windows machine', {
+  skip: process.platform !== 'win32',
+}, async () => {
+  const script = fileURLToPath(new URL('../scripts/test-windows-upgrade.ps1', import.meta.url));
+  const result = spawnSync('powershell.exe', [
+    '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script,
+  ], {
+    env: { ...process.env, GITHUB_ACTIONS: 'false', CI: 'false', RUNNER_ENVIRONMENT: 'self-hosted' },
+    encoding: 'utf8', windowsHide: true, timeout: 45_000,
+  });
+  assert.equal(result.error, undefined, 'Negative guard subprocess must finish normally.');
+  assert.notEqual(result.status, 0);
+  assert.match((result.stderr ?? '') + (result.stdout ?? ''),
+    /Cross-version installer acceptance requires an ephemeral GitHub-hosted Windows CI runner/);
+});

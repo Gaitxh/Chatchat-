@@ -11,6 +11,7 @@ for (const claim of [
   "Chromium stderr tail",
   "withDeadline(opened",
   "MAX_CAPTURE_ATTEMPTS = 2",
+  "fromSurface: attempt === 1",
   "isRetryableTransientCdpError",
   "fresh Chromium profile and debug port",
   '"--disable-background-networking"',

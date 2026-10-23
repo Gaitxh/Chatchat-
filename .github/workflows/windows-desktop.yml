@@ -20,7 +20,7 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 55
     defaults:
       run:
         shell: pwsh
@@ -28,6 +28,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          # Include the exact reviewed 0.10.6 source revision for real
+          # cross-version upgrade; no third-party installer is trusted.
+          fetch-depth: 25
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -73,6 +76,52 @@ jobs:
           if ($line -notmatch '^([0-9a-f]{64})  (ChatChat-Setup-.+\.exe)$') { throw 'Malformed checksum file' }
           $actual = (Get-FileHash (Join-Path desktop/release $Matches[2]) -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($actual -ne $Matches[1]) { throw 'Installer checksum mismatch' }
+      - name: Build reviewed 0.10.6 baseline in temporary Windows source tree
+        timeout-minutes: 15
+        run: |
+          $baselineSha = 'de4dbd9b63a7e14d20e9d9ad674624ba955b9a6f'
+          git cat-file -e "$baselineSha^{commit}"
+          if ($LASTEXITCODE) { throw 'Reviewed 0.10.6 baseline source commit not present in PR history.' }
+          $oldRoot = Join-Path $env:RUNNER_TEMP 'chatchat-0106-upgrade-baseline'
+          if (Test-Path -LiteralPath $oldRoot) { throw 'Temporary upgrade source directory is not empty.' }
+          New-Item -ItemType Directory -Path $oldRoot | Out-Null
+          $sourceZip = Join-Path $env:RUNNER_TEMP 'chatchat-0106-pinned-source.zip'
+          git archive --format=zip "--output=$sourceZip" $baselineSha
+          if ($LASTEXITCODE) { throw 'Failed to archive pinned previous-version source.' }
+          Expand-Archive -LiteralPath $sourceZip -DestinationPath $oldRoot -ErrorAction Stop
+          $oldDesktop = Join-Path $oldRoot 'desktop'
+          if ((Get-Content (Join-Path $oldDesktop 'package.json') -Raw | ConvertFrom-Json).version -ne '0.10.6') {
+            throw 'Pinned historical baseline is not ChatChat desktop 0.10.6.'
+          }
+          npm ci --prefix $oldRoot
+          if ($LASTEXITCODE) { throw 'Old root dependencies failed to install.' }
+          npm ci --prefix $oldDesktop
+          if ($LASTEXITCODE) { throw 'Old desktop dependencies failed to install.' }
+          $browser = Join-Path $PWD 'desktop/.build-cache/browser'
+          if (!(Test-Path (Join-Path $browser 'chrome-win64/chrome.exe'))) {
+            throw 'Current already-verified pinned Chromium bundle is missing.'
+          }
+          New-Item -ItemType Directory -Path (Join-Path $oldDesktop '.build-cache') -Force | Out-Null
+          # Exactly the same pinned browser bytes; the old release packager
+          # rechecks file hashes and does not reuse the user's Chrome profile.
+          Copy-Item -LiteralPath $browser -Destination (Join-Path $oldDesktop '.build-cache/browser') -Recurse -Force
+          Push-Location $oldDesktop
+          try {
+            npm run package:win
+            if ($LASTEXITCODE) { throw 'Historical 0.10.6 Setup.exe build or payload parity failed.' }
+          } finally { Pop-Location }
+          if (!(Test-Path (Join-Path $oldDesktop 'release/ChatChat-Setup-0.10.6-x64.exe'))) {
+            throw 'Reviewed 0.10.6 installer was not built.'
+          }
+          "CHATCHAT_PREVIOUS_DESKTOP=$oldDesktop" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Output 'PASS: exact historical source revision built a reviewed 0.10.6 NSIS installer on this disposable runner.'
+
+      - name: Real 0.10.6 to 0.10.7 upgrade with meeting data preserved
+        timeout-minutes: 10
+        run: |
+          & ./desktop/scripts/test-windows-upgrade.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
       # Headed Electron GUI creation is not always supported in the service
       # session of GitHub-hosted Windows Actions. Its diagnostic outcome is
       # visible, but MUST NOT hide failures of actual installer acceptance.
@@ -109,6 +158,7 @@ jobs:
             desktop/release/*.exe
             desktop/release/SHA256SUMS.txt
             desktop/release/NSIS-PAYLOAD-VERIFICATION.json
+            desktop/release/CROSS-VERSION-ACCEPTANCE.json
             desktop/SECURITY.zh-CN.md
             desktop/README.zh-CN.md
           if-no-files-found: error

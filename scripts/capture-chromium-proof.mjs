@@ -112,9 +112,13 @@ async function captureProofAttempt(attempt) {
       await fs.mkdir(path.dirname(domPath), { recursive: true });
       await fs.writeFile(domPath, `<!doctype html>\n${dom}\n`, "utf8");
 
+      // Keep all DOM/selector/semantic assertions identical. On a transient
+      // headless compositor stall, the ONE existing fresh-browser retry uses
+      // Chromium's alternate non-surface capture path. It is still a real
+      // screenshot from the same verified page, never a placeholder.
       const shot = await cdp.call("Page.captureScreenshot", {
         format: "png",
-        fromSurface: true,
+        fromSurface: attempt === 1,
         captureBeyondViewport: false,
       });
       if (!shot?.data) throw new Error("Chromium did not return screenshot bytes.");
