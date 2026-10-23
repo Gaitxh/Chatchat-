@@ -118,14 +118,25 @@ $installRoot=Wait-InstalledVersion '0.10.6'
 Assert-InstalledMatches $installRoot $previous
 Write-Output 'PASS: 0.10.6 installed under a per-user location with reviewed bytes.'
 
-# A real local history-like artifact; never create or copy browser login
-# sessions, keys, profiles, real AI prompts or user secrets into CI.
+# The arbitrary retention sentinel remains a separate installer-level check.
+# App-native meeting history is generated below by the pinned 0.10.6
+# controller and its compiled core with synthetic, network-free responses.
+# Never copy browser sessions, keys, real prompts or user secrets into CI.
 $dataDir=Join-Path $env:APPDATA 'ChatChat\controller'
 New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
 $sentinel=Join-Path $dataDir 'ci-cross-version-history.txt'
 if (Test-Path -LiteralPath $sentinel) { throw "Unexpected preexisting upgrade sentinel in disposable runner." }
 [IO.File]::WriteAllText($sentinel, 'ChatChat preserved history across reviewed 0.10.6 to 0.10.7 upgrade.')
 $sentinelHash=(Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash
+
+$nativeScript=Join-Path $desktop 'scripts/ci-native-upgrade-history.mjs'
+$nativeManifest=Join-Path $env:RUNNER_TEMP 'chatchat-native-upgrade-history.json'
+& node $nativeScript create
+if ($LASTEXITCODE -ne 0) { throw 'Pinned 0.10.6 controller failed to create genuine synthetic meeting history.' }
+$nativeProof=Get-Content -LiteralPath $nativeManifest -Raw | ConvertFrom-Json
+if ([int]$nativeProof.eventCount -ne 6 -or [int]$nativeProof.positionCount -ne 2) {
+  throw 'Old controller did not persist the reviewed six-event meeting fixture.'
+}
 
 Stop-OwnChatChat $installRoot
 Invoke-Setup $newSetup
@@ -141,7 +152,11 @@ if (-not (Test-Path -LiteralPath $sentinel -PathType Leaf) -or
     (Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash -ne $sentinelHash) {
   throw "A version-to-version upgrade removed or modified local meeting data."
 }
-Write-Output 'PASS: actual 0.10.6 -> 0.10.7 NSIS upgrade preserves user-local history and replaces the reviewed app bytes.'
+& node $nativeScript verify
+if ($LASTEXITCODE -ne 0) {
+  throw '0.10.7 controller could not reopen and export 0.10.6 native history without provider sends.'
+}
+Write-Output 'PASS: actual 0.10.6 -> 0.10.7 NSIS upgrade preserves both sentinel and native controller history.'
 
 Stop-OwnChatChat $upgraded
 $upgradedEntries = @(Find-ChatChatUninstallEntries)
@@ -158,7 +173,11 @@ if (-not (Test-Path -LiteralPath $sentinel -PathType Leaf) -or
     (Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash -ne $sentinelHash) {
   throw "Cross-version final uninstall erased local meeting data."
 }
-Write-Output 'PASS: 0.10.7 uninstall removed files and registration without erasing the preserved history sentinel.'
+& node $nativeScript verify
+if ($LASTEXITCODE -ne 0) {
+  throw 'Final uninstall failed native meeting history load, export or byte-preservation check.'
+}
+Write-Output 'PASS: 0.10.7 uninstall removed files and registration without erasing the preserved sentinel or native meeting archive.'
 $releaseReport = [ordered]@{
   type = 'ChatChat cross-version upgrade acceptance'
   status = 'passed'
@@ -171,6 +190,12 @@ $releaseReport = [ordered]@{
   updatedFileParity = 'passed'
   oldVersionUninstallIdentity = 'replaced'
   localHistorySentinelIntegrity = 'preserved during upgrade and uninstall'
+  nativeMeetingSource = 'pinned 0.10.6 controller and compiled core with synthetic model replies'
+  nativeMeetingEventCount = [int]$nativeProof.eventCount
+  nativeMeetingPositionCount = [int]$nativeProof.positionCount
+  nativeMeetingArchiveSha256 = [string]$nativeProof.archiveSha256
+  nativeMeetingLoadExportIntegrity = 'verified by 0.10.7 controller after upgrade and uninstall'
+  nativeMeetingUnattendedProviderSends = 0
   finalRegistryRemoved = $true
   finalMainExecutableRemoved = $true
   realProviderAccountsTested = $false
