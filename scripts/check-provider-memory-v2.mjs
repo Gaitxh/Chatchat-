@@ -120,6 +120,9 @@ for (const claim of [
   "MEMORY_PROOF_R2_ORDINARY",
   "MEMORY_PROOF_R3_RESOLVER",
   "PINNED_OPEN_ISSUE_SOURCE_EVENT_IDS_JSON",
+  // Structural closure is proven only when the revision cites the old
+  // uncertainty itself, not when it references an unrelated later cause.
+  "causedBy: [oldRisk.id, cause.id]",
 ]) assert(fixture.includes(claim), `Provider Memory stress fixture is missing ${claim}.`);
 
 for (const claim of [
