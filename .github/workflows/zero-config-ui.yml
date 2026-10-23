@@ -47,10 +47,8 @@ jobs:
           ! grep -q 'window.location.reload' src/extension/web-room-onboarding.tsx
 
       - name: Install CJK screenshot fonts
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
-          fc-cache -f
+        timeout-minutes: 4
+        run: bash scripts/install-ci-cjk-fonts.sh
 
       - name: Locate Chromium browser
         run: |
